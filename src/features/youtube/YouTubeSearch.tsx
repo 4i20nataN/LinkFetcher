@@ -1,0 +1,170 @@
+import React, { useState } from 'react';
+import { useApp } from '../../context/AppContext';
+import { mockSearchYouTube } from '../../core/plugins/Providers';
+import { SearchResult } from '../../types';
+import { Search, Globe, Play, ArrowRight, Clock, Eye, Calendar, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { useTranslation } from '../../core/i18n';
+import { 
+  getAccentBgClass, getAccentTextClass, getAccentRingClass, getAccentBorderClass 
+} from '../../components/ThemeWrapper';
+
+export const YouTubeSearch: React.FC = () => {
+  const { settings, setSelectedUrl, setActiveTab } = useApp();
+  const { t } = useTranslation(settings);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<SearchResult[]>(mockSearchYouTube('')); // Start with default trending topics
+  const [searching, setSearching] = useState(false);
+
+  const handleSearch = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setSearching(true);
+
+    // Simulate search delay for high-fidelity response
+    setTimeout(() => {
+      const filtered = mockSearchYouTube(query);
+      setResults(filtered);
+      setSearching(false);
+    }, 1000);
+  };
+
+  const handleSelectVideo = (videoUrl: string) => {
+    setSelectedUrl(videoUrl);
+    setActiveTab('analyze');
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6 py-2 md:py-6 px-4">
+      {/* Title Header */}
+      <div className="text-center md:text-left space-y-2">
+        <div className="flex items-center gap-2 justify-center md:justify-start">
+          <Globe size={28} className={getAccentTextClass(settings)} />
+          <h2 className="font-display font-extrabold text-3xl md:text-4xl text-white tracking-tight">
+            {t('onlineSearch')}
+          </h2>
+        </div>
+        <p className="text-zinc-400 text-sm md:text-base">
+          {t('searchSubtitle')}
+        </p>
+      </div>
+
+      {/* Search Input bar */}
+      <form onSubmit={handleSearch} className="flex gap-3">
+        <div className="relative flex-1">
+          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t('searchPlaceholder')}
+            className={`
+              w-full pl-11 pr-4 py-3.5 rounded-xl glass-input text-sm text-white placeholder-zinc-500
+              focus:border-transparent focus:outline-none focus:ring-2 ${getAccentRingClass(settings)} transition-all
+            `}
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={searching}
+          className={`
+            px-6 py-3.5 rounded-xl text-white font-semibold text-sm transition-all shadow-lg flex items-center gap-2 shrink-0
+            ${getAccentBgClass(settings)} hover:scale-[1.02] active:scale-[0.98]
+          `}
+        >
+          {searching ? '...' : t('btnSearch')}
+        </button>
+      </form>
+
+      {/* Results View */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between text-xs text-zinc-500 font-medium">
+          <span>
+            {query 
+              ? (settings.language === 'en' ? `Results for "${query}"` : `Resultados para "${query}"`) 
+              : (settings.language === 'en' ? 'Featured Media' : 'Mídias em Destaque')}
+          </span>
+          <span>{results.length} {settings.language === 'en' ? 'results' : 'resultados'}</span>
+        </div>
+
+        {searching ? (
+          /* Loading states */
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {[1, 2, 4, 5].map((i) => (
+              <div key={i} className="rounded-2xl glass-card p-3 animate-pulse space-y-4">
+                <div className="aspect-video bg-zinc-800/50 rounded-xl" />
+                <div className="space-y-2">
+                  <div className="h-4 bg-zinc-800/50 rounded-full w-3/4" />
+                  <div className="h-3 bg-zinc-800/50 rounded-full w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* Search results Grid */
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <AnimatePresence>
+              {results.map((video) => (
+                <motion.div
+                  key={video.id}
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  onClick={() => handleSelectVideo(video.url)}
+                  className="group rounded-2xl glass-card p-3 transition-all duration-300 cursor-pointer flex flex-col justify-between hover:bg-white/10"
+                >
+                  <div>
+                    {/* Thumbnail */}
+                    <div className="relative aspect-video rounded-xl overflow-hidden border border-white/5 bg-zinc-950 shrink-0">
+                      <img
+                        src={video.thumbnailUrl}
+                        alt={video.title}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white">
+                          <Play size={16} fill="currentColor" />
+                        </div>
+                      </div>
+                      {/* Duration */}
+                      <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/80 backdrop-blur-md text-[10px] font-mono text-zinc-300">
+                        {video.duration}
+                      </span>
+                    </div>
+
+                    {/* Metadata */}
+                    <h4 className="font-display font-semibold text-sm text-white mt-3 line-clamp-2 leading-snug group-hover:text-zinc-200 transition-colors">
+                      {video.title}
+                    </h4>
+                    <p className="text-xs text-zinc-400 font-medium mt-1">
+                      {video.channel}
+                    </p>
+                  </div>
+
+                  {/* Footer details info */}
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/5 text-[10px] text-zinc-500 font-medium">
+                    <div className="flex gap-3">
+                      <span className="flex items-center gap-1">
+                        <Eye size={12} />
+                        {video.views.split(' ')[0]}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Calendar size={12} />
+                        {video.publishDate}
+                      </span>
+                    </div>
+
+                    {/* CTA arrow */}
+                    <span className={`text-xs font-semibold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${getAccentTextClass(settings)}`}>
+                      {t('btnAnalyzeVideo')} <ArrowRight size={12} />
+                    </span>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

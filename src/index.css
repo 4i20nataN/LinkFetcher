@@ -1,0 +1,203 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Space Grotesk", sans-serif;
+  
+  /* Reduced rounded corners for a sleeker, sharper, less circular look */
+  --radius-3xl: 10px;
+  --radius-2xl: 8px;
+  --radius-xl: 6px;
+  --radius-lg: 4px;
+  --radius-md: 3px;
+  --radius-sm: 2px;
+}
+
+/* Custom scrollbars matching Nothing OS / minimalist design */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.25);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.45);
+}
+
+/* Base custom classes */
+body {
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+/* Frosted Glass Utilities in Tailwind v4 style */
+@utility glass-card {
+  background-color: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@utility glass-card-hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+@utility glass-sidebar {
+  background-color: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(24px);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+@utility glass-input {
+  background-color: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@utility glass-pill {
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Light mode overrides for glass elements - Inverted style (Beige background, pure white elements) */
+.light {
+  background-color: #e6e2d5 !important;
+  color: #1c1917 !important;
+}
+
+.light .glass-card {
+  background-color: #ffffff !important;
+  backdrop-filter: none !important;
+  border: 1px solid rgba(28, 25, 23, 0.08) !important;
+  color: #1c1917 !important;
+  box-shadow: 0 4px 12px rgba(28, 25, 23, 0.04) !important;
+}
+
+.light .glass-card-hover:hover {
+  background-color: #ffffff !important;
+  border: 1px solid rgba(28, 25, 23, 0.15) !important;
+  box-shadow: 0 10px 30px -4px rgba(28, 25, 23, 0.08) !important;
+}
+
+.light .glass-sidebar {
+  background-color: #ffffff !important;
+  border-right: 1px solid rgba(28, 25, 23, 0.08) !important;
+}
+
+.light .glass-input {
+  background-color: #ffffff !important;
+  border: 1px solid rgba(28, 25, 23, 0.1) !important;
+  color: #1c1917 !important;
+}
+
+.light .glass-pill {
+  background-color: #f5f3ef !important;
+  border: 1px solid rgba(28, 25, 23, 0.08) !important;
+  color: #27272a !important;
+}
+
+.light h1, .light h2, .light h3, .light h4, .light h5, .light h6, .light .text-white {
+  color: #1c1917 !important;
+}
+
+.light p, .light span, .light label {
+  color: #44403c;
+}
+
+.light .text-zinc-400 {
+  color: #78716c !important;
+}
+
+.light .text-zinc-500 {
+  color: #a8a29e !important;
+}
+
+.light .bg-zinc-950\/60, .light .bg-zinc-900\/10 {
+  background-color: #f5f3ef !important;
+  border-color: rgba(28, 25, 23, 0.06) !important;
+}
+
+.light .bg-zinc-900 {
+  background-color: #ffffff !important;
+  color: #1c1917 !important;
+  border-color: rgba(28, 25, 23, 0.08) !important;
+}
+
+.light .bg-zinc-800 {
+  background-color: #ffffff !important;
+  border: 1px solid rgba(28, 25, 23, 0.08) !important;
+  color: #1c1917 !important;
+}
+
+.light .bg-zinc-800:hover {
+  background-color: #f5f3ef !important;
+}
+
+.light .border-white\/5, .light .border-white\/10 {
+  border-color: rgba(28, 25, 23, 0.06) !important;
+}
+
+/* Gray mode overrides - Metallic/Steel Gray style (Lighter & distinct) */
+.gray-mode {
+  background-color: #3a3f47 !important;
+  color: #f1f5f9 !important;
+}
+
+.gray-mode .glass-card {
+  background-color: rgba(255, 255, 255, 0.07) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #f1f5f9 !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.12) !important;
+}
+
+.gray-mode .glass-card-hover:hover {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+}
+
+.gray-mode .glass-sidebar {
+  background-color: rgba(30, 34, 40, 0.95) !important;
+  backdrop-filter: blur(24px) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.gray-mode .glass-input {
+  background-color: rgba(0, 0, 0, 0.2) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #f1f5f9 !important;
+}
+
+.gray-mode .glass-pill {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #cbd5e1 !important;
+}
+
+.gray-mode .bg-zinc-950\/60 {
+  background-color: rgba(30, 34, 40, 0.6) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.gray-mode .bg-zinc-900 {
+  background-color: #2c3037 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.gray-mode .border-white\/5, .gray-mode .border-white\/10 {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+

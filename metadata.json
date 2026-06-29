@@ -1,0 +1,6 @@
+{
+  "name": "Downloader Universal",
+  "description": "Um downloader de mídia universal altamente profissional e escalável com gerenciamento de fila, busca de vídeos e temas personalizáveis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
