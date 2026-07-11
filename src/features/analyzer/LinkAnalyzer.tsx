@@ -12,6 +12,7 @@ import {
   getAccentBgClass, getAccentTextClass, getAccentBorderClass, getAccentRingClass 
 } from '../../components/ThemeWrapper';
 import { DownloadEngine } from '../../core/engine/DownloadEngine';
+import { FormatSelector, FormatOptions } from '../downloads/FormatSelector';
 
 export const LinkAnalyzer: React.FC = () => {
   const { 
@@ -34,12 +35,16 @@ export const LinkAnalyzer: React.FC = () => {
   const [selectedFormat, setSelectedFormat] = useState<MediaFormat | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  const [probeLoading, setProbeLoading] = useState(false);
+  const [probeError, setProbeError] = useState<string | null>(null);
+  const [formatOptions, setFormatOptions] = useState<FormatOptions | null>(null);
+
   // Auto-analyze URL from search / download later trigger
   useEffect(() => {
     if (selectedUrl) {
       setUrl(selectedUrl);
       setSelectedUrl(''); // Clear
-      handleAnalyze(selectedUrl);
+      handleSubmit();
     }
   }, [selectedUrl]);
 
@@ -51,7 +56,9 @@ export const LinkAnalyzer: React.FC = () => {
     setError(null);
     setMediaInfo(null);
     setSelectedFormat(null);
+    setFormatOptions(null);
     setSuccessMsg(null);
+    setProbeError(null);
 
     try {
       const provider = ProviderRegistry.getProviderForUrl(targetUrl);
@@ -68,12 +75,45 @@ export const LinkAnalyzer: React.FC = () => {
     }
   };
 
+  const handleProbe = async (probeUrl: string) => {
+    setProbeLoading(true);
+    setProbeError(null);
+
+    try {
+      const response = await fetch('/api/probe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: probeUrl })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Probe failed');
+      }
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      setProbeError(err.message);
+    } finally {
+      setProbeLoading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!url) return;
+    await handleAnalyze(url);
+    handleProbe(url);
+  };
+
   const handlePaste = async () => {
     try {
       const text = await navigator.clipboard.readText();
       if (text) {
         setUrl(text);
-        handleAnalyze(text);
+        handleSubmit();
       }
     } catch (e) {
       setError(settings.language === 'en' ? 'Clipboard permission was denied. Type or paste manually.' : 'A permissão de área de transferência foi negada. Digite ou cole o link manualmente.');
@@ -83,7 +123,14 @@ export const LinkAnalyzer: React.FC = () => {
   const handleStartDownload = () => {
     if (!mediaInfo || !selectedFormat) return;
 
-    DownloadEngine.addDownload(mediaInfo, selectedFormat);
+    const downloadUrl = formatOptions?.format
+      ? `${mediaInfo.originalUrl}#${formatOptions.format}`
+      : mediaInfo.originalUrl;
+
+    DownloadEngine.addDownload(
+      { ...mediaInfo, originalUrl: downloadUrl },
+      selectedFormat
+    );
     setSuccessMsg(settings.language === 'en' ? `Added to queue: ${mediaInfo.title.substring(0, 45)}...` : `Adicionado à fila: ${mediaInfo.title.substring(0, 45)}...`);
     
     // Auto-redirect to downloads manager
@@ -175,7 +222,7 @@ export const LinkAnalyzer: React.FC = () => {
                 w-full pl-4 pr-12 py-3.5 rounded-xl bg-zinc-950/70 border border-zinc-800 text-sm text-white placeholder-zinc-500
                 focus:border-transparent focus:outline-none focus:ring-2 ${getAccentRingClass(settings)} transition-all
               `}
-              onKeyDown={(e) => e.key === 'Enter' && handleAnalyze(url)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
             />
             {url && (
               <button
@@ -196,7 +243,7 @@ export const LinkAnalyzer: React.FC = () => {
               {t('btnPaste')}
             </button>
             <button
-              onClick={() => handleAnalyze(url)}
+              onClick={() => handleSubmit()}
               disabled={loading || !url}
               className={`
                 flex-1 md:flex-none px-6 py-3.5 rounded-xl text-white font-semibold text-sm transition-all shadow-lg
@@ -386,133 +433,25 @@ export const LinkAnalyzer: React.FC = () => {
               </div>
             </div>
 
-            {/* Formats Selection Segment */}
+            {/* Format Selector with Probe Options */}
             <div className="border-t border-white/5 pt-6 space-y-5">
-              <div className="flex items-center justify-between pb-1">
-                <h4 className="font-display font-bold text-sm text-zinc-200">
-                  {t('availableFormats')}
-                </h4>
-                <span className="text-[10px] text-zinc-500 font-mono">{t('selectOption')}</span>
-              </div>
+              {probeLoading && (
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-zinc-500/10 border border-white/5 text-zinc-300 text-xs font-medium">
+                  <RefreshCw size={14} className="animate-spin" />
+                  {settings.language === 'en' ? 'Probing media info...' : 'Analisando informações da mídia...'}
+                </div>
+              )}
+              {probeError && (
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium">
+                  <AlertCircle size={14} />
+                  {settings.language === 'en' ? 'Probe error' : 'Erro na sonda'}: {probeError}
+                </div>
+              )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Column 1: Video Qualities */}
-                {mediaInfo.formats.filter(f => f.type === 'video').length > 0 && (
-                  <div className="space-y-3 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                    <div className="flex items-center gap-2 pb-2 border-b border-white/5">
-                      <FileVideo size={16} className={getAccentTextClass(settings)} />
-                      <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider font-mono">
-                        {settings.language === 'en' ? 'Video Qualities' : 'Qualidades de Vídeo'}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[320px] overflow-y-auto pr-1">
-                      {mediaInfo.formats.filter(f => f.type === 'video').map((format) => {
-                        const isSelected = selectedFormat?.id === format.id;
-                        return (
-                          <button
-                            key={format.id}
-                            onClick={() => setSelectedFormat(format)}
-                            className={`
-                              p-3 rounded-2xl border text-left flex items-start gap-3 transition-all relative
-                              ${isSelected 
-                                ? `${getAccentBorderClass(settings)} bg-white/10 shadow-lg` 
-                                : 'border-white/5 bg-white/5 hover:bg-white/10'
-                              }
-                            `}
-                          >
-                            {isSelected && (
-                              <div 
-                                className="absolute inset-0 opacity-[0.03] rounded-xl"
-                                style={{ backgroundColor: 'var(--color-primary)' }}
-                              />
-                            )}
-                            <div className={`
-                              p-2 rounded-lg shrink-0 mt-0.5
-                              ${isSelected 
-                                ? `${getAccentBgClass(settings)} text-white` 
-                                : 'bg-zinc-900 text-zinc-500'
-                              }
-                            `}>
-                              <FileVideo size={14} />
-                            </div>
-                            <div className="overflow-hidden">
-                              <span className="font-semibold text-xs text-white block truncate">
-                                {format.quality}
-                              </span>
-                              <span className="text-[10px] text-zinc-400 block mt-0.5 font-mono uppercase">
-                                {format.ext} • {format.sizeEst}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Column 2: Audio / MP3 Options */}
-                {mediaInfo.formats.filter(f => f.type === 'audio').length > 0 && (
-                  <div className="space-y-3 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                    <div className="flex items-center gap-2 pb-2 border-b border-white/5">
-                      <Music size={16} className={getAccentTextClass(settings)} />
-                      <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider font-mono">
-                        {settings.language === 'en' ? 'Audio & MP3 Options' : 'Opções de Áudio / MP3'}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[320px] overflow-y-auto pr-1">
-                      {mediaInfo.formats.filter(f => f.type === 'audio').map((format) => {
-                        const isSelected = selectedFormat?.id === format.id;
-                        return (
-                          <button
-                            key={format.id}
-                            onClick={() => setSelectedFormat(format)}
-                            className={`
-                              p-3 rounded-2xl border text-left flex items-start gap-3 transition-all relative
-                              ${isSelected 
-                                ? `${getAccentBorderClass(settings)} bg-white/10 shadow-lg` 
-                                : 'border-white/5 bg-white/5 hover:bg-white/10'
-                              }
-                            `}
-                          >
-                            {isSelected && (
-                              <div 
-                                className="absolute inset-0 opacity-[0.03] rounded-xl"
-                                style={{ backgroundColor: 'var(--color-primary)' }}
-                              />
-                            )}
-                            <div className={`
-                              p-2 rounded-lg shrink-0 mt-0.5
-                              ${isSelected 
-                                ? `${getAccentBgClass(settings)} text-white` 
-                                : 'bg-zinc-900 text-zinc-500'
-                              }
-                            `}>
-                              <Music size={14} />
-                            </div>
-                            <div className="overflow-hidden">
-                              <span className="font-semibold text-xs text-white block truncate">
-                                {format.quality}
-                              </span>
-                              <span className="text-[10px] text-zinc-400 block mt-0.5 font-mono uppercase">
-                                {format.ext} • {format.sizeEst}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-zinc-500/5 border border-white/5 flex gap-2.5 items-start mt-4">
-                <Info size={14} className="text-zinc-400 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  {settings.language === 'en' 
-                    ? 'Note: The final download quality depends on the original video source. If you select a higher quality than what is available on the platform, it will automatically fallback to the highest quality available.'
-                    : 'Nota: A qualidade final do download depende do vídeo original na plataforma. Se você selecionar uma qualidade maior do que a disponível no link original, ela será baixada automaticamente na qualidade máxima disponível.'}
-                </p>
-              </div>
+              <FormatSelector
+                mediaInfo={mediaInfo}
+                onFormatSelect={setFormatOptions}
+              />
             </div>
 
             {/* Execute Download trigger */}
