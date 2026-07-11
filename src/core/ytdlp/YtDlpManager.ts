@@ -9,6 +9,7 @@ import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
 import https from 'https';
+import type { ProbeOptions, SearchOptions, SearchResult, DownloadOptions } from '../../types';
 
 const execFileAsync = promisify(execFile);
 
@@ -247,4 +248,174 @@ export function spawnDownload(params: {
   return () => {
     proc?.kill('SIGTERM');
   };
+}
+
+/**
+ * Execute yt-dlp with given arguments and return structured result.
+ */
+async function executeYtDlp(args: string[]): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  const binary = await ensureYtDlp();
+  try {
+    const { stdout, stderr } = await execFileAsync(binary, args, {
+      maxBuffer: 50 * 1024 * 1024,
+      encoding: 'utf-8',
+    });
+    return { exitCode: 0, stdout, stderr };
+  } catch (err: any) {
+    return {
+      exitCode: err.code ?? 1,
+      stdout: err.stdout ?? '',
+      stderr: err.stderr ?? err.message ?? String(err),
+    };
+  }
+}
+
+/**
+ * Probe a URL with yt-dlp --dump-json --no-download.
+ * Returns the parsed JSON metadata for the URL.
+ */
+export async function probeUrl(options: ProbeOptions): Promise<any> {
+  const args = ['--dump-json', '--no-download'];
+
+  if (options.cookies) args.push('--cookies', options.cookies);
+  if (options.cookiesFromBrowser) args.push('--cookies-from-browser', options.cookiesFromBrowser);
+  if (options.proxy) args.push('--proxy', options.proxy);
+
+  args.push(options.url);
+
+  const result = await executeYtDlp(args);
+
+  if (result.exitCode !== 0) {
+    throw new Error(`Probe failed: ${result.stderr}`);
+  }
+
+  return JSON.parse(result.stdout);
+}
+
+/**
+ * Search videos on a platform using yt-dlp flat-playlist mode.
+ */
+export async function searchVideos(options: SearchOptions): Promise<SearchResult[]> {
+  const maxResults = options.maxResults || 10;
+  const query = options.query;
+
+  let searchQuery: string;
+  switch (options.platform) {
+    case 'youtube':
+      searchQuery = `ytsearch${maxResults}:${query}`;
+      break;
+    case 'vimeo':
+      searchQuery = `https://vimeo.com/search?q=${encodeURIComponent(query)}`;
+      break;
+    case 'dailymotion':
+      searchQuery = `https://www.dailymotion.com/search/${encodeURIComponent(query)}/videos`;
+      break;
+    case 'bilibili':
+      searchQuery = `https://search.bilibili.com/all?keyword=${encodeURIComponent(query)}`;
+      break;
+    case 'soundcloud':
+      searchQuery = `scsearch${maxResults}:${query}`;
+      break;
+    default:
+      searchQuery = `ytsearch${maxResults}:${query}`;
+  }
+
+  const args = ['--flat-playlist', '--dump-json', '--no-download'];
+
+  if (options.cookies) args.push('--cookies', options.cookies);
+  if (options.proxy) args.push('--proxy', options.proxy);
+
+  args.push(searchQuery);
+
+  const result = await executeYtDlp(args);
+
+  if (result.exitCode !== 0) {
+    throw new Error(`Search failed: ${result.stderr}`);
+  }
+
+  const lines = result.stdout.trim().split('\n');
+  const results: SearchResult[] = [];
+
+  for (const line of lines) {
+    if (!line) continue;
+    try {
+      const item = JSON.parse(line);
+      results.push({
+        id: item.id || '',
+        title: item.title || 'Unknown',
+        url: item.url || item.webpage_url || '',
+        thumbnail: item.thumbnail || item.thumbnails?.[0]?.url || '',
+        duration: item.duration || 0,
+        duration_string: item.duration_string || '0:00',
+        view_count: item.view_count || 0,
+        uploader: item.uploader || item.channel || '',
+        description: item.description || ''
+      });
+    } catch {
+      // Skip invalid JSON lines
+    }
+  }
+
+  return results;
+}
+
+const DEFAULT_FORMAT = 'bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b';
+
+/**
+ * Build a complete yt-dlp argument array from DownloadOptions.
+ */
+export function buildArgs(options: DownloadOptions): string[] {
+  const args: string[] = [];
+
+  // Format selection
+  args.push('--format', options.format || DEFAULT_FORMAT);
+
+  // Audio extraction
+  if (options.audioOnly) {
+    args.push('--extract-audio');
+    if (options.audioFormat) args.push('--audio-format', options.audioFormat);
+    if (options.audioQuality) args.push('--audio-quality', options.audioQuality);
+  }
+
+  // Merge output format
+  if (options.mergeOutputFormat) {
+    args.push('--merge-output-format', options.mergeOutputFormat);
+  }
+
+  // Subtitles
+  if (options.writeSubs) args.push('--write-subs');
+  if (options.writeAutoSubs) args.push('--write-auto-subs');
+  if (options.subLangs) args.push('--sub-langs', options.subLangs);
+  if (options.subFormat) args.push('--sub-format', options.subFormat);
+  if (options.embedSubs) args.push('--embed-subs');
+
+  // Thumbnails
+  if (options.writeThumbnail) args.push('--write-thumbnail');
+  if (options.embedThumbnail) args.push('--embed-thumbnail');
+
+  // Metadata
+  if (options.embedMetadata) args.push('--embed-metadata');
+
+  // Output template
+  if (options.outputTemplate) {
+    args.push('-o', options.outputTemplate);
+  }
+
+  // Behavior flags
+  if (options.restrictFilenames) args.push('--restrict-filenames');
+  if (options.noOverwrites) args.push('--no-overwrites');
+  if (options.keepVideo) args.push('--keep-video');
+
+  // Auth options
+  if (options.cookies) args.push('--cookies', options.cookies);
+  if (options.cookiesFromBrowser) args.push('--cookies-from-browser', options.cookiesFromBrowser);
+  if (options.proxy) args.push('--proxy', options.proxy);
+
+  // FFmpeg location
+  if (options.ffmpegLocation) args.push('--ffmpeg-location', options.ffmpegLocation);
+
+  // URL last
+  args.push(options.url);
+
+  return args;
 }
