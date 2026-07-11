@@ -22,7 +22,6 @@ const YT_DLP_PLATFORMS = new Set([
 class DownloadEngineClass {
   private items: DownloadItem[] = [];
   private listeners: Set<EngineListener> = new Set();
-  private intervalId: ReturnType<typeof setInterval> | null = null;
 
   // Map download id → SSE EventSource (for real downloads)
   private eventSources = new Map<string, EventSource>();
@@ -44,7 +43,6 @@ class DownloadEngineClass {
 
   constructor() {
     this.loadState();
-    this.startSimulationLoop(); // Still used for generic/image downloads
   }
 
   setSettings(newSettings: AppSettings) {
@@ -106,7 +104,7 @@ class DownloadEngineClass {
     );
     if (exists) return;
 
-    // Ensure sizeTotal is never 0 (prevents instant-complete on simulation)
+    // Ensure sizeTotal is never 0
     const defaultSizeByType: Record<string, number> = {
       video: 25 * 1024 * 1024,  // 25 MB
       audio: 6 * 1024 * 1024,   // 6 MB
@@ -480,19 +478,6 @@ class DownloadEngineClass {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Simulation loop (only runs for items that don't use real SSE downloads)
-  // Now only simulates UI smoothness for items that ARE actively in SSE mode
-  // ─────────────────────────────────────────────────────────────────────────
-  private startSimulationLoop() {
-    if (this.intervalId) return;
-    this.intervalId = setInterval(() => {
-      // Nothing to simulate — real downloads are driven by SSE events.
-      // We just save state periodically.
-      this.saveState();
-    }, 5000);
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
   // Helpers: parse yt-dlp speed/eta strings
   // ─────────────────────────────────────────────────────────────────────────
   private parseSpeedString(s: string): number {
@@ -518,10 +503,6 @@ class DownloadEngineClass {
   }
 
   destroy() {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
     this.eventSources.forEach(es => es.close());
     this.eventSources.clear();
     this.cancelFns.forEach(fn => fn());
