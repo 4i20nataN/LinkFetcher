@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import { createServer as createViteServer } from "vite";
-import { ensureYtDlp, spawnDownload } from "./src/core/ytdlp/YtDlpManager.js";
+import { ensureYtDlp, spawnDownload, probeUrl, searchVideos } from "./src/core/ytdlp/YtDlpManager.js";
 
 // ─── Temp download directory ────────────────────────────────────────────
 const TEMP_DOWNLOAD_DIR = path.join(os.tmpdir(), 'linkfetcher_downloads');
@@ -23,6 +23,53 @@ async function startServer() {
   // ─── HEALTHCHECK ────────────────────────────────────────────────────────
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, platform: process.platform, arch: process.arch });
+  });
+
+  // ─── PROBE URL ────────────────────────────────────────────────────────
+  app.post('/api/probe', async (req, res) => {
+    try {
+      const { url, cookies, cookiesFromBrowser, proxy } = req.body;
+
+      if (!url) {
+        return res.status(400).json({ error: 'URL is required' });
+      }
+
+      const metadata = await probeUrl({
+        url,
+        cookies,
+        cookiesFromBrowser,
+        proxy
+      });
+
+      res.json(metadata);
+    } catch (error: any) {
+      console.error('Probe error:', error);
+      res.status(500).json({ error: error.message || 'Probe failed' });
+    }
+  });
+
+  // ─── SEARCH VIDEOS ───────────────────────────────────────────────────
+  app.post('/api/search', async (req, res) => {
+    try {
+      const { query, platform, maxResults, cookies, proxy } = req.body;
+
+      if (!query) {
+        return res.status(400).json({ error: 'Query is required' });
+      }
+
+      const results = await searchVideos({
+        query,
+        platform: platform || 'youtube',
+        maxResults: maxResults || 10,
+        cookies,
+        proxy
+      });
+
+      res.json(results);
+    } catch (error: any) {
+      console.error('Search error:', error);
+      res.status(500).json({ error: error.message || 'Search failed' });
+    }
   });
 
   // ─── YT-DLP STATUS ─────────────────────────────────────────────────────
