@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { mockSearchYouTube } from '../../core/plugins/Providers';
 import { SearchResult } from '../../types';
-import { Search, Globe, Play, ArrowRight, Clock, Eye, Calendar, Sparkles } from 'lucide-react';
+import { Search, Globe, Play, ArrowRight, Eye, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from '../../core/i18n';
 import { 
@@ -116,7 +116,7 @@ export const YouTubeSearch: React.FC = () => {
                     {/* Thumbnail */}
                     <div className="relative aspect-video rounded-xl overflow-hidden border border-white/5 bg-zinc-950 shrink-0">
                       <img
-                        src={video.thumbnailUrl}
+                        src={video.thumbnail}
                         alt={video.title}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         referrerPolicy="no-referrer"
@@ -128,7 +128,7 @@ export const YouTubeSearch: React.FC = () => {
                       </div>
                       {/* Duration */}
                       <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/80 backdrop-blur-md text-[10px] font-mono text-zinc-300">
-                        {video.duration}
+                        {video.duration_string}
                       </span>
                     </div>
 
@@ -137,7 +137,7 @@ export const YouTubeSearch: React.FC = () => {
                       {video.title}
                     </h4>
                     <p className="text-xs text-zinc-400 font-medium mt-1">
-                      {video.channel}
+                      {video.uploader}
                     </p>
                   </div>
 
@@ -146,11 +146,7 @@ export const YouTubeSearch: React.FC = () => {
                     <div className="flex gap-3">
                       <span className="flex items-center gap-1">
                         <Eye size={12} />
-                        {video.views.split(' ')[0]}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Calendar size={12} />
-                        {video.publishDate}
+                        {video.view_count.toLocaleString()}
                       </span>
                     </div>
 

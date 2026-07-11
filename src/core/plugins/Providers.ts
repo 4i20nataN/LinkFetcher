@@ -879,15 +879,20 @@ export function mockSearchYouTube(query: string): SearchResult[] {
       ? `${query.charAt(0).toUpperCase() + query.slice(1)}: ${t.title.split(' - ')[0]}`
       : t.title;
 
+    const secs = rand(120, 2700);
+    const mins = Math.floor(secs / 60);
+    const remaining = secs % 60;
+
     return {
       id: `yt_search_${idx}_${rand(100, 999)}`,
       title: finalTitle,
-      channel: t.author,
-      views: formatViews(rand(12000, 5400000)) + ' visualizações',
-      duration: `${rand(2, 45)}:${rand(10, 59).toString().padStart(2, '0')}`,
-      publishDate: `Há ${rand(1, 11)} ${['dias', 'meses', 'semanas'][rand(0, 2)]}`,
-      thumbnailUrl: `https://images.unsplash.com/photo-${t.image}?w=400&auto=format&fit=crop&q=60`,
-      url: `https://youtube.com/watch?v=mockId${idx}ab`
+      url: `https://youtube.com/watch?v=mockId${idx}ab`,
+      thumbnail: `https://images.unsplash.com/photo-${t.image}?w=400&auto=format&fit=crop&q=60`,
+      duration: secs,
+      duration_string: `${mins}:${remaining.toString().padStart(2, '0')}`,
+      view_count: rand(12000, 5400000),
+      uploader: t.author,
+      description: `${t.title} - ${t.author}`,
     };
   });
 }

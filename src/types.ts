@@ -104,13 +104,62 @@ export interface AppSettings {
   customApiUrl?: string;
 }
 
+export interface ProbeOptions {
+  url: string;
+  cookies?: string;
+  cookiesFromBrowser?: string;
+  proxy?: string;
+}
+
+export interface SearchOptions {
+  query: string;
+  platform: 'youtube' | 'vimeo' | 'dailymotion' | 'bilibili' | 'soundcloud';
+  maxResults?: number;
+  cookies?: string;
+  proxy?: string;
+}
+
 export interface SearchResult {
   id: string;
   title: string;
-  channel: string;
-  views: string;
-  duration: string;
-  publishDate: string;
-  thumbnailUrl: string;
   url: string;
+  thumbnail: string;
+  duration: number;          // seconds
+  duration_string: string;   // "12:45"
+  view_count: number;
+  uploader: string;
+  description: string;
+}
+
+export interface DownloadOptions {
+  url: string;
+  outputPath?: string;
+  filename?: string;
+  // Format options
+  format?: string;
+  audioOnly?: boolean;
+  audioFormat?: 'mp3' | 'aac' | 'flac' | 'm4a' | 'opus' | 'wav';
+  audioQuality?: string;
+  mergeOutputFormat?: string;
+  // Subtitle options
+  writeSubs?: boolean;
+  writeAutoSubs?: boolean;
+  subLangs?: string;
+  subFormat?: string;
+  embedSubs?: boolean;
+  // Thumbnail options
+  writeThumbnail?: boolean;
+  embedThumbnail?: boolean;
+  // Metadata options
+  embedMetadata?: boolean;
+  // Advanced options
+  outputTemplate?: string;
+  restrictFilenames?: boolean;
+  noOverwrites?: boolean;
+  keepVideo?: boolean;
+  // Auth options
+  cookies?: string;
+  cookiesFromBrowser?: string;
+  proxy?: string;
+  ffmpegLocation?: string;
 }
