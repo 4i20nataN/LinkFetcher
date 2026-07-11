@@ -57,29 +57,18 @@ export const SettingsView: React.FC = () => {
       .catch(() => setYtdlpStatus({ ready: false }));
   }, []);
 
-  const checkForUpdates = async () => {
-    try {
-      const response = await fetch('https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest');
-      const release = await response.json();
-      const latest = release.tag_name?.replace('v', '');
-      if (latest) {
-        setUpdateAvailable(true);
-        setLatestVersion(latest);
-      }
-    } catch (error) {
-      console.error('Update check failed:', error);
-    }
-  };
-
   const handleCheckUpdates = async () => {
     setCheckingUpdates(true);
     setUpdateAvailable(false);
     showToast(settings.language === 'en' ? 'Checking GitHub repository for updates...' : 'Conectando ao GitHub para buscar atualizações...');
     try {
       const response = await fetch('https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest');
+      if (!response.ok) {
+        throw new Error(`GitHub API returned ${response.status}`);
+      }
       const release = await response.json();
       const latest = release.tag_name?.replace('v', '');
-      const current = '0.0.0';
+      const current = __APP_VERSION__;
       if (latest && latest !== current) {
         setUpdateAvailable(true);
         setLatestVersion(latest);
