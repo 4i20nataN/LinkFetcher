@@ -1,31 +1,51 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { mockSearchYouTube } from '../../core/plugins/Providers';
 import { SearchResult } from '../../types';
-import { Search, Globe, Play, ArrowRight, Eye, Sparkles } from 'lucide-react';
+import { Search, Globe, Play, ArrowRight, Eye, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from '../../core/i18n';
 import { 
-  getAccentBgClass, getAccentTextClass, getAccentRingClass, getAccentBorderClass 
+  getAccentBgClass, getAccentTextClass, getAccentRingClass
 } from '../../components/ThemeWrapper';
 
 export const YouTubeSearch: React.FC = () => {
   const { settings, setSelectedUrl, setActiveTab } = useApp();
   const { t } = useTranslation(settings);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>(mockSearchYouTube('')); // Start with default trending topics
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSearch = (e?: React.FormEvent) => {
+  const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (!query.trim()) return;
+    
     setSearching(true);
+    setError(null);
 
-    // Simulate search delay for high-fidelity response
-    setTimeout(() => {
-      const filtered = mockSearchYouTube(query);
-      setResults(filtered);
+    try {
+      const response = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: query.trim(),
+          platform: 'youtube',
+          maxResults: 10
+        })
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || 'Search failed');
+      }
+
+      const data: SearchResult[] = await response.json();
+      setResults(data);
+    } catch (err: any) {
+      setError(err.message || 'Search failed');
+    } finally {
       setSearching(false);
-    }, 1000);
+    }
   };
 
   const handleSelectVideo = (videoUrl: string) => {
@@ -74,6 +94,14 @@ export const YouTubeSearch: React.FC = () => {
           {searching ? '...' : t('btnSearch')}
         </button>
       </form>
+
+      {/* Error state */}
+      {error && (
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          <AlertCircle size={16} />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Results View */}
       <div className="space-y-4">
