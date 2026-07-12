@@ -1,34 +1,51 @@
 import { MediaInfo, PlatformId, MediaFormat, MediaType, SearchResult } from '../../types';
 import { MediaProvider } from './MediaProvider';
+import { probeUrlWithAdapter } from '../ytdlp/YtDlpAdapter';
 
 // Helper to generate a random number within a range
 const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 async function probeWithYtdlp(url: string, options?: { cookies?: string; proxy?: string }): Promise<Record<string, unknown>> {
-  const response = await fetch('/api/probe', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, ...options })
-  });
+  return probeUrlWithAdapter({ url, ...options });
+}
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Probe failed');
+function resolveFormatSize(f: Record<string, unknown>, totalDuration: number): { sizeEst: string; sizeBytes: number } {
+  const raw = (f.filesize as number) || 0;
+  const approx = (f.filesize_approx as number) || 0;
+  let bytes = raw || approx;
+
+  // Fallback: compute from total bitrate (tbr, in kbps) * duration
+  if (!bytes && totalDuration > 0) {
+    const tbr = (f.tbr as number) || 0;
+    if (tbr > 0) {
+      bytes = Math.round((tbr * 1000 / 8) * totalDuration);
+    }
   }
 
-  return response.json();
+  if (bytes > 0) {
+    const mb = bytes / 1024 / 1024;
+    return {
+      sizeEst: mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(1)} MB`,
+      sizeBytes: bytes,
+    };
+  }
+  return { sizeEst: 'N/A', sizeBytes: 0 };
 }
 
 function buildMediaInfoFromProbe(metadata: Record<string, unknown>, url: string, platform: PlatformId): MediaInfo {
-  const formats = (metadata.formats as Array<Record<string, unknown>> | undefined)?.map((f) => ({
-    id: (f.format_id as string) || 'unknown',
-    ext: (f.ext as string) || 'mp4',
-    quality: (f.resolution as string) || (f.format_note as string) || (f.ext as string) || 'unknown',
-    sizeEst: f.filesize ? `${((f.filesize as number) / 1024 / 1024).toFixed(1)} MB` : 'N/A',
-    sizeBytes: (f.filesize as number) || 0,
-    codec: `${f.vcodec || ''} / ${f.acodec || ''}`.trim(),
-    type: (f.vcodec && f.vcodec !== 'none') ? 'video' as const : 'audio' as const
-  })) || [];
+  const totalDuration = (metadata.duration as number) || 0;
+  const formats = (metadata.formats as Array<Record<string, unknown>> | undefined)?.map((f) => {
+    const { sizeEst, sizeBytes } = resolveFormatSize(f, totalDuration);
+    return {
+      id: (f.format_id as string) || 'unknown',
+      ext: (f.ext as string) || 'mp4',
+      quality: (f.resolution as string) || (f.format_note as string) || (f.ext as string) || 'unknown',
+      sizeEst,
+      sizeBytes,
+      codec: `${f.vcodec || ''} / ${f.acodec || ''}`.trim(),
+      type: (f.vcodec && f.vcodec !== 'none') ? 'video' as const : 'audio' as const
+    };
+  }) || [];
 
   return {
     id: (metadata.id as string) || `probe_${rand(10000, 99999)}`,
@@ -36,10 +53,11 @@ function buildMediaInfoFromProbe(metadata: Record<string, unknown>, url: string,
     author: (metadata.uploader as string) || (metadata.channel as string) || 'Unknown',
     channel: (metadata.uploader as string) || (metadata.channel as string) || 'Unknown',
     duration: (metadata.duration_string as string) || '0:00',
+    durationSeconds: totalDuration,
     resolution: (metadata.resolution as string) || 'Original',
-    sizeEst: 'Original',
+    sizeEst: formats.length > 0 ? formats[0].sizeEst : 'N/A',
     formats,
-    codec: 'Original',
+    codec: formats.length > 0 ? formats[0].codec : (metadata.vcodec as string) || 'N/A',
     type: (metadata.extractor_type === 'video' ? 'video' : 'audio') as MediaType,
     publishDate: metadata.upload_date as string | undefined,
     views: (metadata.view_count as number)?.toLocaleString(),
@@ -387,6 +405,7 @@ export class DirectFileProvider implements MediaProvider {
       author: host,
       channel: host,
       duration,
+      durationSeconds: 0,
       resolution,
       sizeEst: formats[0]?.sizeEst || 'N/A',
       formats,
@@ -486,6 +505,7 @@ export class GenericProvider implements MediaProvider {
         author: host,
         channel: host,
         duration,
+        durationSeconds: 0,
         resolution,
         sizeEst: formats[0]?.sizeEst || 'N/A',
         formats,

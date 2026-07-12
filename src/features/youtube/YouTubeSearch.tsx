@@ -7,6 +7,7 @@ import { useTranslation } from '../../core/i18n';
 import { 
   getAccentBgClass, getAccentTextClass, getAccentRingClass
 } from '../../components/ThemeWrapper';
+import { searchVideosWithAdapter } from '../../core/ytdlp/YtDlpAdapter';
 
 export const YouTubeSearch: React.FC = () => {
   const { settings, setSelectedUrl, setActiveTab } = useApp();
@@ -24,22 +25,11 @@ export const YouTubeSearch: React.FC = () => {
     setError(null);
 
     try {
-      const response = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: query.trim(),
-          platform: 'youtube',
-          maxResults: 10
-        })
+      const data: SearchResult[] = await searchVideosWithAdapter({
+        query: query.trim(),
+        platform: 'youtube',
+        maxResults: 10
       });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || 'Search failed');
-      }
-
-      const data: SearchResult[] = await response.json();
       setResults(data);
     } catch (err: any) {
       setError(err.message || 'Search failed');

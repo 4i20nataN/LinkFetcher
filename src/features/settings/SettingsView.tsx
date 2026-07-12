@@ -11,6 +11,7 @@ import { useTranslation } from '../../core/i18n';
 import { 
   getAccentBgClass, getAccentTextClass, getAccentBorderClass, getAccentRingClass 
 } from '../../components/ThemeWrapper';
+import { getYtDlpStatusWithAdapter } from '../../core/ytdlp/YtDlpAdapter';
 
 const accentColorsList = [
   { id: 'indigo', name: 'indigo', color: 'bg-indigo-500' },
@@ -51,8 +52,7 @@ export const SettingsView: React.FC = () => {
 
   // Check yt-dlp binary status
   useEffect(() => {
-    fetch('/api/ytdlp/status')
-      .then(r => r.json())
+    getYtDlpStatusWithAdapter()
       .then(data => setYtdlpStatus(data))
       .catch(() => setYtdlpStatus({ ready: false }));
   }, []);
@@ -519,7 +519,7 @@ export const SettingsView: React.FC = () => {
                 ? (settings.language === 'en' ? 'Checking status...' : 'Verificando status...')
                 : ytdlpStatus.ready
                   ? (settings.language === 'en' ? 'yt-dlp ready — Real downloads active' : 'yt-dlp pronto — Downloads reais ativos')
-                  : (settings.language === 'en' ? 'yt-dlp not found — will auto-install on first download' : 'yt-dlp não encontrado — será instalado automaticamente no primeiro download')
+                  : (settings.language === 'en' ? 'yt-dlp not found — place binary in electron/resources/ or set YTDLP_PATH' : 'yt-dlp não encontrado — coloque o binário em electron/resources/ ou defina YTDLP_PATH')
               }
             </p>
             <p className="text-[10px] text-zinc-500 leading-relaxed">

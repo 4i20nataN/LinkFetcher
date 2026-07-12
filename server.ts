@@ -77,8 +77,10 @@ async function startServer() {
   app.get("/api/ytdlp/status", (_req, res) => {
     const binaryPath = path.join(process.cwd(), '.cache',
       process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
-    const ready = fs.existsSync(binaryPath);
-    res.json({ ready, binaryPath });
+    const electronResPath = path.join(process.cwd(), 'electron', 'resources',
+      process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
+    const ready = fs.existsSync(binaryPath) || fs.existsSync(electronResPath);
+    res.json({ ready, binaryPath: fs.existsSync(binaryPath) ? binaryPath : electronResPath });
   });
 
   // ─── YT-DLP ENSURE (Setup endpoint) ────────────────────────────────────
@@ -117,7 +119,9 @@ async function startServer() {
       url,
       quality,
       isAudio,
-      title
+      title,
+      bandLimit,
+      formatStr: clientFormatStr
     } = req.query as Record<string, string>;
 
     if (!id || !url) {
@@ -134,9 +138,11 @@ async function startServer() {
       try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch { /* disconnected */ }
     };
 
-    // Build yt-dlp format string
+    // Build yt-dlp format string — prefer client-provided format string from FormatSelector
     let formatStr: string;
-    if (isAudio === 'true') {
+    if (clientFormatStr) {
+      formatStr = clientFormatStr;
+    } else if (isAudio === 'true') {
       // Best audio, convert to mp3
       formatStr = 'bestaudio[ext=m4a]/bestaudio';
     } else {
@@ -162,7 +168,8 @@ async function startServer() {
     const cancelFn = spawnDownload({
       url: decodeURIComponent(url),
       format: formatStr,
-      outputTemplate,
+      outputDir: TEMP_DOWNLOAD_DIR,
+      bandLimit: bandLimit ? parseInt(bandLimit, 10) : 0,
       onProgress: ({ percent, speed, eta }) => {
         send({ type: 'progress', percent, speed, eta });
       },
@@ -335,11 +342,14 @@ async function startServer() {
     console.log(`📁 Downloads temporários: ${TEMP_DOWNLOAD_DIR}`);
     console.log(`🔧 Verificando yt-dlp...\n`);
 
-    // Pre-warm: download yt-dlp in background at startup
-    ensureYtDlp((msg) => console.log(msg)).catch(err => {
-      console.warn('[yt-dlp] Falha no pré-download:', err.message);
-      console.warn('[yt-dlp] Será baixado automaticamente no primeiro uso.');
-    });
+    // Pre-warm check: only run in development. Production must ship binaries bundled.
+    if (process.env.NODE_ENV !== 'production') {
+      ensureYtDlp((msg) => console.log(msg)).catch(err => {
+        console.warn('[yt-dlp] Pré-verificação falhou (dev):', err.message);
+      });
+    } else {
+      console.log('[yt-dlp] Produção: pulando pré-verificação. Binaries must be bundled in the app.');
+    }
   });
 }
 

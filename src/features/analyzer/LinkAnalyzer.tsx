@@ -13,6 +13,7 @@ import {
 } from '../../components/ThemeWrapper';
 import { DownloadEngine } from '../../core/engine/DownloadEngine';
 import { FormatSelector, FormatOptions } from '../downloads/FormatSelector';
+import { probeUrlWithAdapter } from '../../core/ytdlp/YtDlpAdapter';
 
 export const LinkAnalyzer: React.FC = () => {
   const { 
@@ -37,7 +38,23 @@ export const LinkAnalyzer: React.FC = () => {
 
   const [probeLoading, setProbeLoading] = useState(false);
   const [probeError, setProbeError] = useState<string | null>(null);
-  const [formatOptions, setFormatOptions] = useState<FormatOptions | null>(null);
+  const [formatOptions, setFormatOptions] = useState<FormatOptions>({
+    format: 'bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b',
+    audioOnly: false,
+    audioFormat: 'mp3',
+    audioQuality: '0',
+    writeSubs: false,
+    writeAutoSubs: false,
+    subLangs: 'en',
+    subFormat: 'srt',
+    embedSubs: false,
+    writeThumbnail: false,
+    embedThumbnail: false,
+    embedMetadata: true,
+    videoOnly: false,
+    sponsorblockRemove: '',
+    fpsMax: 0,
+  });
 
   // Auto-analyze URL from search / download later trigger
   useEffect(() => {
@@ -56,7 +73,23 @@ export const LinkAnalyzer: React.FC = () => {
     setError(null);
     setMediaInfo(null);
     setSelectedFormat(null);
-    setFormatOptions(null);
+    setFormatOptions({
+      format: 'bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b',
+      audioOnly: false,
+      audioFormat: 'mp3',
+      audioQuality: '0',
+      writeSubs: false,
+      writeAutoSubs: false,
+      subLangs: 'en',
+      subFormat: 'srt',
+      embedSubs: false,
+      writeThumbnail: false,
+      embedThumbnail: false,
+      embedMetadata: true,
+      videoOnly: false,
+      sponsorblockRemove: '',
+      fpsMax: 0,
+    });
     setSuccessMsg(null);
     setProbeError(null);
 
@@ -80,18 +113,7 @@ export const LinkAnalyzer: React.FC = () => {
     setProbeError(null);
 
     try {
-      const response = await fetch('/api/probe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: probeUrl })
-      });
-
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Probe failed');
-      }
-
-      const data = await response.json();
+      const data = await probeUrlWithAdapter({ url: probeUrl });
       if (data.error) {
         throw new Error(data.error);
       }
@@ -103,9 +125,14 @@ export const LinkAnalyzer: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!url) return;
-    await handleAnalyze(url);
-    handleProbe(url);
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    if (!/^https?:\/\/.+/i.test(trimmed)) {
+      setError(settings.language === 'en' ? 'Please enter a valid URL starting with http:// or https://' : 'Insira uma URL válida começando com http:// ou https://');
+      return;
+    }
+    await handleAnalyze(trimmed);
+    handleProbe(trimmed);
   };
 
   const handlePaste = async () => {
@@ -123,13 +150,10 @@ export const LinkAnalyzer: React.FC = () => {
   const handleStartDownload = () => {
     if (!mediaInfo || !selectedFormat) return;
 
-    const downloadUrl = formatOptions?.format
-      ? `${mediaInfo.originalUrl}#${formatOptions.format}`
-      : mediaInfo.originalUrl;
-
     DownloadEngine.addDownload(
-      { ...mediaInfo, originalUrl: downloadUrl },
-      selectedFormat
+      mediaInfo,
+      selectedFormat,
+      formatOptions
     );
     setSuccessMsg(settings.language === 'en' ? `Added to queue: ${mediaInfo.title.substring(0, 45)}...` : `Adicionado à fila: ${mediaInfo.title.substring(0, 45)}...`);
     
@@ -172,15 +196,20 @@ export const LinkAnalyzer: React.FC = () => {
       setSuccessMsg(settings.language === 'en' ? 'Downloading thumbnail...' : 'Baixando capa...');
       
       const filename = `thumbnail_${mediaInfo.id || 'media'}.jpg`;
-      const proxiedUrl = `/api/proxy-download?url=${encodeURIComponent(mediaInfo.thumbnailUrl)}&filename=${encodeURIComponent(filename)}`;
-      
-      const a = document.createElement('a');
-      a.href = proxiedUrl;
-      a.target = '_blank';
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const hasElectronBridge = typeof window !== 'undefined' && !!(window as any).electron?.invoke;
+      if (hasElectronBridge) {
+        // In Electron, open the thumbnail in the default browser (user can save)
+        await (window as any).electron.invoke('shell:openExternal', mediaInfo.thumbnailUrl);
+      } else {
+        const proxiedUrl = `/api/proxy-download?url=${encodeURIComponent(mediaInfo.thumbnailUrl)}&filename=${encodeURIComponent(filename)}`;
+        const a = document.createElement('a');
+        a.href = proxiedUrl;
+        a.target = '_blank';
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
       
       setSuccessMsg(settings.language === 'en' ? 'Thumbnail downloaded successfully!' : 'Capa baixada com sucesso!');
       setTimeout(() => setSuccessMsg(null), 3000);
