@@ -78,7 +78,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = ({
         </div>
 
         {/* Sidebar Sections */}
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 pb-28">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;

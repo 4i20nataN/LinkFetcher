@@ -39,12 +39,12 @@ function DashboardContent() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen">
+    <div className="h-full flex flex-col lg:flex-row overflow-hidden">
       {/* Sidebar Navigation */}
       <Sidebar isOpen={sidebarOpen} toggleOpen={() => setSidebarOpen(!sidebarOpen)} />
 
       {/* Main Panel */}
-      <main className="flex-1 overflow-x-hidden min-h-[calc(100vh-4rem)] lg:min-h-screen relative p-4 md:p-8">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden relative p-4 md:p-8">
         {/* Subtle background abstract decorations matching premium Nothing OS feel */}
         <div className="absolute top-[-10%] left-[20%] w-[350px] h-[350px] rounded-full bg-indigo-500/5 blur-[100px] pointer-events-none" />
         <div className="absolute bottom-[-10%] right-[10%] w-[450px] h-[450px] rounded-full bg-emerald-500/3 blur-[120px] pointer-events-none" />
