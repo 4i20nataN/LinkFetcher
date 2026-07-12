@@ -39,6 +39,7 @@ export interface MediaInfo {
   author: string;
   channel: string;
   duration: string; // e.g. "04:15"
+  durationSeconds: number; // e.g. 255
   resolution?: string;
   sizeEst: string;
   formats: MediaFormat[];
@@ -59,11 +60,33 @@ export interface DownloadItem {
   thumbnailUrl: string;
   platform: PlatformId;
   format: MediaFormat;
-  sizeTotal: number; // in bytes
-  sizeDownloaded: number; // in bytes
-  progress: number; // 0 to 100
-  speed: number; // in bytes/sec
-  eta: number; // remaining seconds
+  formatString?: string;
+  audioOnly?: boolean;
+  audioFormat?: string;
+  audioQuality?: string;
+  writeSubs?: boolean;
+  writeAutoSubs?: boolean;
+  subLangs?: string;
+  subFormat?: string;
+  embedSubs?: boolean;
+  writeThumbnail?: boolean;
+  embedThumbnail?: boolean;
+  embedMetadata?: boolean;
+  mergeOutputFormat?: string;
+  restrictFilenames?: boolean;
+  noOverwrites?: boolean;
+  keepVideo?: boolean;
+  concurrentFragments?: number;
+  retries?: number;
+  downloadSections?: string;
+  videoOnly?: boolean;
+  sponsorblockRemove?: string;
+  fpsMax?: number;
+  sizeTotal: number;
+  sizeDownloaded: number;
+  progress: number;
+  speed: number;
+  eta: number;
   status: 'queued' | 'downloading' | 'paused' | 'completed' | 'failed' | 'cancelled';
   addedAt: string;
   finishedAt?: string;
@@ -157,9 +180,19 @@ export interface DownloadOptions {
   restrictFilenames?: boolean;
   noOverwrites?: boolean;
   keepVideo?: boolean;
+  // Trim/cut
+  downloadSections?: string; // e.g. "*01:30-05:00"
+  // Video only (no audio track)
+  videoOnly?: boolean;
+  // SponsorBlock
+  sponsorblockRemove?: string; // e.g. "all" or comma-separated categories
+  // FPS limit
+  fpsMax?: number;
   // Auth options
   cookies?: string;
   cookiesFromBrowser?: string;
   proxy?: string;
   ffmpegLocation?: string;
+  // Rate limiting
+  bandLimit?: number; // KB/s, 0 = unlimited
 }

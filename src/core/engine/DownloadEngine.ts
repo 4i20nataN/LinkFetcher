@@ -1,4 +1,5 @@
 import { DownloadItem, MediaInfo, MediaFormat, AppSettings } from '../../types';
+import type { FormatOptions } from '../../features/downloads/FormatSelector';
 
 type EngineListener = (items: DownloadItem[]) => void;
 
@@ -96,7 +97,7 @@ class DownloadEngineClass {
     this.saveState();
   }
 
-  addDownload(media: MediaInfo, format: MediaFormat) {
+  addDownload(media: MediaInfo, format: MediaFormat, formatOptions?: FormatOptions | null) {
     const exists = this.items.find(
       item => item.url === media.originalUrl &&
                item.format.id === format.id &&
@@ -104,11 +105,10 @@ class DownloadEngineClass {
     );
     if (exists) return;
 
-    // Ensure sizeTotal is never 0
     const defaultSizeByType: Record<string, number> = {
-      video: 25 * 1024 * 1024,  // 25 MB
-      audio: 6 * 1024 * 1024,   // 6 MB
-      image: 2 * 1024 * 1024,   // 2 MB
+      video: 25 * 1024 * 1024,
+      audio: 6 * 1024 * 1024,
+      image: 2 * 1024 * 1024,
     };
     const sizeTotal = format.sizeBytes > 0
       ? format.sizeBytes
@@ -120,6 +120,28 @@ class DownloadEngineClass {
       thumbnailUrl: media.thumbnailUrl,
       platform: media.platform,
       format,
+      formatString: formatOptions?.format,
+      audioOnly: formatOptions?.audioOnly,
+      audioFormat: formatOptions?.audioFormat,
+      audioQuality: formatOptions?.audioQuality,
+      writeSubs: formatOptions?.writeSubs,
+      writeAutoSubs: formatOptions?.writeAutoSubs,
+      subLangs: formatOptions?.subLangs,
+      subFormat: formatOptions?.subFormat,
+      embedSubs: formatOptions?.embedSubs,
+      writeThumbnail: formatOptions?.writeThumbnail,
+      embedThumbnail: formatOptions?.embedThumbnail,
+      embedMetadata: formatOptions?.embedMetadata,
+      mergeOutputFormat: formatOptions?.audioOnly ? formatOptions.audioFormat : undefined,
+      concurrentFragments: formatOptions?.concurrentFragments,
+      retries: formatOptions?.retries,
+      restrictFilenames: formatOptions?.restrictFilenames,
+      noOverwrites: formatOptions?.noOverwrites,
+      keepVideo: formatOptions?.keepVideo,
+      videoOnly: formatOptions?.videoOnly,
+      downloadSections: formatOptions?.downloadSections,
+      sponsorblockRemove: formatOptions?.sponsorblockRemove,
+      fpsMax: formatOptions?.fpsMax,
       sizeTotal,
       sizeDownloaded: 0,
       progress: 0,
@@ -217,9 +239,9 @@ class DownloadEngineClass {
     const es = this.eventSources.get(id);
     if (es) { es.close(); this.eventSources.delete(id); }
     const cancelFn = this.cancelFns.get(id);
-    if (cancelFn) { cancelFn(); this.cancelFns.delete(id); }
+    if (cancelFn) { cancelFn(); this.cancelFns.delete(id); return; }
 
-    // Tell the server to kill the yt-dlp process
+    // Fallback for server-mode downloads
     fetch('/api/download/cancel', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -259,18 +281,117 @@ class DownloadEngineClass {
   }
 
   private startYtDlpDownload(item: DownloadItem) {
-    const quality = extractQualityHeight(item.format.quality);
-    const isAudio = item.format.type === 'audio';
+    const isAudio = item.audioOnly ?? (item.format.type === 'audio');
 
+    console.log(`[Engine] Starting download: ${item.title} | audio=${isAudio} | format=${item.formatString || 'default'}`);
+
+    const hasElectronBridge = typeof window !== 'undefined' && !!(window as any).electron?.invoke;
+    if (hasElectronBridge) {
+      const onProgress = (payload: any) => {
+        if (!payload || payload.id !== item.id) return;
+        const target = this.items.find(i => i.id === item.id);
+        if (!target) return;
+
+        if (payload.type === 'progress') {
+          const pct = Math.min(Math.round(payload.percent || 0), 99);
+          target.progress = pct;
+          target.sizeDownloaded = Math.floor((pct / 100) * target.sizeTotal);
+          target.speed = this.parseSpeedString(payload.speed || '');
+          target.eta = this.parseEtaString(payload.eta || '');
+          this.notify();
+        }
+
+        if (payload.type === 'complete') {
+          target.progress = 100;
+          target.sizeDownloaded = target.sizeTotal;
+          target.status = 'completed';
+          target.speed = 0;
+          target.eta = 0;
+          target.finishedAt = new Date().toISOString();
+          if (payload.filePath) {
+            this.openFileLocation(payload.filePath);
+          }
+          cleanup();
+          this.notifyCompletion(item);
+          this.notify();
+          this.processQueue();
+        }
+
+        if (payload.type === 'error') {
+          target.status = 'failed';
+          target.error = payload.message || 'Download falhou';
+          target.speed = 0;
+          target.eta = 0;
+          cleanup();
+          this.notify();
+          this.processQueue();
+        }
+      };
+
+      const unsubscribe = (window as any).electron.on('yt-dlp-progress', onProgress);
+      const cleanup = () => {
+        unsubscribe();
+        this.eventSources.delete(item.id);
+        this.cancelFns.delete(item.id);
+      };
+      this.eventSources.set(item.id, { close: cleanup } as unknown as EventSource);
+
+      (window as any).electron.invoke('yt-dlp-download', {
+        id: item.id,
+        url: item.url,
+        title: item.title,
+        format: item.formatString || item.format.id,
+        audioOnly: isAudio,
+        audioFormat: item.audioFormat || (isAudio ? 'mp3' : undefined),
+        audioQuality: item.audioQuality,
+        writeSubs: item.writeSubs,
+        writeAutoSubs: item.writeAutoSubs,
+        subLangs: item.subLangs,
+        subFormat: item.subFormat,
+        embedSubs: item.embedSubs,
+        writeThumbnail: item.writeThumbnail,
+        embedThumbnail: item.embedThumbnail,
+        embedMetadata: item.embedMetadata,
+        mergeOutputFormat: item.mergeOutputFormat,
+        restrictFilenames: item.restrictFilenames,
+        concurrentFragments: item.concurrentFragments,
+        retries: item.retries,
+        bandLimit: this.settings.bandLimit || 0,
+        noOverwrites: item.noOverwrites,
+        keepVideo: item.keepVideo,
+        videoOnly: item.videoOnly,
+        downloadSections: item.downloadSections,
+        sponsorblockRemove: item.sponsorblockRemove,
+        fpsMax: item.fpsMax,
+      }).catch((err: any) => {
+        const target = this.items.find(i => i.id === item.id);
+        if (target) {
+          target.status = 'failed';
+          target.error = err?.message || String(err);
+          this.notify();
+          this.processQueue();
+        }
+      });
+
+      const cancelFn = () => {
+        try { (window as any).electron.invoke('yt-dlp-cancel', item.id); } catch {};
+      };
+      this.cancelFns.set(item.id, cancelFn);
+      return;
+    }
+
+    // Fallback: server mode via SSE
     const params = new URLSearchParams({
       id: item.id,
       url: encodeURIComponent(item.url),
-      quality,
-      isAudio: String(isAudio),
       title: item.title,
+      bandLimit: String(this.settings.bandLimit || 0),
     });
-
-    console.log(`[Engine] Starting yt-dlp download: ${item.title} @ ${quality}p | audio=${isAudio}`);
+    if (item.formatString) params.set('formatStr', item.formatString);
+    if (isAudio) params.set('isAudio', '1');
+    if (item.audioFormat) params.set('audioFormat', item.audioFormat);
+    if (item.writeSubs) params.set('writeSubs', '1');
+    if (item.subLangs) params.set('subLangs', item.subLangs);
 
     const es = new EventSource(`/api/download/start?${params.toString()}`);
     this.eventSources.set(item.id, es);
@@ -283,25 +404,15 @@ class DownloadEngineClass {
       if (!target) { es.close(); return; }
 
       switch (data.type) {
-        case 'setup':
-        case 'started':
-          console.log(`[yt-dlp] ${data.message}`);
-          break;
-
         case 'progress': {
           const pct = Math.min(Math.round(data.percent || 0), 99);
           target.progress = pct;
           target.sizeDownloaded = Math.floor((pct / 100) * target.sizeTotal);
-
-          // Parse speed from yt-dlp string (e.g. "3.2MiB" → bytes/s)
           target.speed = this.parseSpeedString(data.speed || '');
-
-          // Parse ETA string (e.g. "00:45" → 45 seconds)
           target.eta = this.parseEtaString(data.eta || '');
           this.notify();
           break;
         }
-
         case 'complete': {
           target.progress = 100;
           target.sizeDownloaded = target.sizeTotal;
@@ -309,23 +420,15 @@ class DownloadEngineClass {
           target.speed = 0;
           target.eta = 0;
           target.finishedAt = new Date().toISOString();
-
           this.eventSources.delete(item.id);
           es.close();
-
-          // Auto-trigger browser download
-          if (data.downloadUrl) {
-            this.triggerFileSave(data.downloadUrl, data.filename || `${item.title}.${item.format.ext}`);
-          }
-
+          if (data.downloadUrl) this.triggerFileSave(data.downloadUrl, data.filename || `${item.title}.${item.format.ext}`);
           this.notifyCompletion(item);
           this.notify();
           this.processQueue();
           break;
         }
-
         case 'error': {
-          console.error(`[yt-dlp] Download error for ${item.title}:`, data.message);
           target.status = 'failed';
           target.error = data.message || 'Download falhou';
           target.speed = 0;
@@ -354,6 +457,13 @@ class DownloadEngineClass {
     };
   }
 
+  private openFileLocation(filePath: string) {
+    const hasElectronBridge = typeof window !== 'undefined' && !!(window as any).electron?.invoke;
+    if (hasElectronBridge && filePath) {
+      (window as any).electron.invoke('shell:openPath', filePath).catch(() => {});
+    }
+  }
+
   private async startProxyDownload(item: DownloadItem) {
     // For direct files / images: use the proxy-download endpoint
     const cleanTitle = item.title.replace(/[<>:"/\\|?*\x00-\x1f]/g, '').substring(0, 80);
@@ -374,6 +484,33 @@ class DownloadEngineClass {
         this.markCompleted(item);
       } catch (e) {
         this.markFailed(item, 'Falha ao processar data URI');
+      }
+      return;
+    }
+
+    // For images: fetch, convert via canvas, then save
+    if (item.format.type === 'image') {
+      try {
+        let blob: Blob;
+        try {
+          // Try direct fetch first (works in Electron / same-origin)
+          const resp = await fetch(sourceUrl);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          blob = await resp.blob();
+        } catch {
+          // CORS or network error — fetch through server proxy
+          const proxyFetchUrl = `/api/proxy-download?url=${encodeURIComponent(sourceUrl)}&filename=tmp`;
+          const resp = await fetch(proxyFetchUrl);
+          if (!resp.ok) throw new Error(`Proxy HTTP ${resp.status}`);
+          blob = await resp.blob();
+        }
+        await this.convertAndDownloadImageBlob(blob, ext, `${cleanTitle}.${ext}`);
+        this.markCompleted(item);
+      } catch (e: any) {
+        // Final fallback: trigger browser download without conversion
+        const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(sourceUrl)}&filename=${encodeURIComponent(`${cleanTitle}.${ext}`)}`;
+        this.triggerFileSave(proxyUrl, `${cleanTitle}.${ext}`);
+        this.markCompleted(item);
       }
       return;
     }

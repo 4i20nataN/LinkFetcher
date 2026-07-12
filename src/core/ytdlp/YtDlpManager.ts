@@ -1,6 +1,7 @@
 /**
  * YtDlpManager - Manages the yt-dlp binary lifecycle on the server side.
- * Auto-downloads the correct binary for the current OS/arch on first use.
+ * Uses a bundled yt-dlp binary or explicit environment paths.
+ * Does not download yt-dlp at runtime in production.
  * Runs entirely on local hardware - zero paid APIs required.
  */
 
@@ -8,150 +9,79 @@ import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
-import https from 'https';
 import type { ProbeOptions, SearchOptions, SearchResult, DownloadOptions } from '../../types';
 
 const execFileAsync = promisify(execFile);
 
-// Store binary in project's .cache directory
-const CACHE_DIR = path.join(process.cwd(), '.cache');
 const BINARY_NAME = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
-const BINARY_PATH = path.join(CACHE_DIR, BINARY_NAME);
+const FFMPEG_NAME = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
 
-// Latest stable release URL from GitHub
-const GITHUB_API_URL = 'https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest';
+function getBundledBinaryPath(): string {
+  const candidates = [
+    // Allow explicit override via env
+    process.env.YTDLP_PATH || '',
+    // When packaged with electron-builder extraResources -> resources/
+    path.join(process.resourcesPath || process.cwd(), 'resources', BINARY_NAME),
+    path.join(process.resourcesPath || process.cwd(), BINARY_NAME),
+    // Electron dev (binaries in electron/resources/)
+    path.join(process.cwd(), 'electron', 'resources', BINARY_NAME),
+    // Common repo locations during development
+    path.join(process.cwd(), 'yt-dlp', BINARY_NAME),
+    path.join(process.cwd(), BINARY_NAME),
+  ];
 
-function getAssetName(): string {
-  const { platform, arch } = process;
-  if (platform === 'win32') {
-    return 'yt-dlp.exe';
-  } else if (platform === 'darwin') {
-    return arch === 'arm64' ? 'yt-dlp_macos' : 'yt-dlp_macos_legacy';
-  } else {
-    // Linux
-    if (arch === 'arm64') return 'yt-dlp_linux_aarch64';
-    if (arch === 'arm') return 'yt-dlp_linux_armv7l';
-    return 'yt-dlp_linux'; // x64
-  }
+  const found = candidates.find(candidate => candidate && fs.existsSync(candidate));
+  return found || (process.env.YTDLP_PATH || path.join(process.cwd(), 'yt-dlp', BINARY_NAME));
 }
 
-async function fetchJson(url: string): Promise<any> {
-  return new Promise((resolve, reject) => {
-    https.get(url, {
-      headers: { 'User-Agent': 'LinkFetcher-App/1.0' }
-    }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try { resolve(JSON.parse(data)); }
-        catch (e) { reject(e); }
-      });
-    }).on('error', reject);
-  });
-}
+function getBundledFfmpegPath(): string {
+  const candidates = [
+    // Allow explicit override via env
+    process.env.FFMPEG_PATH || '',
+    // Packaged resources
+    path.join(process.resourcesPath || process.cwd(), 'resources', FFMPEG_NAME),
+    path.join(process.resourcesPath || process.cwd(), FFMPEG_NAME),
+    // Electron dev (binaries in electron/resources/)
+    path.join(process.cwd(), 'electron', 'resources', FFMPEG_NAME),
+    // Common repo locations during development
+    path.join(process.cwd(), 'yt-dlp', FFMPEG_NAME),
+    path.join(process.cwd(), FFMPEG_NAME),
+  ];
 
-async function downloadFile(url: string, destPath: string, onProgress?: (pct: number) => void): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const followRedirects = (currentUrl: string) => {
-      https.get(currentUrl, { headers: { 'User-Agent': 'LinkFetcher-App/1.0' } }, (res) => {
-        // Follow redirects
-        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          return followRedirects(res.headers.location);
-        }
-        if (res.statusCode !== 200) {
-          return reject(new Error(`Download failed with status ${res.statusCode}`));
-        }
-
-        const totalLength = parseInt(res.headers['content-length'] || '0', 10);
-        let downloaded = 0;
-
-        const fileStream = fs.createWriteStream(destPath);
-        res.on('data', (chunk) => {
-          downloaded += chunk.length;
-          if (totalLength > 0 && onProgress) {
-            onProgress(Math.floor((downloaded / totalLength) * 100));
-          }
-        });
-        res.pipe(fileStream);
-        fileStream.on('finish', () => fileStream.close(() => resolve()));
-        fileStream.on('error', reject);
-      }).on('error', reject);
-    };
-    followRedirects(url);
-  });
+  const found = candidates.find(candidate => candidate && fs.existsSync(candidate));
+  return found || (process.env.FFMPEG_PATH || '');
 }
 
 let binaryReady = false;
-let downloadPromise: Promise<void> | null = null;
 
 export async function ensureYtDlp(onProgress?: (msg: string) => void): Promise<string> {
-  // Already verified
-  if (binaryReady && fs.existsSync(BINARY_PATH)) return BINARY_PATH;
+  const binaryPath = getBinaryPath();
+  if (binaryReady && fs.existsSync(binaryPath)) return binaryPath;
 
-  // Deduplicate concurrent calls
-  if (downloadPromise) {
-    await downloadPromise;
-    return BINARY_PATH;
+  if (!fs.existsSync(binaryPath)) {
+    throw new Error(`yt-dlp não encontrado. Coloque o binário em ${path.dirname(binaryPath)} ou defina YTDLP_PATH.`);
   }
-
-  // Check if already exists and works
-  if (fs.existsSync(BINARY_PATH)) {
-    try {
-      await execFileAsync(BINARY_PATH, ['--version']);
-      binaryReady = true;
-      return BINARY_PATH;
-    } catch {
-      // Corrupted binary, re-download
-      fs.unlinkSync(BINARY_PATH);
-    }
-  }
-
-  // Need to download
-  downloadPromise = (async () => {
-    if (!fs.existsSync(CACHE_DIR)) {
-      fs.mkdirSync(CACHE_DIR, { recursive: true });
-    }
-
-    onProgress?.('[yt-dlp] Verificando última versão no GitHub...');
-    const release = await fetchJson(GITHUB_API_URL);
-    const assetName = getAssetName();
-    const asset = release.assets?.find((a: any) => a.name === assetName);
-
-    if (!asset) {
-      throw new Error(`yt-dlp: Asset "${assetName}" não encontrado na release.`);
-    }
-
-    onProgress?.(`[yt-dlp] Baixando ${assetName} v${release.tag_name}...`);
-    await downloadFile(asset.browser_download_url, BINARY_PATH, (pct) => {
-      onProgress?.(`[yt-dlp] Download... ${pct}%`);
-    });
-
-    // Make executable on Unix
-    if (process.platform !== 'win32') {
-      fs.chmodSync(BINARY_PATH, 0o755);
-    }
-
-    // Verify
-    await execFileAsync(BINARY_PATH, ['--version']);
-    binaryReady = true;
-    onProgress?.('[yt-dlp] Pronto! Binário instalado e verificado.');
-  })();
 
   try {
-    await downloadPromise;
-  } finally {
-    downloadPromise = null;
+    await execFileAsync(binaryPath, ['--version']);
+    binaryReady = true;
+    onProgress?.('[yt-dlp] Binário local encontrado e verificado.');
+    return binaryPath;
+  } catch (error) {
+    throw new Error(`yt-dlp encontrado em ${binaryPath}, mas falhou na validação: ${error instanceof Error ? error.message : String(error)}`);
   }
-
-  return BINARY_PATH;
 }
 
 export function getBinaryPath(): string {
-  return BINARY_PATH;
+  return process.env.YTDLP_PATH || getBundledBinaryPath();
+}
+
+export function getFfmpegPath(): string {
+  return process.env.FFMPEG_PATH || getBundledFfmpegPath();
 }
 
 export function isBinaryReady(): boolean {
-  return binaryReady && fs.existsSync(BINARY_PATH);
+  return binaryReady && fs.existsSync(getBinaryPath());
 }
 
 /**
@@ -176,76 +106,172 @@ export async function getVideoInfo(url: string): Promise<any> {
  */
 export function spawnDownload(params: {
   url: string;
-  format: string; // yt-dlp format string e.g. 'bestvideo[height<=1080]+bestaudio/best'
-  outputTemplate: string; // e.g. '/tmp/downloads/%(title)s.%(ext)s'
+  outputDir: string;
+  format?: string;
+  audioOnly?: boolean;
+  audioFormat?: string;
+  audioQuality?: string;
+  writeSubs?: boolean;
+  writeAutoSubs?: boolean;
+  subLangs?: string;
+  subFormat?: string;
+  embedSubs?: boolean;
+  writeThumbnail?: boolean;
+  embedThumbnail?: boolean;
+  embedMetadata?: boolean;
+  mergeOutputFormat?: string;
+  restrictFilenames?: boolean;
+  noOverwrites?: boolean;
+  bandLimit?: number;
+  concurrentFragments?: number;
+  retries?: number;
+  keepVideo?: boolean;
+  videoOnly?: boolean;
+  downloadSections?: string;
+  sponsorblockRemove?: string;
+  fpsMax?: number;
   onProgress: (data: { percent: number; speed: string; eta: string; filename?: string }) => void;
   onComplete: (filePath: string) => void;
   onError: (err: string) => void;
-}): () => void /* returns cancel fn */ {
+}): () => void {
+  const ffmpegPath = getFfmpegPath();
+  const cleanTitle = (params.url.match(/(?:v=|\/)([\w-]{11})/)?.[1]) || 'download';
+
   const args = [
     '--no-playlist',
     '--no-warnings',
-    '--newline',           // Force newline on progress
+    '--newline',
     '--progress',
-    '--format', params.format,
-    '--merge-output-format', 'mp4',
-    '-o', params.outputTemplate,
-    '--embed-metadata',
     '--no-mtime',
-    params.url
   ];
 
+  // Build final format string by applying transformations
+  let finalFormat = params.format || DEFAULT_FORMAT;
+
+  if (params.videoOnly) {
+    finalFormat = finalFormat
+      .replace(/\+ba\[ext=\w+\]/g, '')
+      .replace(/\+ba/g, '')
+      .replace(/\/ba/g, '')
+      .replace(/\/b/g, '') || 'bv*';
+  }
+
+  if (params.fpsMax && params.fpsMax > 0) {
+    finalFormat = finalFormat.replace(/\[ext=\w+\]/g, `[ext=mp4][fps<=${params.fpsMax}]`);
+  }
+
+  args.push('--format', finalFormat);
+
+  if (params.audioOnly) {
+    args.push('--extract-audio');
+    if (params.audioFormat) args.push('--audio-format', params.audioFormat);
+    if (params.audioQuality) args.push('--audio-quality', params.audioQuality);
+  }
+
+  if (params.mergeOutputFormat) args.push('--merge-output-format', params.mergeOutputFormat);
+
+  if (params.writeSubs) args.push('--write-subs');
+  if (params.writeAutoSubs) args.push('--write-auto-subs');
+  if (params.subLangs) args.push('--sub-langs', params.subLangs);
+  if (params.subFormat) args.push('--sub-format', params.subFormat);
+  if (params.embedSubs) args.push('--embed-subs');
+
+  if (params.writeThumbnail) args.push('--write-thumbnail');
+  if (params.embedThumbnail) args.push('--embed-thumbnail');
+  if (params.embedMetadata) args.push('--embed-metadata');
+
+  if (params.restrictFilenames) args.push('--restrict-filenames');
+  if (params.noOverwrites) args.push('--no-overwrites');
+  if (params.keepVideo) args.push('--keep-video');
+
+  if (params.downloadSections) {
+    args.push('--download-sections', params.downloadSections);
+  }
+
+  if (params.sponsorblockRemove) {
+    args.push('--sponsorblock-remove', params.sponsorblockRemove);
+  }
+
+  if (params.bandLimit && params.bandLimit > 0) {
+    args.push('--limit-rate', `${params.bandLimit}K`);
+  }
+
+  if (params.concurrentFragments && params.concurrentFragments > 1) {
+    args.push('--concurrent-fragments', String(params.concurrentFragments));
+  }
+
+  if (params.retries && params.retries > 0) {
+    args.push('--retries', String(params.retries));
+  }
+
+  const outputTemplate = path.join(params.outputDir, '%(title)s.%(ext)s');
+  args.push('-o', outputTemplate);
+
+  if (ffmpegPath) args.push('--ffmpeg-location', ffmpegPath);
+
+  args.push(params.url);
+
   let proc: ReturnType<typeof spawn> | null = null;
+  let killed = false;
 
   (async () => {
-    const binary = await ensureYtDlp(msg => console.log(msg));
-    proc = spawn(binary, args);
+    try {
+      const binary = await ensureYtDlp(msg => console.log(msg));
+      proc = spawn(binary, args);
 
-    let lastFile = '';
+      let lastFile = '';
 
-    proc.stdout?.on('data', (chunk: Buffer) => {
-      const lines = chunk.toString().split('\n');
-      for (const line of lines) {
-        // Parse progress lines: [download]  45.2% of   48.50MiB at    3.20MiB/s ETA 00:12
-        const progressMatch = line.match(/\[download\]\s+([\d.]+)%\s+of\s+[\d.]+\S+\s+at\s+([\d.]+\S+)\/s\s+ETA\s+(\S+)/);
-        if (progressMatch) {
-          params.onProgress({
-            percent: parseFloat(progressMatch[1]),
-            speed: progressMatch[2],
-            eta: progressMatch[3],
-          });
+      proc.stdout?.on('data', (chunk: Buffer) => {
+        const lines = chunk.toString().split('\n');
+        for (const line of lines) {
+          const progressMatch = line.match(/\[download\]\s+([\d.]+)%\s+of\s+[\d.]+\S+\s+at\s+([\d.]+\S+)\/s\s+ETA\s+(\S+)/);
+          if (progressMatch) {
+            params.onProgress({
+              percent: parseFloat(progressMatch[1]),
+              speed: progressMatch[2],
+              eta: progressMatch[3],
+            });
+          }
+          const destMatch = line.match(/\[(?:download|Merger)\] Destination:\s*(.+)/) ||
+                            line.match(/\[download\] (.+\.\S+) has already been downloaded/);
+          if (destMatch) {
+            lastFile = destMatch[1].trim();
+            params.onProgress({ percent: 100, speed: '', eta: '', filename: lastFile });
+          }
+          const mergeMatch = line.match(/Merging formats into "(.+)"/);
+          if (mergeMatch) {
+            lastFile = mergeMatch[1].trim();
+            params.onProgress({ percent: 100, speed: '', eta: '', filename: lastFile });
+          }
         }
-        // Detect destination file
-        const destMatch = line.match(/\[(?:download|Merger)\] Destination:\s*(.+)/) ||
-                          line.match(/\[download\] (.+\.(?:mp4|webm|mp3|m4a|opus|ogg|wav)) has already been downloaded/);
-        if (destMatch) {
-          lastFile = destMatch[1].trim();
+      });
+
+      proc.stderr?.on('data', (chunk: Buffer) => {
+        const text = chunk.toString();
+        if (text.includes('ERROR') || text.includes('error')) {
+          console.warn('[yt-dlp stderr]', text.trim());
         }
-        // Merged file
-        const mergeMatch = line.match(/Merging formats into "(.+)"/);
-        if (mergeMatch) lastFile = mergeMatch[1].trim();
-      }
-    });
+      });
 
-    proc.stderr?.on('data', (chunk: Buffer) => {
-      console.warn('[yt-dlp stderr]', chunk.toString());
-    });
+      proc.on('close', (code) => {
+        if (killed) return;
+        if (code === 0) {
+          params.onComplete(lastFile);
+        } else {
+          params.onError(`yt-dlp exited with code ${code}`);
+        }
+      });
 
-    proc.on('close', (code) => {
-      if (code === 0 && lastFile) {
-        params.onComplete(lastFile);
-      } else if (code !== null && code !== 0) {
-        params.onError(`yt-dlp exited with code ${code}`);
-      }
-    });
-
-    proc.on('error', (err) => {
-      params.onError(err.message);
-    });
+      proc.on('error', (err) => {
+        if (!killed) params.onError(err.message);
+      });
+    } catch (err: any) {
+      params.onError(err.message || String(err));
+    }
   })();
 
-  // Return cancel function
   return () => {
+    killed = true;
     proc?.kill('SIGTERM');
   };
 }
@@ -367,8 +393,22 @@ const DEFAULT_FORMAT = 'bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b';
 export function buildArgs(options: DownloadOptions): string[] {
   const args: string[] = [];
 
-  // Format selection
-  args.push('--format', options.format || DEFAULT_FORMAT);
+  // Build final format string by applying transformations
+  let finalFormat = options.format || DEFAULT_FORMAT;
+
+  if (options.videoOnly) {
+    finalFormat = finalFormat
+      .replace(/\+ba\[ext=\w+\]/g, '')
+      .replace(/\+ba/g, '')
+      .replace(/\/ba/g, '')
+      .replace(/\/b/g, '') || 'bv*';
+  }
+
+  if (options.fpsMax && options.fpsMax > 0) {
+    finalFormat = finalFormat.replace(/\[ext=\w+\]/g, `[ext=mp4][fps<=${options.fpsMax}]`);
+  }
+
+  args.push('--format', finalFormat);
 
   // Audio extraction
   if (options.audioOnly) {
@@ -406,6 +446,16 @@ export function buildArgs(options: DownloadOptions): string[] {
   if (options.noOverwrites) args.push('--no-overwrites');
   if (options.keepVideo) args.push('--keep-video');
 
+  // Download sections (trim/cut)
+  if (options.downloadSections) {
+    args.push('--download-sections', options.downloadSections);
+  }
+
+  // SponsorBlock
+  if (options.sponsorblockRemove) {
+    args.push('--sponsorblock-remove', options.sponsorblockRemove);
+  }
+
   // Auth options
   if (options.cookies) args.push('--cookies', options.cookies);
   if (options.cookiesFromBrowser) args.push('--cookies-from-browser', options.cookiesFromBrowser);
@@ -413,6 +463,11 @@ export function buildArgs(options: DownloadOptions): string[] {
 
   // FFmpeg location
   if (options.ffmpegLocation) args.push('--ffmpeg-location', options.ffmpegLocation);
+
+  // Rate limiting
+  if (options.bandLimit && options.bandLimit > 0) {
+    args.push('--limit-rate', `${options.bandLimit}K`);
+  }
 
   // URL last
   args.push(options.url);
