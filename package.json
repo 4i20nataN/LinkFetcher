@@ -1,7 +1,7 @@
 {
-  "name": "react-example",
+  "name": "linkfetcher",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "LinkFetcher - desktop yt-dlp frontend",
   "author": {
     "name": "Natan Vanim",
@@ -38,8 +38,6 @@
     "autoprefixer": "^10.4.21",
     "electron": "^37.2.0",
     "electron-builder": "^26.15.3",
-    "electron-packager": "^17.1.2",
-    "electron-winstaller": "^5.4.4",
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
@@ -49,6 +47,9 @@
   "build": {
     "appId": "com.linkfetcher.app",
     "productName": "LinkFetcher",
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "dist/index.html",
       "dist/assets/**",
