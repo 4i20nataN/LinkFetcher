@@ -33,7 +33,7 @@ class DownloadEngineClass {
     themeMode: 'dark',
     accentColor: 'emerald',
     language: 'pt',
-    defaultDir: 'Downloads',
+    defaultDir: '',
     bandLimit: 0,
     maxConcurrent: 3,
     wifiOnly: false,
@@ -142,6 +142,7 @@ class DownloadEngineClass {
       downloadSections: formatOptions?.downloadSections,
       sponsorblockRemove: formatOptions?.sponsorblockRemove,
       fpsMax: formatOptions?.fpsMax,
+      bandLimit: formatOptions?.bandLimit,
       sizeTotal,
       sizeDownloaded: 0,
       progress: 0,
@@ -341,6 +342,7 @@ class DownloadEngineClass {
         url: item.url,
         title: item.title,
         format: item.formatString || item.format.id,
+        outputDir: this.settings.defaultDir || undefined,
         audioOnly: isAudio,
         audioFormat: item.audioFormat || (isAudio ? 'mp3' : undefined),
         audioQuality: item.audioQuality,
@@ -356,7 +358,7 @@ class DownloadEngineClass {
         restrictFilenames: item.restrictFilenames,
         concurrentFragments: item.concurrentFragments,
         retries: item.retries,
-        bandLimit: this.settings.bandLimit || 0,
+        bandLimit: item.bandLimit || 0,
         noOverwrites: item.noOverwrites,
         keepVideo: item.keepVideo,
         videoOnly: item.videoOnly,
@@ -385,13 +387,30 @@ class DownloadEngineClass {
       id: item.id,
       url: encodeURIComponent(item.url),
       title: item.title,
-      bandLimit: String(this.settings.bandLimit || 0),
+      bandLimit: String(item.bandLimit || 0),
     });
     if (item.formatString) params.set('formatStr', item.formatString);
     if (isAudio) params.set('isAudio', '1');
     if (item.audioFormat) params.set('audioFormat', item.audioFormat);
+    if (item.audioQuality) params.set('audioQuality', item.audioQuality);
     if (item.writeSubs) params.set('writeSubs', '1');
+    if (item.writeAutoSubs) params.set('writeAutoSubs', '1');
     if (item.subLangs) params.set('subLangs', item.subLangs);
+    if (item.subFormat) params.set('subFormat', item.subFormat);
+    if (item.embedSubs) params.set('embedSubs', '1');
+    if (item.writeThumbnail) params.set('writeThumbnail', '1');
+    if (item.embedThumbnail) params.set('embedThumbnail', '1');
+    if (item.embedMetadata) params.set('embedMetadata', '1');
+    if (item.mergeOutputFormat) params.set('mergeOutputFormat', item.mergeOutputFormat);
+    if (item.restrictFilenames) params.set('restrictFilenames', '1');
+    if (item.noOverwrites) params.set('noOverwrites', '1');
+    if (item.keepVideo) params.set('keepVideo', '1');
+    if (item.videoOnly) params.set('videoOnly', '1');
+    if (item.downloadSections) params.set('downloadSections', item.downloadSections);
+    if (item.sponsorblockRemove) params.set('sponsorblockRemove', item.sponsorblockRemove);
+    if (item.fpsMax) params.set('fpsMax', String(item.fpsMax));
+    if (item.concurrentFragments) params.set('concurrentFragments', String(item.concurrentFragments));
+    if (item.retries) params.set('retries', String(item.retries));
 
     const es = new EventSource(`/api/download/start?${params.toString()}`);
     this.eventSources.set(item.id, es);
@@ -460,7 +479,7 @@ class DownloadEngineClass {
   private openFileLocation(filePath: string) {
     const hasElectronBridge = typeof window !== 'undefined' && !!(window as any).electron?.invoke;
     if (hasElectronBridge && filePath) {
-      (window as any).electron.invoke('shell:openPath', filePath).catch(() => {});
+      (window as any).electron.invoke('shell:openPath', filePath).catch((err) => console.warn('Failed to open file location:', err));
     }
   }
 

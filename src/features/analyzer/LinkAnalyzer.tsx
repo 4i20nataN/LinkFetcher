@@ -54,6 +54,7 @@ export const LinkAnalyzer: React.FC = () => {
     videoOnly: false,
     sponsorblockRemove: '',
     fpsMax: 0,
+    bandLimit: 0,
   });
 
   // Auto-analyze URL from search / download later trigger
@@ -108,6 +109,7 @@ export const LinkAnalyzer: React.FC = () => {
       videoOnly: false,
       sponsorblockRemove: '',
       fpsMax: 0,
+      bandLimit: 0,
     });
     setSuccessMsg(null);
     setProbeError(null);
@@ -167,7 +169,10 @@ export const LinkAnalyzer: React.FC = () => {
   };
 
   const handleStartDownload = () => {
-    if (!mediaInfo || !selectedFormat) return;
+    if (!mediaInfo || !selectedFormat) {
+      setError(settings.language === 'en' ? 'No format selected. Please wait for analysis to complete.' : 'Nenhum formato selecionado. Aguarde a analise completar.');
+      return;
+    }
 
     DownloadEngine.addDownload(
       mediaInfo,
@@ -500,6 +505,7 @@ export const LinkAnalyzer: React.FC = () => {
                 mediaInfo={mediaInfo}
                 onFormatSelect={setFormatOptions}
                 onFormatChange={setSelectedFormat}
+                formatOptions={formatOptions}
               />
             </div>
 
