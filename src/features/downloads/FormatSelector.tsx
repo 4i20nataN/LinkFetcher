@@ -227,7 +227,7 @@ function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, accentBg, 
 }
 
 export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: FormatSelectorProps) {
-  const { settings } = useApp();
+  const { settings, updateSettings } = useApp();
   const [activeTab, setActiveTab] = useState<TabId>('media');
   const [showSubs, setShowSubs] = useState(false);
   const [showCustomFormat, setShowCustomFormat] = useState(false);
@@ -741,6 +741,23 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
                 {[1, 3, 5, 10].map(n => (
                   <Btn key={n} active={options.retries === n} onClick={() => update({ retries: n })} className="py-2 flex-1">
                     {n}
+                  </Btn>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Limite de Velocidade ── */}
+            <div className="space-y-2">
+              <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">Limite de Velocidade</label>
+              <div className="flex flex-wrap gap-1.5">
+                {[0, 512, 1024, 5120, 10240, 25600, 51200].map(kbps => (
+                  <Btn
+                    key={kbps}
+                    active={settings.bandLimit === kbps}
+                    onClick={() => updateSettings({ bandLimit: kbps })}
+                    className="py-2 flex-1 text-[10px] min-w-[80px]"
+                  >
+                    {kbps === 0 ? 'Sem limite' : kbps >= 1024 ? `${kbps / 1024}MB/s` : `${kbps}KB/s`}
                   </Btn>
                 ))}
               </div>
