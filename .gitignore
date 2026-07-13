@@ -9,3 +9,12 @@ coverage/
 
 # yt-dlp binary (auto-downloaded on first run)
 .cache/
+
+# Electron build artifacts
+release/
+
+# yt-dlp binaries (bundled, not source)
+yt-dlp/
+
+# Electron bundled resources (ffmpeg.exe, yt-dlp.exe)
+electron/resources/

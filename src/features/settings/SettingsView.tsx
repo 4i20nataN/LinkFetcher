@@ -4,13 +4,14 @@ import { AppSettings } from '../../types';
 import { StorageService } from '../../core/storage/Storage';
 import { 
   Settings, Volume2, Globe, Sliders, HardDrive, Bell, AlertCircle, 
-  Trash2, ShieldCheck, Download, Upload, Info, RefreshCw, Key
+  Trash2, ShieldCheck, Download, Upload, Info, RefreshCw, Key, ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from '../../core/i18n';
 import { 
   getAccentBgClass, getAccentTextClass, getAccentBorderClass, getAccentRingClass 
 } from '../../components/ThemeWrapper';
+import { getYtDlpStatusWithAdapter } from '../../core/ytdlp/YtDlpAdapter';
 
 const accentColorsList = [
   { id: 'indigo', name: 'indigo', color: 'bg-indigo-500' },
@@ -45,26 +46,65 @@ export const SettingsView: React.FC = () => {
   };
 
   const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [showCopied, setShowCopied] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [latestVersion, setLatestVersion] = useState('');
 
   // Check yt-dlp binary status
   useEffect(() => {
-    fetch('/api/ytdlp/status')
-      .then(r => r.json())
+    getYtDlpStatusWithAdapter()
       .then(data => setYtdlpStatus(data))
       .catch(() => setYtdlpStatus({ ready: false }));
   }, []);
 
-  const handleCheckUpdates = () => {
+  const handleCheckUpdates = async () => {
     setCheckingUpdates(true);
+    setUpdateAvailable(false);
     showToast(settings.language === 'en' ? 'Checking GitHub repository for updates...' : 'Conectando ao GitHub para buscar atualizações...');
-    
-    setTimeout(() => {
-      setCheckingUpdates(false);
+    try {
+      const response = await fetch('https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest');
+      if (!response.ok) {
+        throw new Error(`GitHub API returned ${response.status}`);
+      }
+      const release = await response.json();
+      const latest = release.tag_name?.replace('v', '');
+      const current = __APP_VERSION__;
+      if (latest && latest !== current) {
+        setUpdateAvailable(true);
+        setLatestVersion(latest);
+        showToast(settings.language === 'en' 
+          ? `New version available: ${latest}` 
+          : `Nova versão disponível: ${latest}`
+        );
+      } else {
+        showToast(settings.language === 'en' 
+          ? `You are running the latest version! (${current})` 
+          : `Você já está rodando a versão mais recente! (${current})`
+        );
+      }
+    } catch (error) {
       showToast(settings.language === 'en' 
-        ? 'You are running the latest version! (v2.4.0-stable)' 
-        : 'Você já está rodando a versão mais recente! (v2.4.0-stable)'
+        ? 'Update check failed — try again later.' 
+        : 'Falha ao verificar atualizações — tente novamente.'
       );
-    }, 2000);
+    } finally {
+      setCheckingUpdates(false);
+    }
+  };
+
+  const handleOpenFolder = async () => {
+    const downloadPath = settings.defaultDir || 'C:\\Downloads\\UniversalDownloader';
+    if (window.electron) {
+      await window.electron.invoke('shell:openPath', downloadPath);
+    } else {
+      try {
+        await navigator.clipboard.writeText(downloadPath);
+        setShowCopied(true);
+        setTimeout(() => setShowCopied(false), 2000);
+      } catch (_) {
+        showToast(downloadPath);
+      }
+    }
   };
 
   const handleExport = () => {
@@ -314,6 +354,16 @@ export const SettingsView: React.FC = () => {
                   onChange={(e) => updateSettings({ defaultDir: e.target.value })}
                   className="flex-1 px-3 py-2 rounded-xl bg-zinc-950/70 border border-zinc-800 text-xs text-zinc-300 font-mono focus:outline-none"
                 />
+                <button
+                  onClick={handleOpenFolder}
+                  className="px-3 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-zinc-700/50 transition-all whitespace-nowrap"
+                >
+                  <ExternalLink size={12} />
+                  {showCopied
+                    ? (settings.language === 'en' ? 'Copied!' : 'Copiado!')
+                    : (settings.language === 'en' ? 'Open Folder' : 'Abrir Pasta')
+                  }
+                </button>
               </div>
             </div>
 
@@ -469,7 +519,7 @@ export const SettingsView: React.FC = () => {
                 ? (settings.language === 'en' ? 'Checking status...' : 'Verificando status...')
                 : ytdlpStatus.ready
                   ? (settings.language === 'en' ? 'yt-dlp ready — Real downloads active' : 'yt-dlp pronto — Downloads reais ativos')
-                  : (settings.language === 'en' ? 'yt-dlp not found — will auto-install on first download' : 'yt-dlp não encontrado — será instalado automaticamente no primeiro download')
+                  : (settings.language === 'en' ? 'yt-dlp not found — place binary in electron/resources/ or set YTDLP_PATH' : 'yt-dlp não encontrado — coloque o binário em electron/resources/ ou defina YTDLP_PATH')
               }
             </p>
             <p className="text-[10px] text-zinc-500 leading-relaxed">

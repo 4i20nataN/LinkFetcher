@@ -1,13 +1,23 @@
 {
-  "name": "react-example",
+  "name": "linkfetcher",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "LinkFetcher - desktop yt-dlp frontend",
+  "author": {
+    "name": "Natan Vanim",
+    "email": "natan.vanim@gmail.com"
+  },
+  "main": "dist/electron/main.cjs",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && npm run build:electron",
+    "build:electron": "esbuild electron/main.cjs --bundle --platform=node --outfile=dist/electron/main.cjs --external:electron --format=cjs && node -e \"require('fs').copyFileSync('electron/preload.cjs','dist/electron/preload.cjs')\"",
     "start": "node dist/server.cjs",
+    "electron:dev": "node scripts/electron-dev.cjs",
     "clean": "rm -rf dist server.js",
+    "package:win": "npm run build && npx electron-builder --win",
+    "prepare:resources": "node scripts/prepare-resources.cjs",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
@@ -26,10 +36,44 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
+    "electron": "^37.2.0",
+    "electron-builder": "^26.15.3",
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.3"
+  },
+  "build": {
+    "appId": "com.linkfetcher.app",
+    "productName": "LinkFetcher",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/index.html",
+      "dist/assets/**",
+      "dist/electron/**",
+      "dist/server.cjs",
+      "dist/server.cjs.map",
+      "electron/main.cjs",
+      "electron/preload.cjs",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "electron/resources/",
+        "to": "resources/",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    }
   }
 }

@@ -38,7 +38,7 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <div 
-      className={`min-h-screen transition-colors duration-300 select-none ${themeClass} relative overflow-hidden`} 
+      className={`h-screen transition-colors duration-300 select-none ${themeClass} relative overflow-hidden`} 
       style={style}
     >
       {/* Background Mesh Gradients for Frosted Glass feel */}
@@ -47,7 +47,7 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
       <div className="absolute bottom-[-10%] left-[20%] w-[35%] h-[35%] bg-indigo-500/4 blur-[120px] pointer-events-none z-0" />
 
       {/* Content wrapper with higher z-index to stay above meshes */}
-      <div className="relative z-10 min-h-screen">
+      <div className="relative z-10 h-full">
         {children}
       </div>
     </div>

@@ -4,10 +4,15 @@ import { Link2, Search, ArrowDownToLine, Star, Clock, Settings, Sparkles, Menu, 
 import { motion, AnimatePresence } from 'motion/react';
 import { getAccentTextClass, getAccentBgClass } from './ThemeWrapper';
 import { useTranslation, TranslationKey } from '../core/i18n';
+import packageJson from '../../package.json';
 
 export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = ({ isOpen, toggleOpen }) => {
   const { activeTab, setActiveTab, settings, downloads } = useApp();
   const { t } = useTranslation(settings);
+
+  const authorName = packageJson.author?.name || 'Developer';
+  const authorEmail = packageJson.author?.email || '';
+  const authorInitials = authorName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
   const menuItems = [
     { id: 'analyze', label: t('analyzeLink'), icon: Link2, desc: t('analyzeDesc') },
@@ -73,7 +78,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = ({
         </div>
 
         {/* Sidebar Sections */}
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 pb-28">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -142,10 +147,10 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = ({
         <div className="absolute bottom-6 left-6 right-6 p-4 rounded-2xl glass-card flex flex-col gap-2">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center font-bold text-xs text-zinc-300">
-              NV
+              {authorInitials}
             </div>
             <div className="overflow-hidden">
-              <span className="font-semibold text-xs text-zinc-200 block truncate">natan.vanim@gmail.com</span>
+              <span className="font-semibold text-xs text-zinc-200 block truncate">{authorEmail}</span>
               <span className="text-[10px] text-zinc-500 font-mono uppercase block">{t('adminRole')}</span>
             </div>
           </div>

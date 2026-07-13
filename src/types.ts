@@ -39,6 +39,7 @@ export interface MediaInfo {
   author: string;
   channel: string;
   duration: string; // e.g. "04:15"
+  durationSeconds: number; // e.g. 255
   resolution?: string;
   sizeEst: string;
   formats: MediaFormat[];
@@ -59,11 +60,33 @@ export interface DownloadItem {
   thumbnailUrl: string;
   platform: PlatformId;
   format: MediaFormat;
-  sizeTotal: number; // in bytes
-  sizeDownloaded: number; // in bytes
-  progress: number; // 0 to 100
-  speed: number; // in bytes/sec
-  eta: number; // remaining seconds
+  formatString?: string;
+  audioOnly?: boolean;
+  audioFormat?: string;
+  audioQuality?: string;
+  writeSubs?: boolean;
+  writeAutoSubs?: boolean;
+  subLangs?: string;
+  subFormat?: string;
+  embedSubs?: boolean;
+  writeThumbnail?: boolean;
+  embedThumbnail?: boolean;
+  embedMetadata?: boolean;
+  mergeOutputFormat?: string;
+  restrictFilenames?: boolean;
+  noOverwrites?: boolean;
+  keepVideo?: boolean;
+  concurrentFragments?: number;
+  retries?: number;
+  downloadSections?: string;
+  videoOnly?: boolean;
+  sponsorblockRemove?: string;
+  fpsMax?: number;
+  sizeTotal: number;
+  sizeDownloaded: number;
+  progress: number;
+  speed: number;
+  eta: number;
   status: 'queued' | 'downloading' | 'paused' | 'completed' | 'failed' | 'cancelled';
   addedAt: string;
   finishedAt?: string;
@@ -104,13 +127,72 @@ export interface AppSettings {
   customApiUrl?: string;
 }
 
+export interface ProbeOptions {
+  url: string;
+  cookies?: string;
+  cookiesFromBrowser?: string;
+  proxy?: string;
+}
+
+export interface SearchOptions {
+  query: string;
+  platform: 'youtube' | 'vimeo' | 'dailymotion' | 'bilibili' | 'soundcloud';
+  maxResults?: number;
+  cookies?: string;
+  proxy?: string;
+}
+
 export interface SearchResult {
   id: string;
   title: string;
-  channel: string;
-  views: string;
-  duration: string;
-  publishDate: string;
-  thumbnailUrl: string;
   url: string;
+  thumbnail: string;
+  duration: number;          // seconds
+  duration_string: string;   // "12:45"
+  view_count: number;
+  uploader: string;
+  description: string;
+}
+
+export interface DownloadOptions {
+  url: string;
+  outputPath?: string;
+  filename?: string;
+  // Format options
+  format?: string;
+  audioOnly?: boolean;
+  audioFormat?: 'mp3' | 'aac' | 'flac' | 'm4a' | 'opus' | 'wav';
+  audioQuality?: string;
+  mergeOutputFormat?: string;
+  // Subtitle options
+  writeSubs?: boolean;
+  writeAutoSubs?: boolean;
+  subLangs?: string;
+  subFormat?: string;
+  embedSubs?: boolean;
+  // Thumbnail options
+  writeThumbnail?: boolean;
+  embedThumbnail?: boolean;
+  // Metadata options
+  embedMetadata?: boolean;
+  // Advanced options
+  outputTemplate?: string;
+  restrictFilenames?: boolean;
+  noOverwrites?: boolean;
+  keepVideo?: boolean;
+  // Trim/cut
+  downloadSections?: string; // e.g. "*01:30-05:00"
+  // Video only (no audio track)
+  videoOnly?: boolean;
+  // SponsorBlock
+  sponsorblockRemove?: string; // e.g. "all" or comma-separated categories
+  // FPS limit
+  fpsMax?: number;
+  // Auth options
+  cookies?: string;
+  cookiesFromBrowser?: string;
+  proxy?: string;
+  ffmpegLocation?: string;
+  // Rate limiting
+  bandLimit?: number; // KB/s, 0 = unlimited
 }
