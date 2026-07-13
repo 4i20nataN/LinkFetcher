@@ -1,20 +1,56 @@
+# Dependencies
 node_modules/
-build/
+
+# Build outputs
 dist/
+dist-web/
+build/
+*.tsbuildinfo
+
+# Test / coverage
 coverage/
-.DS_Store
-*.log
-.env*
+.nyc_output/
+
+# Vite / bundler cache
+.vite/
+
+# Environment
+.env
+.env.local
+.env.*.local
 !.env.example
 
-# yt-dlp binary (auto-downloaded on first run)
-.cache/
+# IDE / OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.code-workspace
 
-# Electron build artifacts
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Electron
 release/
-
-# yt-dlp binaries (bundled, not source)
-yt-dlp/
-
-# Electron bundled resources (ffmpeg.exe, yt-dlp.exe)
 electron/resources/
+
+# yt-dlp / ffmpeg (bundled, not source)
+.cache/
+yt-dlp/
+*.exe
+
+# Misc artifacts
+*.tgz
+*.blockmap
+.nul
+nul
+
+# TypeScript
+*.tsbuildinfo

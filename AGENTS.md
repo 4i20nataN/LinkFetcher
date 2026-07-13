@@ -197,3 +197,17 @@ Se a documentação não cobre o caso, ou há ambiguidade nas regras:
 ---
 
 *Este arquivo vive na raiz do projeto. Atualize quando houver mudança estrutural.*
+---
+
+## 11. 🛡️ HARNESS SYSTEM: RETROSPECTIVE ANTI-LOOP & SELF-CORRECTION
+
+To optimize performance, prevent token draining (Input/Output thresholds), and eliminate redundant code rewriting, you must operate under a strict Retrospective Self-Correction workflow.
+
+### 1. Loop Prevention & Redundant Rewrite Guardrails
+*   **Zero-Redundancy Rule:** Before modifying, rewriting, or regenerating any file (e.g., Electron main/preload scripts, server components), you MUST verify if the modification is structurally strictly necessary. Do not rewrite whole codeblocks for minor tweaks.
+*   **Command Fail-Safe:** If a terminal command, build script, or execution fails on the first attempt, DO NOT execute the exact same command or variations of it more than twice. If it fails twice, stop immediately and pivot the technical strategy.
+
+### 2. Retrospective Learning Cache (Dynamic Heuristics)
+*   **Error Abstraction:** Every time a decision, path, library, or command yields an unexpected result, error, or syntax mismatch, you must treat this as a "Local Edge Case" rather than an absolute rule.
+*   **Context-Aware Diagnostics:** Absorb the failure immediately. Analyze *why* the path failed (e.g., outdated documentation, breaking changes in packages, missing TypeScript language server mapping) and calculate the shortest alternative route.
+*   **Dynamic Adaptation:** For all subsequent steps within this session, use this learned failure to bypass obsolete patterns. Do not hallucinate or attempt documented pathways that your live terminal testing has already proven to be incorrect or incompatible with the current project state.
