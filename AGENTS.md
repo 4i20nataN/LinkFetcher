@@ -211,3 +211,20 @@ To optimize performance, prevent token draining (Input/Output thresholds), and e
 *   **Error Abstraction:** Every time a decision, path, library, or command yields an unexpected result, error, or syntax mismatch, you must treat this as a "Local Edge Case" rather than an absolute rule.
 *   **Context-Aware Diagnostics:** Absorb the failure immediately. Analyze *why* the path failed (e.g., outdated documentation, breaking changes in packages, missing TypeScript language server mapping) and calculate the shortest alternative route.
 *   **Dynamic Adaptation:** For all subsequent steps within this session, use this learned failure to bypass obsolete patterns. Do not hallucinate or attempt documented pathways that your live terminal testing has already proven to be incorrect or incompatible with the current project state.
+
+---
+
+## 12. 🎯 AGENT OPERATING PROTOCOL: FOCUSED FIX & RETROSPECTIVE REPORTING
+
+**MANDATORY WORKFLOW FOR ALL TASKS:**
+
+1.  **ANALYZE FIRST** — Before making any changes, fully explore the codebase to understand the complete context, data flows, and root causes. Map the entire affected surface area.
+2.  **MINIMAL SURGERY** — Only modify files directly related to the reported issue. Do NOT refactor unrelated code, reformat files, or "improve" things outside the scope.
+3.  **VERIFY THE FIX** — Run lint, type-check, and build to confirm the specific issue is resolved without regressions.
+4.  **RETROSPECTIVE REPORT** — At completion, you MUST provide:
+    *   ✅ **Result**: What was fixed (specific to the user's request)
+    *   🔍 **Observations**: What else you noticed during analysis (related or unrelated)
+    *   ⚠️ **Alerts**: Technical debt, bugs, or risks discovered but not fixed
+    *   💡 **Suggestions**: Actionable next steps or improvements for future work
+
+This protocol prevents scope creep, ensures accountability, and builds a knowledge base for continuous improvement.
