@@ -55,6 +55,14 @@ export const SettingsView: React.FC = () => {
     getYtDlpStatusWithAdapter()
       .then(data => setYtdlpStatus(data))
       .catch(() => setYtdlpStatus({ ready: false }));
+
+    if (isElectron && (!settings.defaultDir || settings.defaultDir === 'Downloads')) {
+      window.electron!.invoke('shell:getDownloadsPath').then((p: any) => {
+        if (p && typeof p === 'string') {
+          updateSettings({ defaultDir: p });
+        }
+      }).catch(() => {});
+    }
   }, []);
 
   const handleCheckUpdates = async () => {
@@ -80,7 +88,11 @@ export const SettingsView: React.FC = () => {
   };
 
   const handleOpenFolder = async () => {
-    const downloadPath = settings.defaultDir || (typeof window !== 'undefined' ? (window.electron ? '' : 'C:\\Downloads\\UniversalDownloader') : '');
+    const downloadPath = settings.defaultDir || '';
+    if (!downloadPath) {
+      showToast(settings.language === 'en' ? 'No folder configured. Choose a destination folder first.' : 'Nenhuma pasta configurada. Escolha uma pasta de destino primeiro.');
+      return;
+    }
     if (isElectron) {
       await window.electron!.invoke('shell:openPath', downloadPath);
     } else {

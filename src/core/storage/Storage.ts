@@ -96,7 +96,7 @@ export class StorageService {
       themeMode: 'dark',
       accentColor: 'indigo',
       language: 'pt',
-      defaultDir: 'C:\\Downloads\\UniversalDownloader',
+      defaultDir: '',
       bandLimit: 0,
       maxConcurrent: 3,
       wifiOnly: false,
