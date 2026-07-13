@@ -82,6 +82,7 @@ export interface DownloadItem {
   videoOnly?: boolean;
   sponsorblockRemove?: string;
   fpsMax?: number;
+  bandLimit?: number;
   sizeTotal: number;
   sizeDownloaded: number;
   progress: number;
