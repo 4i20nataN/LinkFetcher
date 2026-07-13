@@ -21,6 +21,10 @@ export default defineConfig(() => {
     define: {
       __APP_VERSION__: JSON.stringify(packageJson.version),
     },
+    build: {
+      outDir: 'dist-web',
+      emptyOutDir: true,
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
