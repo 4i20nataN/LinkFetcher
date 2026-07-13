@@ -5,7 +5,7 @@ declare global {
 
   interface Window {
     electron?: {
-      invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
+      invoke: <T = unknown>(channel: string, ...args: unknown[]) => Promise<T>;
       on: (channel: string, listener: (...args: unknown[]) => void) => () => void;
       off: (channel: string, listener: (...args: unknown[]) => void) => void;
     };
