@@ -141,3 +141,10 @@ export function getAccentRingClass(settings: { accentColor: string }) {
       return 'focus:ring-indigo-500/30';
   }
 }
+
+// Global Helper to return text color class for active accent background (white or dark)
+export function getAccentTextOnBgClass(settings: { accentColor: string }) {
+  // Colors where 500 shade is too light for white text
+  const darkTextColors = ['amber', 'lime', 'slate'];
+  return darkTextColors.includes(settings.accentColor) ? 'text-zinc-900' : 'text-white';
+}

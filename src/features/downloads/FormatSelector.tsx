@@ -1,14 +1,24 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MediaInfo, MediaFormat } from '../../types';
-import { getAccentBgClass, getAccentTextClass, getAccentBorderClass } from '../../components/ThemeWrapper';
+import { getAccentBgClass, getAccentTextClass, getAccentBorderClass, getAccentTextOnBgClass } from '../../components/ThemeWrapper';
 import { motion, AnimatePresence } from 'motion/react';
 import { FileVideo, SlidersHorizontal, ChevronDown, ChevronUp, Info, Scissors, Shield, Gauge } from 'lucide-react';
+
+const isWebMode = typeof window !== 'undefined' && !window.electron;
+
+const DesktopOnlyTag: React.FC = () => (
+  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-zinc-800 text-zinc-500 border border-zinc-700">
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+    Desktop
+  </span>
+);
 
 interface FormatSelectorProps {
   mediaInfo: MediaInfo;
   onFormatSelect: (options: FormatOptions) => void;
   onFormatChange?: (format: MediaFormat) => void;
+  formatOptions?: FormatOptions;
 }
 
 export interface FormatOptions {
@@ -33,6 +43,7 @@ export interface FormatOptions {
   downloadSections?: string;
   sponsorblockRemove?: string;
   fpsMax?: number;
+  bandLimit?: number; // KB/s, 0 = unlimited
 }
 
 const VIDEO_PRESETS = [
@@ -119,11 +130,12 @@ function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, accentBg, 
   const effectiveEnd = endSeconds || durationSeconds;
 
   const startPct = (startSeconds / maxVal) * 100;
-  const endPct = ((endSeconds || durationSeconds) / maxVal) * 100;
+  const endPct = (effectiveEnd / maxVal) * 100;
 
   const [inputStart, setInputStart] = useState(formatTime(startSeconds));
   const [inputEnd, setInputEnd] = useState(endSeconds > 0 ? formatTime(endSeconds) : '');
   const [inputFocused, setInputFocused] = useState<'start' | 'end' | null>(null);
+  const [dragging, setDragging] = useState<'start' | 'end' | null>(null);
 
   useEffect(() => {
     if (inputFocused !== 'start') setInputStart(formatTime(startSeconds));
@@ -147,20 +159,53 @@ function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, accentBg, 
     setInputFocused(null);
   };
 
+  const updateFromClientX = useCallback((which: 'start' | 'end', clientX: number) => {
+    const track = document.querySelector('[data-time-range-track]') as HTMLElement;
+    if (!track) return;
+    const rect = track.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const val = Math.round(pct * maxVal);
+    if (which === 'start') {
+      const maxAllowed = effectiveEnd > 0 ? effectiveEnd - 1 : maxVal;
+      if (val <= maxAllowed) onChange(val, endSeconds);
+    } else {
+      const minAllowed = startSeconds + 1;
+      if (val >= minAllowed) onChange(startSeconds, val >= durationSeconds ? 0 : val);
+    }
+  }, [maxVal, effectiveEnd, durationSeconds, endSeconds, startSeconds, onChange]);
+
+  useEffect(() => {
+    if (!dragging) return;
+    const mouseMove = (e: MouseEvent) => { e.preventDefault(); updateFromClientX(dragging, e.clientX); };
+    const mouseUp = () => setDragging(null);
+    const touchMove = (e: TouchEvent) => { e.preventDefault(); updateFromClientX(dragging, e.touches[0].clientX); };
+    const touchEnd = () => setDragging(null);
+    window.addEventListener('mousemove', mouseMove);
+    window.addEventListener('mouseup', mouseUp);
+    window.addEventListener('touchmove', touchMove, { passive: false });
+    window.addEventListener('touchend', touchEnd);
+    return () => {
+      window.removeEventListener('mousemove', mouseMove);
+      window.removeEventListener('mouseup', mouseUp);
+      window.removeEventListener('touchmove', touchMove);
+      window.removeEventListener('touchend', touchEnd);
+    };
+  }, [dragging, updateFromClientX]);
+
   const cutDuration = effectiveEnd > startSeconds ? effectiveEnd - startSeconds : 0;
 
   return (
     <div className="space-y-3">
       {/* Slider track */}
-      <div className="relative h-6 flex items-center select-none">
+      <div className="relative h-6 flex items-center select-none" data-time-range-track>
         {/* Background track */}
         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 rounded-full bg-zinc-800" />
-        {/* Selected region */}
+        {/* Selected region - perfectly aligned with custom thumbs */}
         <div
           className={`absolute top-1/2 -translate-y-1/2 h-1 rounded-full ${accentBg}`}
-          style={{ left: `${startPct}%`, width: `${endPct - startPct}%` }}
+          style={{ left: `${startPct}%`, width: `${Math.max(0, endPct - startPct)}%` }}
         />
-        {/* Start handle */}
+        {/* Hidden native range inputs for keyboard/accessibility only */}
         <input
           type="range"
           min={0}
@@ -169,24 +214,61 @@ function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, accentBg, 
           value={startSeconds}
           onChange={e => {
             const val = parseInt(e.target.value);
-            if (val < (endSeconds || durationSeconds)) onChange(val, endSeconds);
+            const maxAllowed = effectiveEnd > 0 ? effectiveEnd - 1 : maxVal;
+            if (val <= maxAllowed) onChange(val, endSeconds);
           }}
-          className="range-slider absolute inset-0"
-          style={{ zIndex: 3 }}
+          className="absolute inset-0 opacity-0 pointer-events-none"
+          tabIndex={-1}
+          aria-label="Início do recorte"
         />
-        {/* End handle */}
         <input
           type="range"
           min={0}
           max={maxVal}
           step={1}
-          value={endSeconds || durationSeconds}
+          value={effectiveEnd}
           onChange={e => {
             const val = parseInt(e.target.value);
-            if (val > startSeconds) onChange(startSeconds, val >= durationSeconds ? 0 : val);
+            const minAllowed = startSeconds + 1;
+            if (val >= minAllowed) onChange(startSeconds, val >= durationSeconds ? 0 : val);
           }}
-          className="range-slider absolute inset-0"
-          style={{ zIndex: 4 }}
+          className="absolute inset-0 opacity-0 pointer-events-none"
+          tabIndex={-1}
+          aria-label="Fim do recorte"
+        />
+        {/* Custom start thumb - perfectly centered on fill bar edge */}
+        <button
+          type="button"
+          onMouseDown={e => { e.preventDefault(); setDragging('start'); }}
+          onTouchStart={e => { setDragging('start'); }}
+          onKeyDown={e => {
+            if (e.key === 'ArrowLeft') { e.preventDefault(); onChange(Math.max(0, startSeconds - 1), endSeconds); }
+            if (e.key === 'ArrowRight') { e.preventDefault(); const maxAllowed = effectiveEnd > 0 ? effectiveEnd - 1 : maxVal; if (startSeconds + 1 <= maxAllowed) onChange(startSeconds + 1, endSeconds); }
+          }}
+          className="absolute top-1/2 w-4 h-4 rounded-full bg-white border-2 border-zinc-300 shadow-lg transition-transform hover:scale-125 active:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-zinc-900"
+          style={{ left: `${startPct}%`, transform: 'translate(-50%, -50%)', zIndex: 4 }}
+          aria-label="Início do recorte"
+          aria-valuemin={0}
+          aria-valuemax={maxVal}
+          aria-valuenow={startSeconds}
+          tabIndex={0}
+        />
+        {/* Custom end thumb - perfectly centered on fill bar edge */}
+        <button
+          type="button"
+          onMouseDown={e => { e.preventDefault(); setDragging('end'); }}
+          onTouchStart={e => { setDragging('end'); }}
+          onKeyDown={e => {
+            if (e.key === 'ArrowLeft') { e.preventDefault(); const minAllowed = startSeconds + 1; if (effectiveEnd - 1 >= minAllowed) onChange(startSeconds, effectiveEnd - 1); }
+            if (e.key === 'ArrowRight') { e.preventDefault(); if (effectiveEnd < maxVal) onChange(startSeconds, effectiveEnd + 1 >= durationSeconds ? 0 : effectiveEnd + 1); }
+          }}
+          className="absolute top-1/2 w-4 h-4 rounded-full bg-white border-2 border-zinc-300 shadow-lg transition-transform hover:scale-125 active:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-zinc-900"
+          style={{ left: `${endPct}%`, transform: 'translate(-50%, -50%)', zIndex: 4 }}
+          aria-label="Fim do recorte"
+          aria-valuemin={0}
+          aria-valuemax={maxVal}
+          aria-valuenow={effectiveEnd}
+          tabIndex={0}
         />
       </div>
 
@@ -255,6 +337,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
     videoOnly: false,
     sponsorblockRemove: '',
     fpsMax: 0,
+    bandLimit: 0,
   });
 
   const [trimStart, setTrimStart] = useState(0);
@@ -331,6 +414,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
   const accentBg = getAccentBgClass(settings).split(' ')[0];
   const accentText = getAccentTextClass(settings);
   const accentBorder = getAccentBorderClass(settings).split(' ')[0];
+  const accentTextOnBg = getAccentTextOnBgClass(settings);
 
   const isImage = mediaInfo.type === 'image';
 
@@ -432,7 +516,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${isActive ? `${accentBg} text-white shadow-lg` : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}`}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${isActive ? `${accentBg} ${accentTextOnBg} shadow-lg` : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}`}
             >
               <Icon size={14} />
               {tab.label}
@@ -578,7 +662,10 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
                     ))}
                   </div>
                 </div>
-                <SmallToggle value={options.embedSubs} onChange={() => update({ embedSubs: !options.embedSubs })} label="Embutir no video" />
+                <div className={`${isWebMode ? 'opacity-40 pointer-events-none' : ''}`}>
+                  <SmallToggle value={options.embedSubs} onChange={() => update({ embedSubs: !options.embedSubs })} label="Embutir no video" />
+                  {isWebMode && <div className="mt-1"><DesktopOnlyTag /></div>}
+                </div>
               </motion.div>
             )}
 
@@ -683,10 +770,11 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
 
 
             {/* ── SponsorBlock ── */}
-            <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
+            <div className={`p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2 ${isWebMode ? 'opacity-40 pointer-events-none' : ''}`}>
               <div className="flex items-center gap-2">
                 <Shield size={13} className="text-zinc-400" />
                 <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">SponsorBlock</label>
+                {isWebMode && <DesktopOnlyTag />}
               </div>
               <p className="text-[10px] text-zinc-600">Remover automaticamente partes indesejadas do video</p>
               <div className="grid grid-cols-2 gap-1.5">
@@ -709,7 +797,10 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
             {/* ── Thumbnail ── */}
             <Toggle value={!!options.writeThumbnail} onChange={() => update({ writeThumbnail: !options.writeThumbnail })} label="Thumbnail" desc="Salvar imagem da miniatura" />
             {options.writeThumbnail && (
-              <SmallToggle value={!!options.embedThumbnail} onChange={() => update({ embedThumbnail: !options.embedThumbnail })} label="Incorporar thumbnail" />
+              <div className={`${isWebMode ? 'opacity-40 pointer-events-none' : ''}`}>
+                <SmallToggle value={!!options.embedThumbnail} onChange={() => update({ embedThumbnail: !options.embedThumbnail })} label="Incorporar thumbnail" />
+                {isWebMode && <div className="mt-1"><DesktopOnlyTag /></div>}
+              </div>
             )}
 
             {/* ── Comportamento ── */}
@@ -753,8 +844,8 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
                 {[0, 512, 1024, 5120, 10240, 25600, 51200].map(kbps => (
                   <Btn
                     key={kbps}
-                    active={settings.bandLimit === kbps}
-                    onClick={() => updateSettings({ bandLimit: kbps })}
+                    active={options.bandLimit === kbps}
+                    onClick={() => update({ bandLimit: kbps })}
                     className="py-2 flex-1 text-[10px] min-w-[80px]"
                   >
                     {kbps === 0 ? 'Sem limite' : kbps >= 1024 ? `${kbps / 1024}MB/s` : `${kbps}KB/s`}
