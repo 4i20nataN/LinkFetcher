@@ -480,6 +480,7 @@ export const LinkAnalyzer: React.FC = () => {
               <FormatSelector
                 mediaInfo={mediaInfo}
                 onFormatSelect={setFormatOptions}
+                onFormatChange={setSelectedFormat}
               />
             </div>
 

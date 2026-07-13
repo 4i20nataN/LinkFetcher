@@ -47,12 +47,13 @@
   "build": {
     "appId": "com.linkfetcher.app",
     "productName": "LinkFetcher",
+    "electronDist": "node_modules/electron/dist",
     "directories": {
       "output": "release"
     },
     "files": [
-      "dist/index.html",
-      "dist/assets/**",
+      "dist-web/index.html",
+      "dist-web/assets/**",
       "dist/electron/**",
       "dist/server.cjs",
       "dist/server.cjs.map",

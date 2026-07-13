@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import { MediaInfo } from '../../types';
+import { MediaInfo, MediaFormat } from '../../types';
 import { getAccentBgClass, getAccentTextClass, getAccentBorderClass } from '../../components/ThemeWrapper';
 import { motion, AnimatePresence } from 'motion/react';
 import { FileVideo, SlidersHorizontal, ChevronDown, ChevronUp, Info, Scissors, Shield, Gauge } from 'lucide-react';
@@ -8,6 +8,7 @@ import { FileVideo, SlidersHorizontal, ChevronDown, ChevronUp, Info, Scissors, S
 interface FormatSelectorProps {
   mediaInfo: MediaInfo;
   onFormatSelect: (options: FormatOptions) => void;
+  onFormatChange?: (format: MediaFormat) => void;
 }
 
 export interface FormatOptions {
@@ -225,7 +226,7 @@ function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, accentBg, 
   );
 }
 
-export function FormatSelector({ mediaInfo, onFormatSelect }: FormatSelectorProps) {
+export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: FormatSelectorProps) {
   const { settings } = useApp();
   const [activeTab, setActiveTab] = useState<TabId>('media');
   const [showSubs, setShowSubs] = useState(false);
@@ -258,6 +259,56 @@ export function FormatSelector({ mediaInfo, onFormatSelect }: FormatSelectorProp
 
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
+
+  // Find the best matching MediaFormat from probe results based on current options
+  const findMatchingFormat = useCallback((): MediaFormat | null => {
+    const formats = mediaInfo.formats;
+    if (!formats.length) return null;
+
+    if (options.audioOnly) {
+      // For audio-only, find best audio format
+      const audioFormats = formats.filter(f => f.type === 'audio');
+      if (audioFormats.length) {
+        // Prefer the format matching audioFormat if specified
+        const preferred = audioFormats.find(f => f.ext === options.audioFormat);
+        return preferred || audioFormats.reduce((best, f) => (f.sizeBytes > best.sizeBytes ? f : best), audioFormats[0]);
+      }
+      return formats[0];
+    }
+
+    // For video, find format matching the resolution preset
+    const targetHeight = VIDEO_PRESETS.find(p => p.format === options.format)?.height;
+    if (targetHeight && targetHeight !== Infinity) {
+      const videoFormats = formats.filter(f => f.type === 'video');
+      // Find format with height <= targetHeight, preferring highest
+      const matching = videoFormats
+        .filter(f => {
+          const m = f.quality.match(/(\d+)/);
+          return m && parseInt(m[1], 10) <= targetHeight;
+        })
+        .sort((a, b) => {
+          const ha = a.quality.match(/(\d+)/)?.[1] || '0';
+          const hb = b.quality.match(/(\d+)/)?.[1] || '0';
+          return parseInt(hb, 10) - parseInt(ha, 10);
+        });
+      if (matching.length) return matching[0];
+      // Fallback to highest available
+      if (videoFormats.length) return videoFormats.sort((a, b) => b.sizeBytes - a.sizeBytes)[0];
+    }
+
+    // 'best' preset or fallback - return highest quality video+audio combination
+    const videoFormats = formats.filter(f => f.type === 'video');
+    if (videoFormats.length) return videoFormats.sort((a, b) => b.sizeBytes - a.sizeBytes)[0];
+    return formats[0];
+  }, [mediaInfo.formats, options.format, options.audioOnly, options.audioFormat]);
+
+  // Notify parent when matching format changes
+  useEffect(() => {
+    if (onFormatChange) {
+      const fmt = findMatchingFormat();
+      if (fmt) onFormatChange(fmt);
+    }
+  }, [onFormatChange, findMatchingFormat]);
 
   const update = useCallback((partial: Partial<FormatOptions>) => {
     setOptions(prev => ({ ...prev, ...partial }));
@@ -629,21 +680,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect }: FormatSelectorProp
               </div>
             </div>
 
-            {/* ── Velocidade ── */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Gauge size={13} className="text-zinc-400" />
-                <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">Limite de Velocidade</label>
-              </div>
-              <div className="flex gap-1.5">
-                {[0, 512, 1024, 5120, 10240, 25600, 51200].map(kbps => (
-                  <Btn key={kbps} active={settings.bandLimit === kbps} onClick={() => update({})} className="py-2 flex-1 text-[10px]">
-                    {kbps === 0 ? 'Sem limite' : kbps >= 1024 ? `${kbps / 1024}MB/s` : `${kbps}KB/s`}
-                  </Btn>
-                ))}
-              </div>
-              <p className="text-[9px] text-zinc-600 italic">* Configurado nas Configuracoes Gerais</p>
-            </div>
+
 
             {/* ── SponsorBlock ── */}
             <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
