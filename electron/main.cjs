@@ -55,6 +55,15 @@ function resolveFfmpegPath() {
 
 ipcMain.handle('shell:openPath', async (_event, targetPath) => shell.openPath(targetPath));
 ipcMain.handle('shell:openExternal', async (_event, url) => shell.openExternal(url));
+ipcMain.handle('shell:selectFolder', async (_event, defaultPath) => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory', 'createDirectory'],
+    defaultPath: defaultPath || app.getPath('downloads'),
+    title: 'Select Download Folder'
+  });
+  if (canceled || filePaths.length === 0) return null;
+  return filePaths[0];
+});
 
 ipcMain.handle('yt-dlp-probe', async (_event, args) => {
   const { probeUrl } = await import('../src/core/ytdlp/YtDlpManager.ts');

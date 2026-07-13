@@ -4,7 +4,8 @@ import { AppSettings } from '../../types';
 import { StorageService } from '../../core/storage/Storage';
 import { 
   Settings, Volume2, Globe, Sliders, HardDrive, Bell, AlertCircle, 
-  Trash2, ShieldCheck, Download, Upload, Info, RefreshCw, Key, ExternalLink
+  Trash2, ShieldCheck, Download, Upload, Info, RefreshCw, Key, ExternalLink,
+  FolderOpen, FolderPlus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from '../../core/i18n';
@@ -38,11 +39,11 @@ export const SettingsView: React.FC = () => {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [ytdlpStatus, setYtdlpStatus] = useState<{ ready: boolean; binaryPath?: string } | null>(null);
 
+  const isElectron = typeof window !== 'undefined' && !!window.electron;
+
   const showToast = (msg: string) => {
     setToastMsg(msg);
-    setTimeout(() => {
-      setToastMsg(null);
-    }, 2000);
+    setTimeout(() => { setToastMsg(null); }, 2000);
   };
 
   const [checkingUpdates, setCheckingUpdates] = useState(false);
@@ -50,7 +51,6 @@ export const SettingsView: React.FC = () => {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [latestVersion, setLatestVersion] = useState('');
 
-  // Check yt-dlp binary status
   useEffect(() => {
     getYtDlpStatusWithAdapter()
       .then(data => setYtdlpStatus(data))
@@ -63,39 +63,26 @@ export const SettingsView: React.FC = () => {
     showToast(settings.language === 'en' ? 'Checking GitHub repository for updates...' : 'Conectando ao GitHub para buscar atualizações...');
     try {
       const response = await fetch('https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest');
-      if (!response.ok) {
-        throw new Error(`GitHub API returned ${response.status}`);
-      }
+      if (!response.ok) { throw new Error(`GitHub API returned ${response.status}`); }
       const release = await response.json();
       const latest = release.tag_name?.replace('v', '');
       const current = __APP_VERSION__;
       if (latest && latest !== current) {
         setUpdateAvailable(true);
         setLatestVersion(latest);
-        showToast(settings.language === 'en' 
-          ? `New version available: ${latest}` 
-          : `Nova versão disponível: ${latest}`
-        );
+        showToast(settings.language === 'en' ? `New version available: ${latest}` : `Nova versão disponível: ${latest}`);
       } else {
-        showToast(settings.language === 'en' 
-          ? `You are running the latest version! (${current})` 
-          : `Você já está rodando a versão mais recente! (${current})`
-        );
+        showToast(settings.language === 'en' ? `You are running the latest version! (${current})` : `Você já está rodando a versão mais recente! (${current})`);
       }
     } catch (error) {
-      showToast(settings.language === 'en' 
-        ? 'Update check failed — try again later.' 
-        : 'Falha ao verificar atualizações — tente novamente.'
-      );
-    } finally {
-      setCheckingUpdates(false);
-    }
+      showToast(settings.language === 'en' ? 'Update check failed — try again later.' : 'Falha ao verificar atualizações — tente novamente.');
+    } finally { setCheckingUpdates(false); }
   };
 
   const handleOpenFolder = async () => {
-    const downloadPath = settings.defaultDir || 'C:\\Downloads\\UniversalDownloader';
-    if (window.electron) {
-      await window.electron.invoke('shell:openPath', downloadPath);
+    const downloadPath = settings.defaultDir || (typeof window !== 'undefined' ? (window.electron ? '' : 'C:\\Downloads\\UniversalDownloader') : '');
+    if (isElectron) {
+      await window.electron!.invoke('shell:openPath', downloadPath);
     } else {
       try {
         await navigator.clipboard.writeText(downloadPath);
@@ -103,6 +90,34 @@ export const SettingsView: React.FC = () => {
         setTimeout(() => setShowCopied(false), 2000);
       } catch (_) {
         showToast(downloadPath);
+      }
+    }
+  };
+
+  const handleSelectFolder = async () => {
+    if (isElectron) {
+      const selectedPath = await window.electron!.invoke('shell:selectFolder', settings.defaultDir);
+      if (selectedPath) {
+        updateSettings({ defaultDir: selectedPath });
+        showToast(settings.language === 'en' ? `Download folder set to: ${selectedPath}` : `Pasta de downloads definida para: ${selectedPath}`);
+      }
+    } else {
+      if ('showDirectoryPicker' in window) {
+        try {
+          const dirHandle = await (window as any).showDirectoryPicker({ 
+            mode: 'readwrite',
+            startIn: 'downloads'
+          });
+          const path = (dirHandle as any).name;
+          updateSettings({ defaultDir: `[Web] ${path}` });
+          showToast(settings.language === 'en' ? `Folder selected: ${path} (Web mode - path simulated)` : `Pasta selecionada: ${path} (Modo Web - caminho simulado)`);
+        } catch (err) {
+          if ((err as Error).name !== 'AbortError') {
+            showToast(settings.language === 'en' ? 'Failed to select folder' : 'Falha ao selecionar pasta');
+          }
+        }
+      } else {
+        showToast(settings.language === 'en' ? 'Folder picker not supported in this browser. Use Electron version for native dialog.' : 'Seletor de pasta não suportado neste navegador. Use a versão Electron para diálogo nativo.');
       }
     }
   };
@@ -130,9 +145,7 @@ export const SettingsView: React.FC = () => {
     const success = StorageService.importConfig(importText);
     if (success) {
       showToast(t('importSuccess') + (settings.language === 'en' ? ' Restarting...' : ' Reiniciando...'));
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      setTimeout(() => { window.location.reload(); }, 1000);
     } else {
       showToast(t('importFailed'));
     }
@@ -147,19 +160,15 @@ export const SettingsView: React.FC = () => {
     const msg = settings.language === 'en'
       ? 'Are you sure you want to reset ALL settings, favorites, and download history? This action cannot be undone.'
       : 'Tem certeza de que deseja redefinir TODAS as configurações, favoritos e histórico de download? Esta ação não pode ser desfeita.';
-    
     if (window.confirm(msg)) {
       clearAllData();
       showToast(settings.language === 'en' ? 'All data reset to defaults' : 'Todos os dados foram redefinidos para os padrões');
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      setTimeout(() => { window.location.reload(); }, 1000);
     }
   };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 py-2 md:py-6 px-4 pb-12">
-      {/* Toast Alert */}
       <AnimatePresence>
         {toastMsg && (
           <motion.div
@@ -174,7 +183,6 @@ export const SettingsView: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Header Info */}
       <div className="text-center md:text-left space-y-2">
         <h2 className="font-display font-extrabold text-3xl md:text-4xl text-white tracking-tight">
           {t('settingsTitle')}
@@ -185,15 +193,12 @@ export const SettingsView: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* LEFT COLUMN */}
         <div className="space-y-6">
-          {/* Theme & Visual Layout Settings */}
           <div className="p-5 rounded-3xl glass-card space-y-4 shadow-md">
             <h3 className="font-display font-bold text-sm text-white flex items-center gap-2">
               <Settings size={16} className={getAccentTextClass(settings)} /> {t('visualPrefs')}
             </h3>
 
-            {/* Light / Dark Mode selector */}
             <div className="space-y-2">
               <span className="text-xs text-zinc-400 font-medium">{t('themeMode')}</span>
               <div className="grid grid-cols-3 gap-2 p-1 rounded-xl bg-zinc-950/60 border border-white/5">
@@ -205,13 +210,7 @@ export const SettingsView: React.FC = () => {
                   <button
                     key={mode.id}
                     onClick={() => updateSettings({ themeMode: mode.id as any })}
-                    className={`
-                      py-2 rounded-lg text-xs font-semibold transition-all
-                      ${settings.themeMode === mode.id 
-                        ? 'bg-zinc-900 text-white shadow-md border border-white/5' 
-                        : 'text-zinc-500 hover:text-zinc-300'
-                      }
-                    `}
+                    className={`py-2 rounded-lg text-xs font-semibold transition-all ${settings.themeMode === mode.id ? 'bg-zinc-900 text-white shadow-md border border-white/5' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
                     {mode.name}
                   </button>
@@ -219,7 +218,6 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
 
-            {/* Accent Color Chooser */}
             <div className="space-y-2.5">
               <span className="text-xs text-zinc-400 font-medium block">{t('accentColor')}</span>
               <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
@@ -229,13 +227,7 @@ export const SettingsView: React.FC = () => {
                     <button
                       key={color.id}
                       onClick={() => updateSettings({ accentColor: color.id })}
-                      className={`
-                        p-2 rounded-xl border flex flex-col items-center gap-1.5 transition-all
-                        ${isSelected 
-                          ? `${getAccentBorderClass(settings)} bg-white/5` 
-                          : 'border-zinc-800 bg-transparent hover:bg-white/5'
-                        }
-                      `}
+                      className={`p-2 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${isSelected ? `${getAccentBorderClass(settings)} bg-white/5` : 'border-zinc-800 bg-transparent hover:bg-white/5'}`}
                     >
                       <span className={`w-4 h-4 rounded-full ${color.color} block shadow-inner`} />
                       <span className="text-[10px] text-zinc-400 font-medium capitalize">{t(color.name as any)}</span>
@@ -246,13 +238,11 @@ export const SettingsView: React.FC = () => {
             </div>
           </div>
 
-          {/* Network & Limits Setting */}
           <div className="p-5 rounded-3xl glass-card space-y-4 shadow-md">
             <h3 className="font-display font-bold text-sm text-white flex items-center gap-2">
               <Sliders size={16} className={getAccentTextClass(settings)} /> {t('networkSettings')}
             </h3>
 
-            {/* Max Concurrent */}
             <div className="space-y-2">
               <div className="flex justify-between text-xs font-medium">
                 <span className="text-zinc-400">{t('simultaneousDownloads')}</span>
@@ -263,45 +253,13 @@ export const SettingsView: React.FC = () => {
                   <button
                     key={num}
                     onClick={() => updateSettings({ maxConcurrent: num })}
-                    className={`
-                      flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all
-                      ${settings.maxConcurrent === num 
-                        ? 'bg-zinc-900 text-white shadow-md border border-white/5' 
-                        : 'text-zinc-500 hover:text-zinc-300'
-                      }
-                    `}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${settings.maxConcurrent === num ? 'bg-zinc-900 text-white shadow-md border border-white/5' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
                     {num}
                   </button>
                 ))}
               </div>
-            </div>
 
-            {/* Bandwidth Limiter Slider */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-medium">
-                <span className="text-zinc-400">{t('bandwidthLimit')}</span>
-                <span className="text-white">{settings.bandLimit === 0 ? t('unlimitedMax') : `${settings.bandLimit} KB/s`}</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="10000"
-                step="500"
-                value={settings.bandLimit}
-                onChange={(e) => updateSettings({ bandLimit: parseInt(e.target.value) })}
-                className={`w-full accent-current h-1.5 rounded-lg bg-zinc-800 ${getAccentTextClass(settings)} cursor-pointer`}
-              />
-              <div className="flex justify-between text-[10px] text-zinc-600 font-mono">
-                <span>{settings.language === 'en' ? 'Unlimited' : 'Ilimitado'}</span>
-                <span>5 MB/s</span>
-                <span>10 MB/s</span>
-              </div>
-            </div>
-
-            {/* Switches */}
-            <div className="space-y-3.5 pt-2">
-              {/* Wi-Fi Download only */}
               <label className="flex items-center justify-between cursor-pointer group">
                 <div className="space-y-0.5">
                   <span className="text-xs font-semibold text-zinc-300 group-hover:text-white transition-colors">{t('wifiOnly')}</span>
@@ -315,7 +273,6 @@ export const SettingsView: React.FC = () => {
                 />
               </label>
 
-              {/* Auto Download */}
               <label className="flex items-center justify-between cursor-pointer group">
                 <div className="space-y-0.5">
                   <span className="text-xs font-semibold text-zinc-300 group-hover:text-white transition-colors">
@@ -336,15 +293,12 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN */}
         <div className="space-y-6">
-          {/* General Directory & Settings */}
           <div className="p-5 rounded-3xl glass-card space-y-4 shadow-md">
             <h3 className="font-display font-bold text-sm text-white flex items-center gap-2">
               <HardDrive size={16} className={getAccentTextClass(settings)} /> {t('storageSettings')}
             </h3>
 
-            {/* Default Directory path display */}
             <div className="space-y-2">
               <span className="text-xs text-zinc-400 font-medium">{t('destinationFolder')}</span>
               <div className="flex gap-2">
@@ -352,22 +306,39 @@ export const SettingsView: React.FC = () => {
                   type="text"
                   value={settings.defaultDir}
                   onChange={(e) => updateSettings({ defaultDir: e.target.value })}
-                  className="flex-1 px-3 py-2 rounded-xl bg-zinc-950/70 border border-zinc-800 text-xs text-zinc-300 font-mono focus:outline-none"
+                  className="flex-1 px-3 py-2 rounded-xl bg-zinc-950/70 border border-zinc-800 text-xs text-zinc-300 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  placeholder={settings.language === 'en' ? 'Download folder path...' : 'Caminho da pasta de downloads...'}
                 />
+                <button
+                  onClick={handleSelectFolder}
+                  className="px-3 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-zinc-700/50 transition-all whitespace-nowrap"
+                  title={settings.language === 'en' ? 'Choose folder (native dialog)' : 'Escolher pasta (diálogo nativo)'}
+                >
+                  <FolderPlus size={12} />
+                  {settings.language === 'en' ? 'Choose' : 'Escolher'}
+                </button>
                 <button
                   onClick={handleOpenFolder}
                   className="px-3 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-zinc-700/50 transition-all whitespace-nowrap"
                 >
-                  <ExternalLink size={12} />
+                  <FolderOpen size={12} />
                   {showCopied
                     ? (settings.language === 'en' ? 'Copied!' : 'Copiado!')
-                    : (settings.language === 'en' ? 'Open Folder' : 'Abrir Pasta')
-                  }
+                    : (settings.language === 'en' ? 'Open' : 'Abrir')}
                 </button>
               </div>
+              <p className="text-[10px] text-zinc-600 flex items-center gap-1">
+                {isElectron ? '🖥️' : '🌐'}
+                {settings.language === 'en' 
+                  ? isElectron 
+                    ? 'Native folder dialogs available (Electron)' 
+                    : 'Web mode: folder picker uses File System Access API (limited)'
+                  : isElectron 
+                    ? 'Diálogos de pasta nativos disponíveis (Electron)' 
+                    : 'Modo Web: seletor usa File System Access API (limitado)'}
+              </p>
             </div>
 
-            {/* Language Selection */}
             <div className="space-y-2">
               <span className="text-xs text-zinc-400 font-medium flex items-center gap-1">
                 <Globe size={14} /> {t('appLanguage')}
@@ -380,13 +351,7 @@ export const SettingsView: React.FC = () => {
                   <button
                     key={lang.id}
                     onClick={() => updateSettings({ language: lang.id as any })}
-                    className={`
-                      py-2 rounded-lg text-xs font-semibold transition-all
-                      ${settings.language === lang.id 
-                        ? 'bg-zinc-900 text-white shadow-md border border-white/5' 
-                        : 'text-zinc-500 hover:text-zinc-300'
-                      }
-                    `}
+                    className={`py-2 rounded-lg text-xs font-semibold transition-all ${settings.language === lang.id ? 'bg-zinc-900 text-white shadow-md border border-white/5' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
                     {lang.name}
                   </button>
@@ -394,7 +359,6 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
 
-            {/* Notifications & System switches */}
             <div className="space-y-3.5 pt-2">
               <label className="flex items-center justify-between cursor-pointer group">
                 <div className="space-y-0.5">
@@ -424,7 +388,6 @@ export const SettingsView: React.FC = () => {
             </div>
           </div>
 
-          {/* Backup & Import Configuration */}
           <div className="p-5 rounded-3xl glass-card space-y-4 shadow-md">
             <h3 className="font-display font-bold text-sm text-white flex items-center gap-2">
               <RefreshCw size={16} className={getAccentTextClass(settings)} /> {t('backupSettings')}
@@ -473,7 +436,6 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Dangerous Operations / Storage management */}
       <div className="p-5 rounded-2xl bg-red-500/5 border border-red-500/10 grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
         <div>
           <h4 className="font-semibold text-xs text-red-400 flex items-center gap-1.5">
@@ -501,7 +463,6 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* yt-dlp Engine Status */}
       <div className="p-5 rounded-3xl glass-card space-y-4 shadow-md">
         <h3 className="font-display font-bold text-sm text-white flex items-center gap-2">
           <Download size={16} className={getAccentTextClass(settings)} />
@@ -509,54 +470,28 @@ export const SettingsView: React.FC = () => {
         </h3>
 
         <div className="flex items-start gap-4">
-          <div className={`mt-0.5 w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-            ytdlpStatus === null ? 'bg-zinc-600 animate-pulse' :
-            ytdlpStatus.ready ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50' : 'bg-amber-400'
-          }`} />
-          <div className="space-y-1 flex-1">
-            <p className="text-xs font-semibold text-zinc-200">
-              {ytdlpStatus === null
-                ? (settings.language === 'en' ? 'Checking status...' : 'Verificando status...')
-                : ytdlpStatus.ready
-                  ? (settings.language === 'en' ? 'yt-dlp ready — Real downloads active' : 'yt-dlp pronto — Downloads reais ativos')
-                  : (settings.language === 'en' ? 'yt-dlp not found — place binary in electron/resources/ or set YTDLP_PATH' : 'yt-dlp não encontrado — coloque o binário em electron/resources/ ou defina YTDLP_PATH')
-              }
+          <div className={`mt-0.5 w-2.5 h-2.5 rounded-full flex-shrink-0 ${ytdlpStatus === null ? 'bg-zinc-600 animate-pulse' : ytdlpStatus.ready ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50' : 'bg-red-500'}`} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 text-sm">
+              <span className={ytdlpStatus?.ready ? 'text-emerald-400' : 'text-red-400'} font-semibold>
+                {ytdlpStatus === null 
+                  ? (settings.language === 'en' ? 'Checking...' : 'Verificando...')
+                  : ytdlpStatus.ready 
+                    ? (settings.language === 'en' ? 'Ready' : 'Pronto')
+                    : (settings.language === 'en' ? 'Not Found' : 'Não Encontrado')}
+              </span>
+              {ytdlpStatus?.binaryPath && (
+                <span className="text-[10px] text-zinc-500 font-mono truncate flex-1">
+                  {ytdlpStatus.binaryPath}
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-zinc-500 mt-1">
+              {settings.language === 'en' 
+                ? 'Binaries bundled in electron/resources/ (production) or auto-resolved (dev). Web mode uses cached binaries.' 
+                : 'Binários embutidos em electron/resources/ (produção) ou auto-resolvidos (dev). Modo Web usa binários em cache.'}
             </p>
-            <p className="text-[10px] text-zinc-500 leading-relaxed">
-              {settings.language === 'en'
-                ? 'yt-dlp runs locally on your hardware. No paid APIs. Video+audio merging is done by your CPU/GPU automatically.'
-                : 'yt-dlp roda localmente no seu hardware. Zero APIs pagas. O merge de vídeo+áudio é feito pelo seu CPU/GPU automaticamente.'
-              }
-            </p>
-            {ytdlpStatus?.binaryPath && (
-              <p className="text-[9px] font-mono text-zinc-600 break-all">
-                {settings.language === 'en' ? 'Binary:' : 'Binário:'} {ytdlpStatus.binaryPath}
-              </p>
-            )}
           </div>
-        </div>
-      </div>
-
-      {/* App Info / About */}
-      <div className="p-6 rounded-3xl glass-card space-y-4 shadow-md">
-        <h3 className="font-display font-bold text-sm text-white flex items-center gap-2">
-          <Info size={16} /> {t('aboutTitle')}
-        </h3>
-
-        <div className="text-xs text-zinc-400 leading-relaxed space-y-3 font-medium">
-          <p>
-            {t('aboutDesc')}
-          </p>
-          <p>
-            {settings.language === 'en' 
-              ? 'Downloads use yt-dlp running locally on your machine — no paid APIs, no external services. Video and audio streams are fetched and merged using your own CPU, then delivered directly to your browser as a real file.'
-              : 'Os downloads usam o yt-dlp rodando localmente na sua máquina — zero APIs pagas, nenhum serviço externo. Os streams de vídeo e áudio são baixados e mesclados usando o seu próprio CPU, e entregues direto ao navegador como um arquivo real.'}
-          </p>
-        </div>
-
-        <div className="pt-4 border-t border-white/5 flex flex-wrap justify-between items-center text-[10px] text-zinc-500 font-mono">
-          <span>{settings.language === 'en' ? 'Licensed under Apache 2.0' : 'Licenciado sob licença Apache 2.0'}</span>
-          <span>© 2026 Downloader Universal Co. {settings.language === 'en' ? 'All rights reserved.' : 'Todos os direitos reservados.'}</span>
         </div>
       </div>
     </div>
