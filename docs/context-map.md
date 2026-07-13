@@ -1,5 +1,13 @@
 # Context Map — LinkFetcher
 
+## Current State (2025-07-13)
+
+- **Git**: HEAD at `24cd040`, 14 uncommitted files
+- **Branch**: `feat/electron-web-version`
+- **Key finding**: downloads work but `bandLimit` is lost in mapping between `FormatSelector` → `DownloadEngine.addDownload()`
+
+---
+
 ## Quick Reference: File → Responsibility
 
 | Path | Role | Key Exports / Symbols |
@@ -41,6 +49,8 @@
 | **Format → args** | `YtDlpManager.buildArgs()` | Final argv array |
 | **Queue persistence** | `DownloadEngine.saveState()` / `loadState()` | `localStorage['linkfetcher-state']` |
 | **Settings persistence** | `AppContext` `useEffect` watches | `localStorage['linkfetcher-*']` |
+| **bandLimit mapping** | `DownloadEngine.addDownload()` lines 117-153 | Is `formatOptions.bandLimit` copied to `DownloadItem.bandLimit`? |
+| **FPS filter** | `YtDlpManager.spawnDownload()` lines 195-198 | Format string mutation vs `--format-sort` |
 
 ---
 
@@ -54,6 +64,9 @@
 | Change binary location | `YtDlpManager.getBundledBinaryPath()` + `main.cjs resolveYtDlpPath()` |
 | Add new setting | 1. `types.ts` → `AppSettings` 2. `AppContext` → default + persist 3. `SettingsView` → UI |
 | Debug download stall | Check `DownloadEngine.startYtDlpDownload()` → IPC vs SSE branch → progress handler |
+| Fix download parameter loss | `DownloadEngine.ts:addDownload()` → check formatOptions mapping |
+| Fix bandLimit flow | `FormatSelector.tsx` → `DownloadEngine.ts:~144` → `types.ts:DownloadItem.bandLimit` |
+| Debug download not starting | `LinkAnalyzer.tsx:handleStartDownload()` → check selectedFormat state |
 
 ---
 
@@ -74,4 +87,29 @@ AppContext (state)
 
 SettingsView ──► AppContext (settings) ──► localStorage
 YouTubeSearch ──► YtDlpAdapter.searchVideosWithAdapter()
+```
+
+---
+
+## Download Flow (Detailed)
+
+```
+User clicks download → LinkAnalyzer.tsx:handleStartDownload() (line 171)
+    │
+    ▼ guard: if (!mediaInfo || !selectedFormat) return (line 173)
+    │
+    ▼ DownloadEngine.addDownload(mediaInfo, selectedFormat, formatOptions) (line 175)
+    │
+    ▼ Maps formatOptions → DownloadItem (lines 117-153)
+    │   ⚠️ bandLimit NOT mapped (missing from mapping)
+    │
+    ▼ processQueue() → startRealDownload() → startYtDlpDownload()
+    │
+    ├─► Electron: window.electron.invoke('yt-dlp-download', params) (line ~345)
+    │       │
+    │       ▼ main.cjs:147 → import YtDlpManager → spawnDownload()
+    │       │
+    │       ▼ YtDlpManager.spawnDownload() → build args → spawn yt-dlp (line 254)
+    │
+    └─► Web: fetch('/api/download/start') → server.ts → spawnDownload()
 ```
