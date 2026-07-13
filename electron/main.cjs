@@ -3,6 +3,12 @@ const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
 
+const LOG_FILE = path.join(app.getPath('downloads'), 'linkfetcher-debug.log');
+function logDebug(...args) {
+  const line = `[${new Date().toISOString()}] ${args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ')}\n`;
+  fs.appendFileSync(LOG_FILE, line);
+}
+
 let mainWindow;
 const cancelMap = new Map();
 
@@ -30,35 +36,81 @@ function createWindow() {
 }
 
 function resolveYtDlpPath() {
+  const binaryName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
   const candidates = [
     process.env.YTDLP_PATH || '',
-    path.join(process.resourcesPath || process.cwd(), 'resources', process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'),
-    path.join(process.resourcesPath || process.cwd(), process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'),
-    path.join(app.getAppPath(), 'yt-dlp', process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'),
-    path.join(app.getAppPath(), process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'),
-    path.join(process.cwd(), 'yt-dlp', process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp')
+    path.join(__dirname, 'resources', binaryName),
+    path.join(__dirname, '..', 'electron', 'resources', binaryName),
+    path.join(app.getAppPath(), 'electron', 'resources', binaryName),
+    path.join(app.getAppPath(), 'resources', binaryName),
+    path.join(process.resourcesPath || process.cwd(), 'resources', binaryName),
+    path.join(process.resourcesPath || process.cwd(), binaryName),
+    path.join(app.getAppPath(), 'yt-dlp', binaryName),
+    path.join(app.getAppPath(), binaryName),
+    path.join(process.cwd(), 'electron', 'resources', binaryName),
+    path.join(process.cwd(), 'yt-dlp', binaryName),
+    path.join(process.cwd(), binaryName),
   ];
   return candidates.find(candidate => candidate && fs.existsSync(candidate)) || '';
 }
 
 function resolveFfmpegPath() {
+  const binaryName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
   const candidates = [
     process.env.FFMPEG_PATH || '',
-    path.join(process.resourcesPath || process.cwd(), 'resources', process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'),
-    path.join(process.resourcesPath || process.cwd(), process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'),
-    path.join(app.getAppPath(), 'yt-dlp', process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'),
-    path.join(app.getAppPath(), process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'),
-    path.join(process.cwd(), 'yt-dlp', process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg')
+    path.join(__dirname, 'resources', binaryName),
+    path.join(__dirname, '..', 'electron', 'resources', binaryName),
+    path.join(app.getAppPath(), 'electron', 'resources', binaryName),
+    path.join(app.getAppPath(), 'resources', binaryName),
+    path.join(process.resourcesPath || process.cwd(), 'resources', binaryName),
+    path.join(process.resourcesPath || process.cwd(), binaryName),
+    path.join(app.getAppPath(), 'yt-dlp', binaryName),
+    path.join(app.getAppPath(), binaryName),
+    path.join(process.cwd(), 'electron', 'resources', binaryName),
+    path.join(process.cwd(), 'yt-dlp', binaryName),
+    path.join(process.cwd(), binaryName),
   ];
   return candidates.find(candidate => candidate && fs.existsSync(candidate)) || '';
 }
 
-ipcMain.handle('shell:openPath', async (_event, targetPath) => shell.openPath(targetPath));
+ipcMain.handle('shell:getDownloadsPath', async () => app.getPath('downloads'));
+
+ipcMain.handle('shell:openPath', async (_event, targetPath) => {
+  if (!targetPath) return;
+
+  const normalizedTarget = String(targetPath).trim().replace(/^['"]|['"]$/g, '');
+  if (!normalizedTarget) return;
+
+  if (fs.existsSync(normalizedTarget)) {
+    const stat = fs.statSync(normalizedTarget);
+    if (stat.isFile()) {
+      shell.showItemInFolder(normalizedTarget);
+      return;
+    }
+    if (stat.isDirectory()) {
+      shell.openPath(normalizedTarget);
+      return;
+    }
+  }
+
+  const parentDir = path.dirname(normalizedTarget);
+  if (parentDir && fs.existsSync(parentDir)) {
+    shell.openPath(parentDir);
+    return;
+  }
+
+  shell.openPath(normalizedTarget);
+});
+
 ipcMain.handle('shell:openExternal', async (_event, url) => shell.openExternal(url));
+
 ipcMain.handle('shell:selectFolder', async (_event, defaultPath) => {
+  const resolvedDefault = defaultPath && path.isAbsolute(defaultPath)
+    ? defaultPath
+    : app.getPath('downloads');
   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory', 'createDirectory'],
-    defaultPath: defaultPath || app.getPath('downloads'),
+    defaultPath: resolvedDefault,
     title: 'Select Download Folder'
   });
   if (canceled || filePaths.length === 0) return null;
@@ -67,9 +119,21 @@ ipcMain.handle('shell:selectFolder', async (_event, defaultPath) => {
 
 ipcMain.handle('yt-dlp-probe', async (_event, args) => {
   const { probeUrl } = await import('../src/core/ytdlp/YtDlpManager.ts');
-  process.env.YTDLP_PATH = resolveYtDlpPath();
-  process.env.FFMPEG_PATH = resolveFfmpegPath();
-  return probeUrl(args);
+  const resolvedYtDlpPath = resolveYtDlpPath();
+  const resolvedFfmpegPath = resolveFfmpegPath();
+  process.env.YTDLP_PATH = resolvedYtDlpPath;
+  process.env.FFMPEG_PATH = resolvedFfmpegPath;
+  logDebug('[electron:probe] yt-dlp', resolvedYtDlpPath || 'missing');
+  logDebug('[electron:probe] ffmpeg', resolvedFfmpegPath || 'missing');
+  logDebug('[electron:probe] args', args);
+  try {
+    const result = await probeUrl(args);
+    logDebug('[electron:probe] success', typeof result, result?.id || result?.title || '');
+    return result;
+  } catch (error) {
+    console.error('[electron:probe] failed', error);
+    throw error;
+  }
 });
 
 ipcMain.handle('yt-dlp-search', async (_event, args) => {
@@ -87,11 +151,22 @@ ipcMain.handle('yt-dlp-status', async () => {
 });
 
 ipcMain.handle('yt-dlp-download', async (_event, params) => {
+  logDebug('[yt-dlp-download] RECEIVED PARAMS:', JSON.stringify(params, null, 2));
   const { spawnDownload } = await import('../src/core/ytdlp/YtDlpManager.ts');
-  process.env.YTDLP_PATH = resolveYtDlpPath();
-  process.env.FFMPEG_PATH = resolveFfmpegPath();
+  const resolvedYtDlpPath = resolveYtDlpPath();
+  const resolvedFfmpegPath = resolveFfmpegPath();
+  process.env.YTDLP_PATH = resolvedYtDlpPath;
+  process.env.FFMPEG_PATH = resolvedFfmpegPath;
+
+  if (!resolvedYtDlpPath) {
+    const error = 'yt-dlp não foi encontrado nas pastas do app. Verifique os binários em electron/resources.';
+    logDebug('[electron] ERROR:', error);
+    mainWindow?.webContents.send('yt-dlp-progress', { id: params.id, type: 'error', message: error });
+    throw new Error(error);
+  }
 
   const outputDir = params.outputDir || require('electron').app.getPath('downloads');
+  logDebug('[yt-dlp-download] outputDir:', outputDir);
 
   const promise = new Promise((resolve, reject) => {
     const child = spawnDownload({
