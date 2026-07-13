@@ -423,8 +423,8 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
     <div className="space-y-3">
       <div className="flex gap-1 p-1 rounded-xl bg-zinc-900/60 border border-white/5">
         {([
-          { id: 'media' as TabId, icon: FileVideo, label: 'Midia' },
-          { id: 'advanced' as TabId, icon: SlidersHorizontal, label: 'Avancado' },
+          { id: 'media' as TabId, icon: FileVideo, label: 'Mídia' },
+          { id: 'advanced' as TabId, icon: SlidersHorizontal, label: 'Avançado' },
         ]).map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -432,7 +432,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${isActive ? `${accentBg} ${accentText} shadow-lg` : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}`}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${isActive ? `${accentBg} text-white shadow-lg` : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}`}
             >
               <Icon size={14} />
               {tab.label}

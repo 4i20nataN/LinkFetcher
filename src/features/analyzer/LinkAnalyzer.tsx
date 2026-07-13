@@ -65,6 +65,25 @@ export const LinkAnalyzer: React.FC = () => {
     }
   }, [selectedUrl]);
 
+  // Persist analyzer state to localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('universal_downloader_analyzer_state');
+    if (saved) {
+      try {
+        const state = JSON.parse(saved);
+        if (state.url) setUrl(state.url);
+        if (state.mediaInfo) setMediaInfo(state.mediaInfo);
+        if (state.selectedFormat) setSelectedFormat(state.selectedFormat);
+        if (state.formatOptions) setFormatOptions(state.formatOptions);
+      } catch { /* ignore */ }
+    }
+  }, []);
+
+  useEffect(() => {
+    const state = { url, mediaInfo, selectedFormat, formatOptions };
+    localStorage.setItem('universal_downloader_analyzer_state', JSON.stringify(state));
+  }, [url, mediaInfo, selectedFormat, formatOptions]);
+
   const handleAnalyze = async (urlToAnalyze: string) => {
     const targetUrl = urlToAnalyze.trim();
     if (!targetUrl) return;

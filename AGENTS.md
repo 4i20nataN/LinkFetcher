@@ -49,7 +49,8 @@
 
 ### 3.2 Estilo de Comunicação
 
-- **Direto, técnico, sem floreios**
+- **Idioma obrigatório: Português (PT-BR)** — o usuário **só fala português**. Responda **sempre em português**.
+- Direto, técnico, sem floreios
 - Use **tabelas** para comparações, **listas** para passos, **código** para exemplos
 - Destaque termos-chave em **negrito** para ancoragem RAG
 - Se houver trade-off, apresente **opções + recomendação** em 3 linhas máx.
