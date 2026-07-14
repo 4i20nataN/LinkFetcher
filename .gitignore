@@ -54,3 +54,6 @@ nul
 
 # TypeScript
 *.tsbuildinfo
+
+# Unrelated artifacts
+LinkFatcher_Background.html
