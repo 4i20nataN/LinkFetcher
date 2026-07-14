@@ -171,6 +171,7 @@ export function spawnDownload(params: {
   downloadSections?: string;
   sponsorblockRemove?: string;
   fpsMax?: number;
+  customFilename?: string;
   onProgress: (data: { percent: number; speed: string; eta: string; filename?: string }) => void;
   onComplete: (filePath: string) => void;
   onError: (err: string) => void;
@@ -250,7 +251,9 @@ export function spawnDownload(params: {
     args.push('--retries', String(params.retries));
   }
 
-  const outputTemplate = path.join(outputDir, '%(title)s.%(ext)s');
+  const outputTemplate = params.customFilename
+    ? path.join(outputDir, `${params.customFilename}.%(ext)s`)
+    : path.join(outputDir, '%(title)s.%(ext)s');
   args.push('-o', outputTemplate);
 
   if (ffmpegPath) args.push('--ffmpeg-location', ffmpegPath);

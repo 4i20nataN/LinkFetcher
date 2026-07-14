@@ -83,6 +83,7 @@ export interface DownloadItem {
   sponsorblockRemove?: string;
   fpsMax?: number;
   bandLimit?: number;
+  customFilename?: string;
   sizeTotal: number;
   sizeDownloaded: number;
   progress: number;
@@ -117,6 +118,7 @@ export interface DownloadLaterItem {
 export interface AppSettings {
   themeMode: 'light' | 'dark' | 'gray';
   accentColor: string; // e.g., 'indigo', 'emerald', 'amber', 'rose', 'violet', 'sky', 'teal', 'fuchsia'
+  iconStyle: 'emoji' | 'lucide-mono' | 'lucide-color';
   language: 'pt' | 'en';
   defaultDir: string;
   bandLimit: number; // KB/s, 0 = unlimited

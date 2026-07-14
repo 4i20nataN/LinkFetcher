@@ -195,6 +195,7 @@ ipcMain.handle('yt-dlp-download', async (_event, params) => {
       downloadSections: params.downloadSections,
       sponsorblockRemove: params.sponsorblockRemove,
       fpsMax: params.fpsMax,
+      customFilename: params.customFilename,
       onProgress: (data) => {
         mainWindow?.webContents.send('yt-dlp-progress', { id: params.id, type: 'progress', ...data });
       },

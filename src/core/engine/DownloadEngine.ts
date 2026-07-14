@@ -32,6 +32,7 @@ class DownloadEngineClass {
   private settings: AppSettings = {
     themeMode: 'dark',
     accentColor: 'emerald',
+    iconStyle: 'lucide-mono',
     language: 'pt',
     defaultDir: '',
     bandLimit: 0,
@@ -143,6 +144,7 @@ class DownloadEngineClass {
       sponsorblockRemove: formatOptions?.sponsorblockRemove,
       fpsMax: formatOptions?.fpsMax,
       bandLimit: formatOptions?.bandLimit,
+      customFilename: formatOptions?.customFilename,
       sizeTotal,
       sizeDownloaded: 0,
       progress: 0,
@@ -365,6 +367,7 @@ class DownloadEngineClass {
         downloadSections: item.downloadSections,
         sponsorblockRemove: item.sponsorblockRemove,
         fpsMax: item.fpsMax,
+        customFilename: item.customFilename,
       }).catch((err: any) => {
         const target = this.items.find(i => i.id === item.id);
         if (target) {
@@ -411,6 +414,7 @@ class DownloadEngineClass {
     if (item.fpsMax) params.set('fpsMax', String(item.fpsMax));
     if (item.concurrentFragments) params.set('concurrentFragments', String(item.concurrentFragments));
     if (item.retries) params.set('retries', String(item.retries));
+    if (item.customFilename) params.set('customFilename', item.customFilename);
 
     const es = new EventSource(`/api/download/start?${params.toString()}`);
     this.eventSources.set(item.id, es);

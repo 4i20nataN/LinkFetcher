@@ -143,7 +143,8 @@ async function startServer() {
       sponsorblockRemove,
       fpsMax,
       concurrentFragments,
-      retries
+      retries,
+      customFilename
     } = req.query as Record<string, string>;
 
     if (!id || !url) {
@@ -214,6 +215,7 @@ async function startServer() {
       fpsMax: fpsMax ? parseInt(fpsMax, 10) : undefined,
       concurrentFragments: concurrentFragments ? parseInt(concurrentFragments, 10) : undefined,
       retries: retries ? parseInt(retries, 10) : undefined,
+      customFilename: customFilename || undefined,
       onProgress: ({ percent, speed, eta }) => {
         send({ type: 'progress', percent, speed, eta });
       },
