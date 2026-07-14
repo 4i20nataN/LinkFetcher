@@ -5,7 +5,8 @@ import { DownloadEngine } from '../../core/engine/DownloadEngine';
 import { 
   Play, Pause, X, Trash2, FolderOpen, Share2, RotateCcw, 
   ArrowUp, ArrowDown, ListOrdered, CheckCircle2, AlertTriangle, 
-  Clock, TrendingUp, HelpCircle, ShieldCheck, ChevronRight
+  Clock, TrendingUp, HelpCircle, ShieldCheck, ChevronRight,
+  Subtitles, Scissors, Shield, Tag
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from '../../core/i18n';
@@ -351,6 +352,44 @@ export const DownloadManager: React.FC = () => {
                       <span className="text-[10px] text-zinc-500 font-mono font-medium shrink-0">
                         {item.format.ext.toUpperCase()} • {formatBytes(item.sizeTotal)}
                       </span>
+                    </div>
+
+                    {/* Feature tags row */}
+                    <div className="flex flex-wrap gap-1">
+                      {/* Platform badge */}
+                      {platform && (
+                        <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold ${platform.color}`}>
+                          {platform.name}
+                        </span>
+                      )}
+                      {/* Subtitles */}
+                      {(item.writeSubs || item.writeAutoSubs) && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-semibold bg-blue-900/60 text-blue-300 border border-blue-800/40">
+                          <Subtitles size={8} />
+                          {item.subLangs || 'EN'}
+                        </span>
+                      )}
+                      {/* SponsorBlock */}
+                      {item.sponsorblockRemove && item.sponsorblockRemove !== '' && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-semibold bg-purple-900/60 text-purple-300 border border-purple-800/40">
+                          <Shield size={8} />
+                          Sponsor
+                        </span>
+                      )}
+                      {/* Trimmed */}
+                      {item.downloadSections && item.downloadSections !== '' && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-semibold bg-amber-900/60 text-amber-300 border border-amber-800/40">
+                          <Scissors size={8} />
+                          Cortado
+                        </span>
+                      )}
+                      {/* Audio Only */}
+                      {item.audioOnly && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-semibold bg-emerald-900/60 text-emerald-300 border border-emerald-800/40">
+                          <Tag size={8} />
+                          {(item.audioFormat || 'mp3').toUpperCase()}
+                        </span>
+                      )}
                     </div>
 
                     {/* Progress tracking bar */}
