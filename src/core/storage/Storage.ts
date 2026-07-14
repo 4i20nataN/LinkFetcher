@@ -95,6 +95,7 @@ export class StorageService {
     return {
       themeMode: 'dark',
       accentColor: 'indigo',
+      iconStyle: 'lucide-mono',
       language: 'pt',
       defaultDir: '',
       bandLimit: 0,

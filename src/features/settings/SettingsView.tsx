@@ -5,7 +5,7 @@ import { StorageService } from '../../core/storage/Storage';
 import { 
   Settings, Volume2, Globe, Sliders, HardDrive, Bell, AlertCircle, 
   Trash2, ShieldCheck, Download, Upload, Info, RefreshCw, Key, ExternalLink,
-  FolderOpen, FolderPlus
+  FolderOpen, FolderPlus, Smile, Palette
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from '../../core/i18n';
@@ -247,6 +247,37 @@ export const SettingsView: React.FC = () => {
                   );
                 })}
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-xs text-zinc-400 font-medium flex items-center gap-1">
+                <Palette size={14} /> {settings.language === 'en' ? 'Icon Style' : 'Estilo dos Icones'}
+              </span>
+              <div className="grid grid-cols-3 gap-2 p-1 rounded-xl bg-zinc-950/60 border border-white/5">
+                {[
+                  { id: 'emoji', name: 'Emoji', icon: '🎬' },
+                  { id: 'lucide-mono', name: 'Lucide', icon: null },
+                  { id: 'lucide-color', name: 'Colorido', icon: null },
+                ].map((mode) => (
+                  <button
+                    key={mode.id}
+                    onClick={() => updateSettings({ iconStyle: mode.id as any })}
+                    className={`py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${settings.iconStyle === mode.id ? 'bg-zinc-900 text-white shadow-md border border-white/5' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    {mode.icon ? (
+                      <span className="text-sm">{mode.icon}</span>
+                    ) : (
+                      <Palette size={12} className={mode.id === 'lucide-color' ? 'text-amber-400' : 'text-zinc-400'} />
+                    )}
+                    {mode.name}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-zinc-600">
+                {settings.language === 'en'
+                  ? 'Choose how icons appear on download option blocks and format selector cards.'
+                  : 'Escolha como os icones aparecem nos blocos de opcoes de download e cards do seletor de formato.'}
+              </p>
             </div>
           </div>
 
