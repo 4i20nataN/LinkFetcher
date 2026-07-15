@@ -871,7 +871,48 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
               </AccordionSection>
             )}
 
-            {/* ── Legendas + Extrair Apenas Audio ── */}
+            {/* ── Áudio ── */}
+            <AccordionSection id="audio" title="Áudio" blockId="audio-format">
+              <div className="px-3 pb-3 pt-0 space-y-3">
+                <Toggle
+                  value={options.audioOnly}
+                  onChange={() => update({ audioOnly: !options.audioOnly })}
+                  label="Extrair apenas audio"
+                  desc="Baixar somente a faixa de audio"
+                  icon={<BlockIcon blockId="audio-extract" />}
+                />
+                <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 ${options.audioOnly ? '' : 'opacity-30 pointer-events-none'}`}>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <BlockIcon blockId="audio-format" />
+                    <BlockTitle>Formato do Audio</BlockTitle>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {AUDIO_FORMATS.map(fmt => (
+                      <Btn key={fmt.id} active={options.audioFormat === fmt.id} onClick={() => update({ audioFormat: fmt.id })} className="py-2">
+                        {fmt.label}
+                      </Btn>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <BlockIcon blockId="audio-quality" />
+                    <BlockTitle>Qualidade do Audio</BlockTitle>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {AUDIO_QUALITY_PRESETS.map(q => (
+                      <Btn key={q.value} active={options.audioQuality === q.value} onClick={() => update({ audioQuality: q.value })} className="py-2">
+                        {q.label}
+                      </Btn>
+                    ))}
+                  </div>
+                </div>
+                </div>
+              </div>
+            </AccordionSection>
+
+            {/* ── Legendas ── */}
             <AccordionSection id="subtitles" title="Legendas" blockId="subtitles">
               <div className="px-3 pb-3 pt-0 space-y-3">
                 <Toggle
@@ -914,53 +955,6 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                     </div>
                   </motion.div>
                 )}
-                <div className="border-t border-white/5 pt-2">
-                  <Toggle
-                    value={options.audioOnly}
-                    onChange={() => update({ audioOnly: !options.audioOnly })}
-                    label="Extrair apenas audio"
-                    desc="Baixar somente a faixa de audio"
-                    icon={<BlockIcon blockId="audio-extract" />}
-                  />
-                </div>
-              </div>
-            </AccordionSection>
-
-            {/* ── Formato + Qualidade do Áudio (2 colunas) ── */}
-            {!options.audioOnly && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                <span className="fs-sm text-yellow-500">⚠</span>
-                <span className="text-yellow-500/80 fs-sm">Funciona apenas com <strong>"Extrair apenas audio"</strong> ativado</span>
-              </div>
-            )}
-            <AccordionSection id="audio" title="Áudio" blockId="audio-format">
-              <div className={`px-3 pb-3 pt-0 grid grid-cols-1 sm:grid-cols-2 gap-2 ${options.audioOnly ? '' : 'opacity-30 pointer-events-none'}`}>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <BlockIcon blockId="audio-format" />
-                    <BlockTitle>Formato do Audio</BlockTitle>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {AUDIO_FORMATS.map(fmt => (
-                      <Btn key={fmt.id} active={options.audioFormat === fmt.id} onClick={() => update({ audioFormat: fmt.id })} className="py-2">
-                        {fmt.label}
-                      </Btn>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <BlockIcon blockId="audio-quality" />
-                    <BlockTitle>Qualidade do Audio</BlockTitle>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {AUDIO_QUALITY_PRESETS.map(q => (
-                      <Btn key={q.value} active={options.audioQuality === q.value} onClick={() => update({ audioQuality: q.value })} className="py-2">
-                        {q.label}
-                      </Btn>
-                    ))}
-                  </div>
-                </div>
               </div>
             </AccordionSection>
           </motion.div>
