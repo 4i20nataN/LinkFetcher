@@ -562,13 +562,17 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
       animate={active ? { scale: 1.02, boxShadow: '0 2px 12px rgba(0,0,0,0.3)' } : { scale: 1, boxShadow: '0 0px 0px rgba(0,0,0,0)' }}
       transition={{ duration: 0.2 }}
       className={`
-        border rounded-xl px-3 py-1.5 text-[11px] font-bold transition-colors text-center
+        relative border rounded-xl px-3 py-1.5 text-[11px] font-bold transition-colors text-center
         ${disabled ? 'bg-zinc-900/20 border-white/5 text-zinc-600 cursor-not-allowed' :
           active ? 'bg-[#282B33] border-white/15 text-white' : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}
         ${className}
       `}
     >
-      {active && <span className="mr-1">✔</span>}
+      {active && (
+        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center shadow-md">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+        </span>
+      )}
       {children}
     </motion.button>
   );
