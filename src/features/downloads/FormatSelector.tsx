@@ -450,6 +450,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   key={fmt.id}
                   onClick={() => {
                     setOptions(prev => ({ ...prev, format: fmt.id }));
+                    onFormatChange(fmt);
                   }}
                   className={`
                     border rounded-lg text-[11px] font-bold transition-all text-center py-2.5
