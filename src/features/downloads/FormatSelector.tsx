@@ -521,7 +521,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
   const AccordionSection: React.FC<{ id: string; title: string; blockId: BlockId; children: React.ReactNode; defaultOpen?: boolean }> = ({ id, title, blockId, children, defaultOpen = false }) => {
     const isOpen = openSections.has(id) || defaultOpen;
     return (
-      <div className="rounded-xl bg-zinc-900/40 border border-white/5 overflow-hidden">
+      <div className="rounded-xl bg-zinc-900/40 border border-white/5">
         <button
           onClick={() => toggleSection(id)}
           className="w-full flex items-center justify-between p-3 text-left hover:bg-white/[0.02] transition-colors"
