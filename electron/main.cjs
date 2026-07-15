@@ -125,9 +125,9 @@ ipcMain.handle('download-file', async (_event, { url, filename }) => {
 });
 
 // Image proxy download — saves directly to default downloads folder (no dialog)
-ipcMain.handle('download-file-proxy', async (_event, { url, filename }) => {
+ipcMain.handle('download-file-proxy', async (_event, { url, filename, dir }) => {
   if (!url) throw new Error('No URL provided');
-  const downloadsDir = app.getPath('downloads');
+  const downloadsDir = (dir && path.isAbsolute(dir)) ? dir : app.getPath('downloads');
   const safeName = (filename || 'download').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
   let filePath = path.join(downloadsDir, safeName);
 

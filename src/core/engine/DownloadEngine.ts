@@ -512,20 +512,27 @@ class DownloadEngineClass {
     }
 
     // For images: try Electron IPC proxy first (bypasses CORS, saves to default folder)
+    // Only use proxy when formats match (no conversion needed) — otherwise skip to Canvas
     if (item.format.type === 'image') {
-      const hasElectronBridge = typeof window !== 'undefined' && !!(window as any).electron?.invoke;
-      if (hasElectronBridge) {
-        try {
-          const result = await (window as any).electron.invoke('download-file-proxy', {
-            url: sourceUrl,
-            filename: `${cleanTitle}.${ext}`,
-          });
-          if (result?.filePath) {
-            this.markCompleted(item);
-            return;
+      const originalExt = sourceUrl.split('.').pop()?.split('?')[0]?.toLowerCase() || '';
+      const needsConversion = ext.toLowerCase() !== originalExt && originalExt !== '';
+
+      if (!needsConversion) {
+        const hasElectronBridge = typeof window !== 'undefined' && !!(window as any).electron?.invoke;
+        if (hasElectronBridge) {
+          try {
+            const result = await (window as any).electron.invoke('download-file-proxy', {
+              url: sourceUrl,
+              filename: `${cleanTitle}.${ext}`,
+              dir: this.settings.defaultDir || undefined,
+            });
+            if (result?.filePath) {
+              this.markCompleted(item);
+              return;
+            }
+          } catch (err: any) {
+            console.warn('[Engine] Electron proxy download failed, falling back:', err);
           }
-        } catch (err: any) {
-          console.warn('[Engine] Electron proxy download failed, falling back:', err);
         }
       }
 
@@ -621,6 +628,7 @@ class DownloadEngineClass {
     try {
       const objectUrl = URL.createObjectURL(blob);
       const img = new Image();
+      img.crossOrigin = 'anonymous';
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve();
         img.onerror = reject;
@@ -640,14 +648,33 @@ class DownloadEngineClass {
       };
       const mime = mimeMap[targetExt] || 'image/png';
 
-      await new Promise<void>((resolve, reject) => {
-        canvas.toBlob((convertedBlob) => {
-          if (!convertedBlob) return reject(new Error('Conversion failed'));
-          this.downloadBlob(convertedBlob, filename);
-          resolve();
-        }, mime, 0.92);
+      const convertedBlob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((b) => resolve(b), mime, 0.92);
       });
-    } catch {
+      if (!convertedBlob) throw new Error('Canvas conversion failed');
+
+      // Try Electron IPC proxy to save directly to Downloads folder
+      const hasElectronBridge = typeof window !== 'undefined' && !!(window as any).electron?.invoke;
+      if (hasElectronBridge) {
+        try {
+          const arrayBuf = await convertedBlob.arrayBuffer();
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
+          const dataUrl = `data:${mime};base64,${base64}`;
+          const result = await (window as any).electron.invoke('download-file-proxy', {
+            url: dataUrl,
+            filename,
+            dir: this.settings.defaultDir || undefined,
+          });
+          if (result?.filePath) return;
+        } catch (err) {
+          console.warn('[Engine] Electron IPC save failed, falling back to browser:', err);
+        }
+      }
+
+      // Fallback: browser download
+      this.downloadBlob(convertedBlob, filename);
+    } catch (err) {
+      console.warn('[Engine] Canvas conversion failed, downloading original:', err);
       this.downloadBlob(blob, filename);
     }
   }
