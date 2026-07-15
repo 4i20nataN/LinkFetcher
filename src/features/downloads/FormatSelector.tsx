@@ -308,7 +308,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
   const [showSubs, setShowSubs] = useState(false);
   const [showCustomFormat, setShowCustomFormat] = useState(false);
   const [useUnderscore, setUseUnderscore] = useState(true);
-  const [uiScale, setUiScale] = useState(12);
+  const [uiScale, setUiScale] = useState(13);
 
   const maxRes = useMemo(() => getMaxVideoHeight(mediaInfo.formats), [mediaInfo.formats]);
 
@@ -473,7 +473,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
       <div className="flex items-center gap-2">
         {icon && <span className="text-zinc-400">{icon}</span>}
         <div>
-          <p className="text-xs font-semibold text-white">{label}</p>
+          <p className="fs-sm font-semibold text-white">{label}</p>
           {desc && <p className="fs-sm text-zinc-500 mt-0.5">{desc}</p>}
         </div>
       </div>
@@ -583,7 +583,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold transition-all relative ${isActive ? accentText : 'text-zinc-500 hover:text-zinc-300'}`}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 fs-sm font-semibold transition-all relative ${isActive ? accentText : 'text-zinc-500 hover:text-zinc-300'}`}
             >
               <BlockIcon blockId={tab.blockId} size={14} />
               {tab.label}
@@ -598,7 +598,9 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
           );
         })}
         <div className="flex items-center gap-0.5 ml-1 pl-1 border-l border-white/5">
+          <span className="fs-sm text-zinc-600 mr-0.5">🔍</span>
           <button onClick={() => setUiScale(s => Math.max(8, s - 1))} className="w-5 h-5 rounded flex items-center justify-center fs-sm text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">A-</button>
+          <span className="fs-xs text-zinc-500 w-4 text-center font-mono">{uiScale <= 10 ? 'P' : uiScale <= 15 ? 'M' : 'G'}</span>
           <button onClick={() => setUiScale(s => Math.min(20, s + 1))} className="w-5 h-5 rounded flex items-center justify-center fs-sm text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">A+</button>
         </div>
       </div>
@@ -845,7 +847,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             {/* ── Formato + Qualidade do Áudio (2 colunas) ── */}
             {!options.audioOnly && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                <span className="text-yellow-500 text-xs">⚠</span>
+                <span className="fs-sm text-yellow-500">⚠</span>
                 <span className="text-yellow-500/80 fs-sm">Funciona apenas com <strong>"Extrair apenas audio"</strong> ativado</span>
               </div>
             )}
@@ -897,7 +899,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   value={options.format || ''}
                   onChange={e => update({ format: e.target.value })}
                   placeholder="bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b"
-                  className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-white/5 text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/15"
+                  className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-white/5 fs-sm font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/15"
                 />
               )}
             </div>
@@ -927,7 +929,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                           else if (val) update({ downloadSections: `*${val}-` });
                           else update({ downloadSections: end ? `*-${end}` : '' });
                         }}
-                        className="flex-1 px-3 py-2 rounded-lg bg-zinc-900 border border-white/5 text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/15"
+                        className="flex-1 px-3 py-2 rounded-lg bg-zinc-900 border border-white/5 fs-sm font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/15"
                       />
                       <span className="text-zinc-600 text-xs">-</span>
                       <input
@@ -940,7 +942,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                           else if (val) update({ downloadSections: `*-${val}` });
                           else update({ downloadSections: start ? `*${start}-` : '' });
                         }}
-                        className="flex-1 px-3 py-2 rounded-lg bg-zinc-900 border border-white/5 text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/15"
+                        className="flex-1 px-3 py-2 rounded-lg bg-zinc-900 border border-white/5 fs-sm font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/15"
                       />
                     </div>
                   </>

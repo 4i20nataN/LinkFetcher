@@ -77,7 +77,7 @@ export const BlockIcon: React.FC<{ blockId: BlockId; size?: number }> = ({ block
   const style = settings.iconStyle || 'lucide-mono';
 
   if (style === 'emoji') {
-    return <span className="text-sm leading-none">{EMOJI_MAP[blockId]}</span>;
+    return <span className="fs-sm leading-none">{EMOJI_MAP[blockId]}</span>;
   }
 
   const Icon = LUCIDE_MAP[blockId];
@@ -88,5 +88,5 @@ export const BlockIcon: React.FC<{ blockId: BlockId; size?: number }> = ({ block
 };
 
 export const BlockTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <label className="text-xs font-bold text-zinc-300 tracking-wide">{children}</label>
+  <label className="fs-sm font-bold text-zinc-300 tracking-wide">{children}</label>
 );
