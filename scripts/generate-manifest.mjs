@@ -77,31 +77,29 @@ writeFileSync('CHECKSUMS_SHA512.txt', checksums);
 console.log('CHECKSUMS_SHA512.txt written');
 
 // Sign manifest with Ed25519
-// Sign manifest with Ed25519
 let privKeyPem;
 const keyPath = process.env.SIGNING_KEY_PATH;
 if (keyPath) {
-  // Read from file (most reliable on GitHub Actions)
   privKeyPem = readFileSync(keyPath, 'utf-8');
   console.log('Read key from file:', keyPath);
 } else {
-  // Fallback: from env var
   const envKey = process.env.UPDATE_SIGNING_PRIVATE_KEY;
   if (!envKey) {
-    console.error('No signing key found (SIGNING_KEY_PATH or UPDATE_SIGNING_PRIVATE_KEY)');
+    console.error('No signing key found');
     process.exit(1);
   }
   privKeyPem = envKey.replace(/\\n/g, '\n');
   console.log('Read key from env var');
 }
-console.log('Key starts with:', privKeyPem.slice(0, 30));
-console.log('Key length:', privKeyPem.length);
-console.log('Has BEGIN:', privKeyPem.includes('BEGIN'));
+// Normalize: fix escaped newlines, strip BOM, trim whitespace
+privKeyPem = privKeyPem.replace(/\\n/g, '\n').replace(/^\uFEFF/, '').trim();
+console.log('Key length after normalize:', privKeyPem.length);
+console.log('Key header:', privKeyPem.split('\n')[0]);
 const keyObject = createPrivateKey(privKeyPem);
 const manifestBytes = readFileSync('manifest.json');
 const signature = sign(null, manifestBytes, keyObject);
 writeFileSync('manifest.json.sig', signature);
-console.log('manifest.json.sig written');
+console.log('manifest.json.sig written (' + signature.length + ' bytes)');
 
 // Summary
 console.log('\nRelease ' + VERSION + ':');

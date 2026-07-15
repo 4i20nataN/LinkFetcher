@@ -59,8 +59,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Write signing key to file
-        shell: bash
-        run: echo "$UPDATE_SIGNING_PRIVATE_KEY" > "$RUNNER_TEMP/signing_key.pem"
+        shell: pwsh
+        run: |
+          $key = $env:UPDATE_SIGNING_PRIVATE_KEY
+          [System.IO.File]::WriteAllText("$env:RUNNER_TEMP\signing_key.pem", $key)
+          $size = (Get-Item "$env:RUNNER_TEMP\signing_key.pem").Length
+          Write-Host "Key file: $size bytes"
+          if ($size -lt 100) { Write-Host "WARNING: Key file too small, secret may be empty"; exit 1 }
         env:
           UPDATE_SIGNING_PRIVATE_KEY: ${{ secrets.UPDATE_SIGNING_PRIVATE_KEY }}
 
@@ -68,7 +73,7 @@ jobs:
         run: node scripts/generate-manifest.mjs
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.VERSION }}
-          SIGNING_KEY_PATH: ${{ runner.temp }}/signing_key.pem
+          SIGNING_KEY_PATH: ${{ runner.temp }}\signing_key.pem
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
