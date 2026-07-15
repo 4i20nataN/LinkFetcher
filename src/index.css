@@ -15,11 +15,11 @@
   --radius-sm: 2px;
 }
 
-/* UI Scale variable for FormatSelector zoom */
-.fs-xs { font-size: calc(var(--ui-scale, 12) * 0.0833rem); }
-.fs-sm { font-size: calc(var(--ui-scale, 12) * 0.1rem); }
-.fs-md { font-size: calc(var(--ui-scale, 12) * 0.1167rem); }
-.fs-lg { font-size: calc(var(--ui-scale, 12) * 0.1333rem); }
+/* UI Scale — only text, no buttons/padding affected. 0%=tiny, 50%=default, 100%=large */
+.fs-xs { font-size: calc((6 + var(--ui-scale, 50) * 0.12) * 1px); }
+.fs-sm { font-size: calc((8 + var(--ui-scale, 50) * 0.12) * 1px); }
+.fs-md { font-size: calc((9 + var(--ui-scale, 50) * 0.14) * 1px); }
+.fs-lg { font-size: calc((10 + var(--ui-scale, 50) * 0.16) * 1px); }
 
 /* Custom scrollbars matching Nothing OS / minimalist design */
 ::-webkit-scrollbar {

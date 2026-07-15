@@ -307,8 +307,13 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
   const [activeTab, setActiveTab] = useState<TabId>('media');
   const [showSubs, setShowSubs] = useState(false);
   const [showCustomFormat, setShowCustomFormat] = useState(false);
+
+  const fmtDate = (d: string) => {
+    if (/^\d{8}$/.test(d)) return `${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}`;
+    return d;
+  };
   const [useUnderscore, setUseUnderscore] = useState(true);
-  const [uiScale, setUiScale] = useState(8);
+  const [uiScale, setUiScale] = useState(50);
 
   const maxRes = useMemo(() => getMaxVideoHeight(mediaInfo.formats), [mediaInfo.formats]);
 
@@ -599,9 +604,9 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
         })}
         <div className="flex items-center gap-0.5 ml-1 pl-1 border-l border-white/5">
           <span className="fs-sm text-zinc-600 mr-0.5">🔍</span>
-          <button onClick={() => setUiScale(s => Math.max(8, s - 1))} className="w-5 h-5 rounded flex items-center justify-center fs-sm text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">A-</button>
-          <span className="fs-xs text-zinc-500 w-7 text-center font-mono">{Math.round(((uiScale - 8) / 12) * 100)}%</span>
-          <button onClick={() => setUiScale(s => Math.min(20, s + 1))} className="w-5 h-5 rounded flex items-center justify-center fs-sm text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">A+</button>
+          <button onClick={() => setUiScale(s => Math.max(0, s - 5))} className="w-5 h-5 rounded flex items-center justify-center fs-sm text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">A-</button>
+          <span className="fs-xs text-zinc-500 w-7 text-center font-mono">{uiScale}%</span>
+          <button onClick={() => setUiScale(s => Math.min(100, s + 5))} className="w-5 h-5 rounded flex items-center justify-center fs-sm text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">A+</button>
         </div>
       </div>
 
@@ -627,7 +632,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             {mediaInfo.publishDate && (
               <span className="flex items-center gap-1">
                 <Calendar size={10} />
-                {mediaInfo.publishDate}
+                {fmtDate(mediaInfo.publishDate)}
               </span>
             )}
           </div>
@@ -663,7 +668,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                 {[
                   { resolved: mediaInfo.title || 'video', label: 'Titulo' },
                   { resolved: mediaInfo.channel || 'canal', label: 'Canal' },
-                  { resolved: mediaInfo.publishDate || '', label: 'Data' },
+                  { resolved: fmtDate(mediaInfo.publishDate || ''), label: 'Data' },
                   { resolved: mediaInfo.duration || '', label: 'Duracao' },
                 ].filter(t => t.resolved).map(t => (
                   <button
@@ -680,7 +685,6 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   </button>
                 ))}
                 <div className="flex items-center gap-1 ml-1 pl-2 border-l border-white/5">
-                  <span className="fs-sm text-zinc-600">_</span>
                   <button
                     onClick={() => {
                       const next = !useUnderscore;
@@ -696,7 +700,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   <span className="fs-sm text-zinc-600">Sem Espaco</span>
                 </div>
                 <div className="flex items-center gap-1 ml-1 pl-2 border-l border-white/5">
-                  <label className="fs-sm text-zinc-400">Nome limpo</label>
+                  <label className="fs-sm text-zinc-400">Nome limpo (sem caracteres especiais)</label>
                   <button onClick={() => update({ restrictFilenames: !options.restrictFilenames })} className={`relative w-7 h-4 rounded-full transition-colors shrink-0 ${options.restrictFilenames ? accentBg : 'bg-zinc-800'}`}>
                     <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${options.restrictFilenames ? 'left-[14px]' : 'left-0.5'}`} />
                   </button>
