@@ -4,7 +4,7 @@ import { MediaInfo, MediaFormat } from '../../types';
 import { getAccentBgClass, getAccentTextClass, getAccentBorderClass, getAccentTextOnBgClass } from '../../components/ThemeWrapper';
 import { BlockIcon, BlockTitle, BlockId } from '../../components/BlockIcon';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info, User, Eye, Calendar, ArrowDownToLine, AlertTriangle } from 'lucide-react';
 
 const isWebMode = typeof window !== 'undefined' && !window.electron;
 
@@ -51,22 +51,22 @@ export interface FormatOptions {
 }
 
 const VIDEO_PRESETS = [
-  { id: 'best', label: 'Melhor', height: Infinity, format: 'bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b' },
-  { id: '2160p', label: '4K', height: 2160, format: 'bv*[height<=2160][ext=mp4]+ba[ext=m4a]/b[height<=2160]' },
-  { id: '1440p', label: '1440p', height: 1440, format: 'bv*[height<=1440][ext=mp4]+ba[ext=m4a]/b[height<=1440]' },
-  { id: '1080p', label: '1080p', height: 1080, format: 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080]' },
-  { id: '720p', label: '720p', height: 720, format: 'bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720]' },
-  { id: '480p', label: '480p', height: 480, format: 'bv*[height<=480][ext=mp4]+ba[ext=m4a]/b[height<=480]' },
-  { id: '360p', label: '360p', height: 360, format: 'bv*[height<=360][ext=mp4]+ba[ext=m4a]/b[height<=360]' },
+  { id: 'best', label: '★★★★ Melhor', height: Infinity, format: 'bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b' },
+  { id: '2160p', label: '4K Ultra', height: 2160, format: 'bv*[height<=2160][ext=mp4]+ba[ext=m4a]/b[height<=2160]' },
+  { id: '1440p', label: '1440 QHD', height: 1440, format: 'bv*[height<=1440][ext=mp4]+ba[ext=m4a]/b[height<=1440]' },
+  { id: '1080p', label: '1080 Full HD', height: 1080, format: 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080]' },
+  { id: '720p', label: '720 HD', height: 720, format: 'bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720]' },
+  { id: '480p', label: '480 SD', height: 480, format: 'bv*[height<=480][ext=mp4]+ba[ext=m4a]/b[height<=480]' },
+  { id: '360p', label: '360 Baixa', height: 360, format: 'bv*[height<=360][ext=mp4]+ba[ext=m4a]/b[height<=360]' },
 ] as const;
 
 const VIDEO_FORMATS = ['mp4', 'mkv', 'webm', 'avi', 'flv', 'mov', 'ts'] as const;
 const VIDEO_CODECS = [
-  { id: '', label: 'Auto' },
-  { id: 'h264', label: 'H.264' },
-  { id: 'h265', label: 'H.265' },
-  { id: 'vp9', label: 'VP9' },
-  { id: 'av01', label: 'AV1' },
+  { id: '', label: 'Auto', tip: 'Escolher automaticamente o melhor codec' },
+  { id: 'h264', label: 'H.264', tip: 'Mais compativel. Funciona em todos os dispositivos' },
+  { id: 'h265', label: 'H.265', tip: 'Melhor compressao. Pode nao funcionar em TVs antigas' },
+  { id: 'vp9', label: 'VP9', tip: 'Codec Google. Bom para YouTube, compressao eficiente' },
+  { id: 'av01', label: 'AV1', tip: 'Codec moderno. Maior compressao. Suporte crescente' },
 ] as const;
 const AUDIO_FORMATS = [
   { id: 'mp3', label: 'MP3' },
@@ -76,13 +76,13 @@ const AUDIO_FORMATS = [
   { id: 'opus', label: 'OPUS' },
   { id: 'wav', label: 'WAV' },
 ] as const;
-const AUDIO_QUALITY_PRESETS = [
+export const AUDIO_QUALITY_PRESETS = [
   { value: '0', label: 'Melhor', desc: 'Qualidade maxima' },
-  { value: '3', label: '320', desc: 'kbps' },
-  { value: '4', label: '256', desc: 'kbps' },
-  { value: '5', label: '192', desc: 'kbps' },
-  { value: '7', label: '128', desc: 'kbps' },
-  { value: '9', label: '64', desc: 'kbps' },
+  { value: '3', label: '320 kbps', desc: '' },
+  { value: '4', label: '256 kbps', desc: '' },
+  { value: '5', label: '192 kbps', desc: '' },
+  { value: '7', label: '128 kbps', desc: '' },
+  { value: '9', label: '64 kbps', desc: '' },
 ] as const;
 const SUB_FORMATS = ['srt', 'ass', 'vtt'] as const;
 const SUB_LANGS = [
@@ -482,8 +482,8 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
           {desc && <p className="text-[10px] text-zinc-500 mt-0.5">{desc}</p>}
         </div>
       </div>
-      <button onClick={onChange} className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${value ? accentBg : 'bg-zinc-700'}`}>
-        <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform shadow-md ${value ? 'left-[26px]' : 'left-1'}`} />
+      <button onClick={onChange} className={`relative w-[52px] h-[28px] rounded-full transition-colors duration-300 shrink-0 ${value ? accentBg : 'bg-zinc-700'}`}>
+        <div className={`absolute top-[3px] w-5 h-5 rounded-full bg-white transition-all duration-300 shadow-md ${value ? 'left-[27px]' : 'left-[3px]'}`} />
       </button>
     </div>
   );
@@ -491,30 +491,90 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
   const SmallToggle: React.FC<{ value: boolean; onChange: () => void; label: string }> = ({ value, onChange, label }) => (
     <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900/30 border border-white/5">
       <label className="text-[11px] text-zinc-400">{label}</label>
-      <button onClick={onChange} className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${value ? accentBg : 'bg-zinc-800'}`}>
-        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${value ? 'left-[18px]' : 'left-0.5'}`} />
+      <button onClick={onChange} className={`relative w-10 h-[24px] rounded-full transition-colors duration-300 shrink-0 ${value ? accentBg : 'bg-zinc-800'}`}>
+        <div className={`absolute top-[3px] w-[18px] h-[18px] rounded-full bg-white transition-all duration-300 ${value ? 'left-[21px]' : 'left-[3px]'}`} />
       </button>
     </div>
   );
 
+  const TooltipWrapper: React.FC<{ tip: string; children: React.ReactNode }> = ({ tip, children }) => (
+    <div className="relative group/tip inline-flex">
+      {children}
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg bg-zinc-800 border border-white/10 text-[10px] text-zinc-300 whitespace-nowrap opacity-0 pointer-events-none group-hover/tip:opacity-100 transition-opacity z-50 shadow-xl">
+        {tip}
+        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-zinc-800" />
+      </div>
+    </div>
+  );
+
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
+  const toggleSection = useCallback((id: string) => {
+    setOpenSections(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const AccordionSection: React.FC<{ id: string; title: string; blockId: BlockId; children: React.ReactNode; defaultOpen?: boolean }> = ({ id, title, blockId, children, defaultOpen = false }) => {
+    const isOpen = openSections.has(id) || defaultOpen;
+    return (
+      <div className="rounded-xl bg-zinc-900/40 border border-white/5 overflow-hidden">
+        <button
+          onClick={() => toggleSection(id)}
+          className="w-full flex items-center justify-between p-3 text-left hover:bg-white/[0.02] transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <BlockIcon blockId={blockId} />
+            <BlockTitle>{title}</BlockTitle>
+          </div>
+          <motion.div
+            animate={{ rotate: isOpen ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <ChevronDown size={14} className="text-zinc-500" />
+          </motion.div>
+        </button>
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              {children}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  };
+
   const Btn: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode; className?: string; disabled?: boolean }> = ({ active, onClick, children, className = '', disabled = false }) => (
-    <button
+    <motion.button
       onClick={onClick}
       disabled={disabled}
+      whileTap={{ scale: 0.97 }}
+      animate={active ? { scale: 1.02, boxShadow: '0 2px 12px rgba(0,0,0,0.3)' } : { scale: 1, boxShadow: '0 0px 0px rgba(0,0,0,0)' }}
+      transition={{ duration: 0.2 }}
       className={`
-        border rounded-lg text-[11px] font-bold transition-all text-center
+        border rounded-xl text-[11px] font-bold transition-colors text-center
         ${disabled ? 'bg-zinc-900/20 border-white/5 text-zinc-600 cursor-not-allowed' :
-          active ? `${accentBg} text-white ${accentBorder}` : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}
+          active ? 'bg-[#282B33] border-white/15 text-white' : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}
         ${className}
       `}
     >
+      {active && <span className="mr-1">✔</span>}
       {children}
-    </button>
+    </motion.button>
   );
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-1 p-1 rounded-xl bg-zinc-900/60 border border-white/5">
+      <div className="flex gap-1 border-b border-white/5">
         {([
           { id: 'media' as TabId, blockId: 'video-format' as BlockId, label: 'Mídia' },
           { id: 'advanced' as TabId, blockId: 'behavior' as BlockId, label: 'Avançado' },
@@ -524,28 +584,58 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${isActive ? `${accentBg} ${accentTextOnBg} shadow-lg` : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}`}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold transition-all relative ${isActive ? accentText : 'text-zinc-500 hover:text-zinc-300'}`}
             >
               <BlockIcon blockId={tab.blockId} size={14} />
               {tab.label}
+              {isActive && (
+                <motion.div
+                  layoutId="tab-indicator"
+                  className={`absolute bottom-0 left-0 right-0 h-0.5 ${accentBg}`}
+                  transition={{ duration: 0.2 }}
+                />
+              )}
             </button>
           );
         })}
       </div>
 
-      <div className="flex items-center gap-3 p-2.5 rounded-xl bg-zinc-900/40 border border-white/5">
-        <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/5 bg-zinc-950 shrink-0">
+      <div className="flex items-start gap-3 p-3 rounded-xl bg-zinc-900/40 border border-white/5">
+        <div className="w-16 h-16 rounded-lg overflow-hidden border border-white/5 bg-zinc-950 shrink-0">
           <img src={mediaInfo.thumbnailUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 space-y-1">
           <p className="text-[11px] font-semibold text-white truncate">{mediaInfo.title}</p>
-          <p className="text-[10px] text-zinc-500 font-mono">{mediaInfo.formats.length} formatos{mediaInfo.duration ? ` • ${mediaInfo.duration}` : ''}</p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-zinc-500">
+            {mediaInfo.channel && (
+              <span className="flex items-center gap-1">
+                <User size={10} />
+                {mediaInfo.channel}
+              </span>
+            )}
+            {mediaInfo.views && (
+              <span className="flex items-center gap-1">
+                <Eye size={10} />
+                {mediaInfo.views}
+              </span>
+            )}
+            {mediaInfo.publishDate && (
+              <span className="flex items-center gap-1">
+                <Calendar size={10} />
+                {mediaInfo.publishDate}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 text-[10px] text-zinc-500 font-mono">
+            <span>{mediaInfo.formats.length} formatos</span>
+            {mediaInfo.duration && <span>{mediaInfo.duration}</span>}
+          </div>
         </div>
       </div>
 
       <AnimatePresence mode="wait">
         {activeTab === 'media' && (
-          <motion.div key="media" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="space-y-3">
+          <motion.div key="media" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="space-y-4">
 
             {/* ── Nome do Arquivo + Nome Limpo ── */}
             <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
@@ -558,8 +648,28 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                 value={options.customFilename || ''}
                 onChange={e => update({ customFilename: e.target.value })}
                 placeholder="Se vazio, usa o titulo original do video"
-                className="w-full px-3 py-2 rounded-lg bg-zinc-800/60 border border-white/5 text-[13px] text-white placeholder-zinc-500 focus:outline-none focus:border-white/15 transition-colors"
+                className="w-full px-3 py-2 rounded-lg bg-zinc-800/60 border border-white/5 text-[13px] text-white placeholder-zinc-500 focus:outline-none focus:border-white/15 transition-colors font-mono"
               />
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { tpl: '%(title)s', label: 'Titulo' },
+                  { tpl: '%(uploader)s', label: 'Canal' },
+                  { tpl: '%(upload_date)s', label: 'Data' },
+                  { tpl: '%(resolution)s', label: 'Resolucao' },
+                  { tpl: '%(duration)s', label: 'Duracao' },
+                ].map(t => (
+                  <button
+                    key={t.tpl}
+                    onClick={() => {
+                      const cur = options.customFilename || '';
+                      update({ customFilename: cur ? `${cur} ${t.tpl}` : t.tpl });
+                    }}
+                    className="px-2 py-1 rounded-md bg-zinc-800/60 border border-white/5 text-[10px] text-zinc-400 hover:text-white hover:border-white/10 transition-colors font-mono"
+                  >
+                    {t.tpl}
+                  </button>
+                ))}
+              </div>
               <div className="flex items-center justify-end gap-2.5 p-2.5 rounded-lg bg-zinc-900/30 border border-white/5">
                 <label className="text-[11px] text-zinc-400">Nome limpo (sem caracteres especiais)</label>
                 <button onClick={() => update({ restrictFilenames: !options.restrictFilenames })} className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${options.restrictFilenames ? accentBg : 'bg-zinc-800'}`}>
@@ -569,41 +679,40 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             </div>
 
             {/* ── Resolução ── */}
-            <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
-              <div className="flex items-center gap-2">
-                <BlockIcon blockId="resolution" />
-                <BlockTitle>Resolucao</BlockTitle>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
-                {VIDEO_PRESETS.map(preset => {
-                  const unavailable = preset.height !== Infinity && maxRes > 0 && preset.height > maxRes;
-                  return (
-                    <Btn
-                      key={preset.id}
-                      active={options.format === preset.format && !options.audioOnly}
-                      onClick={() => update({ format: preset.format, audioOnly: false })}
-                      disabled={unavailable}
-                      className="py-2.5"
-                    >
-                      {preset.label}
-                    </Btn>
-                  );
-                })}
-              </div>
-              {maxRes > 0 && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-900/30 border border-white/5">
-                  <Info size={12} className="text-zinc-500 shrink-0" />
-                  <p className="text-[10px] text-zinc-400">
-                    {settings.language === 'en'
-                      ? `This video is available up to ${maxRes}p. Higher presets will download at the maximum available quality.`
-                      : `Este video esta disponivel ate ${maxRes}p. Presets maiores serao baixados na maxima qualidade disponivel.`}
-                  </p>
+            <AccordionSection id="resolution" title="Resolução" blockId="resolution">
+              <div className="px-3 pb-3 pt-0 space-y-2">
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+                  {VIDEO_PRESETS.map(preset => {
+                    const unavailable = preset.height !== Infinity && maxRes > 0 && preset.height > maxRes;
+                    return (
+                      <Btn
+                        key={preset.id}
+                        active={options.format === preset.format && !options.audioOnly}
+                        onClick={() => update({ format: preset.format, audioOnly: false })}
+                        disabled={unavailable}
+                        className="py-2.5"
+                      >
+                        {preset.label}
+                      </Btn>
+                    );
+                  })}
                 </div>
-              )}
-            </div>
+                {maxRes > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-900/30 border border-white/5">
+                    <Info size={12} className="text-zinc-500 shrink-0" />
+                    <p className="text-[10px] text-zinc-400">
+                      {settings.language === 'en'
+                        ? `This video is available up to ${maxRes}p. Higher presets will download at the maximum available quality.`
+                        : `Este video esta disponivel ate ${maxRes}p. Presets maiores serao baixados na maxima qualidade disponivel.`}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </AccordionSection>
 
             {/* ── Formato Video + Codecs | Legendas + Audio (2 colunas) ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <AccordionSection id="media-options" title="Formato e Legendas" blockId="video-format">
+              <div className="px-3 pb-3 pt-0 grid grid-cols-1 sm:grid-cols-2 gap-2">
               {/* Coluna esquerda: Formato do Video + Codecs */}
               <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-3">
                 <div className="flex items-center gap-2">
@@ -632,25 +741,26 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   </div>
                   <div className="flex gap-1.5">
                     {VIDEO_CODECS.map(codec => (
-                      <Btn
-                        key={codec.id}
-                        active={options.videoCodec === codec.id}
-                        onClick={() => {
-                          const codecVal = codec.id;
-                          update({ videoCodec: codecVal });
-                          if (!options.audioOnly && options.format) {
-                            let fmt = options.format;
-                            fmt = fmt.replace(/\[vcodec~?[^]]*\]/g, '');
-                            if (codecVal) {
-                              fmt = fmt.replace(/bv\*\[/g, `bv*[vcodec~=${codecVal}][`);
+                      <TooltipWrapper key={codec.id} tip={codec.tip}>
+                        <Btn
+                          active={options.videoCodec === codec.id}
+                          onClick={() => {
+                            const codecVal = codec.id;
+                            update({ videoCodec: codecVal });
+                            if (!options.audioOnly && options.format) {
+                              let fmt = options.format;
+                              fmt = fmt.replace(/\[vcodec~?[^]]*\]/g, '');
+                              if (codecVal) {
+                                fmt = fmt.replace(/bv\*\[/g, `bv*[vcodec~=${codecVal}][`);
+                              }
+                              update({ format: fmt });
                             }
-                            update({ format: fmt });
-                          }
-                        }}
-                        className="py-2 flex-1"
-                      >
-                        {codec.label}
-                      </Btn>
+                          }}
+                          className="py-2 flex-1"
+                        >
+                          {codec.label}
+                        </Btn>
+                      </TooltipWrapper>
                     ))}
                   </div>
                 </div>
@@ -712,7 +822,8 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   />
                 </div>
               </div>
-            </div>
+              </div>
+            </AccordionSection>
 
             {/* ── Formato + Qualidade do Áudio (2 colunas) ── */}
             {!options.audioOnly && (
@@ -721,34 +832,36 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                 <span className="text-yellow-500/80 text-[10px]">Funciona apenas com <strong>"Extrair apenas audio"</strong> ativado</span>
               </div>
             )}
-            <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 ${options.audioOnly ? '' : 'opacity-30 pointer-events-none'}`}>
-              <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
-                <div className="flex items-center gap-2">
-                  <BlockIcon blockId="audio-format" />
-                  <BlockTitle>Formato do Audio</BlockTitle>
+            <AccordionSection id="audio" title="Áudio" blockId="audio-format">
+              <div className={`px-3 pb-3 pt-0 grid grid-cols-1 sm:grid-cols-2 gap-2 ${options.audioOnly ? '' : 'opacity-30 pointer-events-none'}`}>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <BlockIcon blockId="audio-format" />
+                    <BlockTitle>Formato do Audio</BlockTitle>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {AUDIO_FORMATS.map(fmt => (
+                      <Btn key={fmt.id} active={options.audioFormat === fmt.id} onClick={() => update({ audioFormat: fmt.id })} className="py-2">
+                        {fmt.label}
+                      </Btn>
+                    ))}
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {AUDIO_FORMATS.map(fmt => (
-                    <Btn key={fmt.id} active={options.audioFormat === fmt.id} onClick={() => update({ audioFormat: fmt.id })} className="py-2">
-                      {fmt.label}
-                    </Btn>
-                  ))}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <BlockIcon blockId="audio-quality" />
+                    <BlockTitle>Qualidade do Audio</BlockTitle>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {AUDIO_QUALITY_PRESETS.map(q => (
+                      <Btn key={q.value} active={options.audioQuality === q.value} onClick={() => update({ audioQuality: q.value })} className="py-2">
+                        {q.label}
+                      </Btn>
+                    ))}
+                  </div>
                 </div>
               </div>
-              <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
-                <div className="flex items-center gap-2">
-                  <BlockIcon blockId="audio-quality" />
-                  <BlockTitle>Qualidade do Audio</BlockTitle>
-                </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {AUDIO_QUALITY_PRESETS.map(q => (
-                    <Btn key={q.value} active={options.audioQuality === q.value} onClick={() => update({ audioQuality: q.value })} className="py-2">
-                      {q.label}
-                    </Btn>
-                  ))}
-                </div>
-              </div>
-            </div>
+            </AccordionSection>
 
             {/* ── Formato customizado ── */}
             <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
@@ -770,157 +883,199 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
         )}
 
         {activeTab === 'advanced' && (
-          <motion.div key="advanced" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="space-y-3">
+          <motion.div key="advanced" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="space-y-4">
 
             {/* ── Recorte de tempo ── */}
-            <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
-              <div className="flex items-center gap-2">
-                <BlockIcon blockId="trim" />
-                <BlockTitle>Recortar video</BlockTitle>
-              </div>
-              {mediaInfo.durationSeconds > 0 ? (
-                <TimeRangeSlider
-                  durationSeconds={mediaInfo.durationSeconds}
-                  startSeconds={trimStart}
-                  endSeconds={trimEnd}
-                  accentBg={accentBg}
-                  onChange={(s, e) => { setTrimStart(s); setTrimEnd(e); }}
-                />
-              ) : (
-                <>
-                  <p className="text-[10px] text-zinc-600">Baixar apenas um trecho. Formato: MM:SS ou HH:MM:SS</p>
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      placeholder="Inicio (00:00)"
-                      onChange={e => {
-                        const end = (e.target.closest('.space-y-4')?.querySelector('input[placeholder*="Fim"]') as HTMLInputElement)?.value || '';
-                        const val = e.target.value.trim();
-                        if (val && end) update({ downloadSections: `*${val}-${end}` });
-                        else if (val) update({ downloadSections: `*${val}-` });
-                        else update({ downloadSections: end ? `*-${end}` : '' });
-                      }}
-                      className="flex-1 px-3 py-2 rounded-lg bg-zinc-900 border border-white/5 text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/15"
-                    />
-                    <span className="text-zinc-600 text-xs">-</span>
-                    <input
-                      type="text"
-                      placeholder="Fim (fim)"
-                      onChange={e => {
-                        const start = (e.target.closest('.space-y-4')?.querySelector('input[placeholder*="Inicio"]') as HTMLInputElement)?.value || '';
-                        const val = e.target.value.trim();
-                        if (start && val) update({ downloadSections: `*${start}-${val}` });
-                        else if (val) update({ downloadSections: `*-${val}` });
-                        else update({ downloadSections: start ? `*${start}-` : '' });
-                      }}
-                      className="flex-1 px-3 py-2 rounded-lg bg-zinc-900 border border-white/5 text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/15"
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* ── Modo de Saída + FPS (2 colunas) ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
-                <div className="flex items-center gap-2">
-                  <BlockIcon blockId="output-mode" />
-                  <BlockTitle>Modo de saida</BlockTitle>
-                </div>
-                <div className="grid grid-cols-3 gap-1.5">
-                  <Btn active={!options.videoOnly && !options.audioOnly} onClick={() => update({ videoOnly: false, audioOnly: false })} className="py-2.5">
-                    Video + Audio
-                  </Btn>
-                  <Btn active={!!options.videoOnly} onClick={() => update({ videoOnly: !options.videoOnly, audioOnly: false })} className="py-2.5">
-                    So Video
-                  </Btn>
-                  <Btn active={!!options.audioOnly} onClick={() => update({ audioOnly: !options.audioOnly, videoOnly: false })} className="py-2.5">
-                    So Audio
-                  </Btn>
-                </div>
-              </div>
-              <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
-                <div className="flex items-center gap-2">
-                  <BlockIcon blockId="fps" />
-                  <BlockTitle>FPS Maximo</BlockTitle>
-                </div>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {[0, 24, 30, 60, 120].map(fps => (
-                    <Btn key={fps} active={options.fpsMax === fps} onClick={() => update({ fpsMax: fps })} className="py-2 flex-1">
-                      {fps === 0 ? 'Auto' : `${fps}`}
-                    </Btn>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* ── SponsorBlock ── */}
-            <div className={`p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2 ${isWebMode ? 'opacity-40 pointer-events-none' : ''}`}>
-              <div className="flex items-center gap-2">
-                <BlockIcon blockId="sponsorblock" />
-                <BlockTitle>SponsorBlock</BlockTitle>
-                {isWebMode && <DesktopOnlyTag />}
-              </div>
-              <p className="text-[10px] text-zinc-600">Remover automaticamente partes indesejadas do video</p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {[
-                  { id: '', label: 'Desligado' },
-                  { id: 'sponsor', label: 'Sponsors' },
-                  { id: 'intro,outro,preview', label: 'Intro/Outro' },
-                  { id: 'all', label: 'Remover Tudo' },
-                ].map(opt => (
-                  <Btn key={opt.id} active={options.sponsorblockRemove === opt.id} onClick={() => update({ sponsorblockRemove: opt.id })} className="py-2">
-                    {opt.label}
-                  </Btn>
-                ))}
-              </div>
-            </div>
-
-            {/* ── Metadados + Thumbnail (2 colunas) ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <Toggle value={options.embedMetadata} onChange={() => update({ embedMetadata: !options.embedMetadata })} label="Metadados" desc="Incorporar titulo, autor e outros dados" icon={<BlockIcon blockId="metadata" />} />
-              <div>
-                <Toggle value={!!options.writeThumbnail} onChange={() => update({ writeThumbnail: !options.writeThumbnail })} label="Thumbnail" desc="Salvar imagem da miniatura" icon={<BlockIcon blockId="thumbnail" />} />
-                {options.writeThumbnail && (
-                  <div className={`mt-2 ${isWebMode ? 'opacity-40 pointer-events-none' : ''}`}>
-                    <SmallToggle value={!!options.embedThumbnail} onChange={() => update({ embedThumbnail: !options.embedThumbnail })} label="Incorporar thumbnail" />
-                    {isWebMode && <div className="mt-1"><DesktopOnlyTag /></div>}
-                  </div>
+            <AccordionSection id="trim" title="Recortar vídeo" blockId="trim">
+              <div className="px-3 pb-3 pt-0 space-y-2">
+                {mediaInfo.durationSeconds > 0 ? (
+                  <TimeRangeSlider
+                    durationSeconds={mediaInfo.durationSeconds}
+                    startSeconds={trimStart}
+                    endSeconds={trimEnd}
+                    accentBg={accentBg}
+                    onChange={(s, e) => { setTrimStart(s); setTrimEnd(e); }}
+                  />
+                ) : (
+                  <>
+                    <p className="text-[10px] text-zinc-600">Baixar apenas um trecho. Formato: MM:SS ou HH:MM:SS</p>
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="text"
+                        placeholder="Inicio (00:00)"
+                        onChange={e => {
+                          const end = (e.target.closest('.space-y-4')?.querySelector('input[placeholder*="Fim"]') as HTMLInputElement)?.value || '';
+                          const val = e.target.value.trim();
+                          if (val && end) update({ downloadSections: `*${val}-${end}` });
+                          else if (val) update({ downloadSections: `*${val}-` });
+                          else update({ downloadSections: end ? `*-${end}` : '' });
+                        }}
+                        className="flex-1 px-3 py-2 rounded-lg bg-zinc-900 border border-white/5 text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/15"
+                      />
+                      <span className="text-zinc-600 text-xs">-</span>
+                      <input
+                        type="text"
+                        placeholder="Fim (fim)"
+                        onChange={e => {
+                          const start = (e.target.closest('.space-y-4')?.querySelector('input[placeholder*="Inicio"]') as HTMLInputElement)?.value || '';
+                          const val = e.target.value.trim();
+                          if (start && val) update({ downloadSections: `*${start}-${val}` });
+                          else if (val) update({ downloadSections: `*-${val}` });
+                          else update({ downloadSections: start ? `*${start}-` : '' });
+                        }}
+                        className="flex-1 px-3 py-2 rounded-lg bg-zinc-900 border border-white/5 text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/15"
+                      />
+                    </div>
+                  </>
                 )}
               </div>
-            </div>
+            </AccordionSection>
+
+            {/* ── Modo de Saída + FPS (2 colunas) ── */}
+            <AccordionSection id="output" title="Modo de saída" blockId="output-mode">
+              <div className="px-3 pb-3 pt-0 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <BlockIcon blockId="output-mode" />
+                    <BlockTitle>Modo de saida</BlockTitle>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <Btn active={!options.videoOnly && !options.audioOnly} onClick={() => update({ videoOnly: false, audioOnly: false })} className="py-2.5">
+                      Video + Audio
+                    </Btn>
+                    <Btn active={!!options.videoOnly} onClick={() => update({ videoOnly: !options.videoOnly, audioOnly: false })} className="py-2.5">
+                      So Video
+                    </Btn>
+                    <Btn active={!!options.audioOnly} onClick={() => update({ audioOnly: !options.audioOnly, videoOnly: false })} className="py-2.5">
+                      So Audio
+                    </Btn>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <BlockIcon blockId="fps" />
+                    <BlockTitle>FPS Maximo</BlockTitle>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[0, 24, 30, 60, 120].map(fps => (
+                      <Btn key={fps} active={options.fpsMax === fps} onClick={() => update({ fpsMax: fps })} className="py-2 flex-1">
+                        {fps === 0 ? 'Original' : `${fps} FPS`}
+                      </Btn>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </AccordionSection>
+
+            {/* ── SponsorBlock ── */}
+            <AccordionSection id="sponsorblock" title="SponsorBlock" blockId="sponsorblock">
+              <div className={`px-3 pb-3 pt-0 space-y-2 ${isWebMode ? 'opacity-40 pointer-events-none' : ''}`}>
+                <p className="text-[10px] text-zinc-600">Remover automaticamente partes indesejadas do video</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { id: 'sponsor', label: 'Sponsors' },
+                    { id: 'intro', label: 'Intro' },
+                    { id: 'outro', label: 'Outro' },
+                    { id: 'preview', label: 'Preview' },
+                    { id: 'selfpromo', label: 'Self-promo' },
+                    { id: 'interaction', label: 'Interacao' },
+                    { id: 'music_offtopic', label: 'Musica' },
+                    { id: 'filler', label: 'Filler' },
+                  ].map(cat => {
+                    const current = options.sponsorblockRemove || '';
+                    const selected = current === 'all' || current.split(',').includes(cat.id);
+                    return (
+                      <Btn
+                        key={cat.id}
+                        active={selected}
+                        onClick={() => {
+                          if (current === 'all') {
+                            update({ sponsorblockRemove: cat.id });
+                          } else {
+                            const parts = current ? current.split(',') : [];
+                            const next = selected ? parts.filter(p => p !== cat.id) : [...parts, cat.id];
+                            update({ sponsorblockRemove: next.length > 0 ? next.join(',') : '' });
+                          }
+                        }}
+                        className="py-1.5 px-2.5 text-[10px]"
+                      >
+                        {selected && '✓ '}{cat.label}
+                      </Btn>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-1.5">
+                  <Btn
+                    active={!options.sponsorblockRemove}
+                    onClick={() => update({ sponsorblockRemove: '' })}
+                    className="py-1.5 px-2.5 text-[10px]"
+                  >
+                    Desligado
+                  </Btn>
+                  <Btn
+                    active={options.sponsorblockRemove === 'all'}
+                    onClick={() => update({ sponsorblockRemove: 'all' })}
+                    className="py-1.5 px-2.5 text-[10px]"
+                  >
+                    {options.sponsorblockRemove === 'all' && '✓ '}Remover Tudo
+                  </Btn>
+                </div>
+              </div>
+            </AccordionSection>
+
+            {/* ── Metadados + Thumbnail (2 colunas) ── */}
+            <AccordionSection id="metadata" title="Metadados" blockId="metadata">
+              <div className="px-3 pb-3 pt-0 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Toggle value={options.embedMetadata} onChange={() => update({ embedMetadata: !options.embedMetadata })} label="Metadados" desc="Incorporar titulo, autor e outros dados" icon={<BlockIcon blockId="metadata" />} />
+                <div>
+                  <Toggle value={!!options.writeThumbnail} onChange={() => update({ writeThumbnail: !options.writeThumbnail })} label="Thumbnail" desc="Salvar imagem da miniatura" icon={<BlockIcon blockId="thumbnail" />} />
+                  {options.writeThumbnail && (
+                    <div className={`mt-2 ${isWebMode ? 'opacity-40 pointer-events-none' : ''}`}>
+                      <SmallToggle value={!!options.embedThumbnail} onChange={() => update({ embedThumbnail: !options.embedThumbnail })} label="Incorporar thumbnail" />
+                      {isWebMode && <div className="mt-1"><DesktopOnlyTag /></div>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </AccordionSection>
 
             {/* ── Comportamento + Limite de Velocidade (2 colunas) ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
-                <div className="flex items-center gap-2">
-                  <BlockIcon blockId="speed-limit" />
-                  <BlockTitle>Limite de Velocidade</BlockTitle>
+            <AccordionSection id="behavior" title="Comportamento" blockId="behavior">
+              <div className="px-3 pb-3 pt-0 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <BlockIcon blockId="speed-limit" />
+                    <BlockTitle>Limite de Velocidade</BlockTitle>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[0, 512, 1024, 5120, 10240, 25600, 51200].map(kbps => (
+                      <Btn
+                        key={kbps}
+                        active={options.bandLimit === kbps}
+                        onClick={() => update({ bandLimit: kbps })}
+                        className="py-2 flex-1 text-[10px] min-w-[80px]"
+                      >
+                      {kbps === 0 ? 'Sem limite' : kbps >= 1024 ? `${kbps / 1024}MB/s` : `${kbps}KB/s`}
+                    </Btn>
+                  ))}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {[0, 512, 1024, 5120, 10240, 25600, 51200].map(kbps => (
-                    <Btn
-                      key={kbps}
-                      active={options.bandLimit === kbps}
-                      onClick={() => update({ bandLimit: kbps })}
-                      className="py-2 flex-1 text-[10px] min-w-[80px]"
-                    >
-                    {kbps === 0 ? 'Sem limite' : kbps >= 1024 ? `${kbps / 1024}MB/s` : `${kbps}KB/s`}
-                  </Btn>
-                ))}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <BlockIcon blockId="behavior" />
+                    <BlockTitle>Comportamento</BlockTitle>
+                  </div>
+                  <div className="space-y-1.5 p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/15">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <AlertTriangle size={11} className="text-amber-500/70" />
+                      <span className="text-[10px] text-amber-500/70 font-medium">Opcoes avancadas</span>
+                    </div>
+                    <SmallToggle value={!!options.noOverwrites} onChange={() => update({ noOverwrites: !options.noOverwrites })} label="Nao sobrescrever arquivos existentes" />
+                    <SmallToggle value={!!options.keepVideo} onChange={() => update({ keepVideo: !options.keepVideo })} label="Manter video apos extrair audio" />
+                  </div>
                 </div>
               </div>
-              <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
-                <div className="flex items-center gap-2">
-                  <BlockIcon blockId="behavior" />
-                  <BlockTitle>Comportamento</BlockTitle>
-                </div>
-                <div className="space-y-1.5">
-                  <SmallToggle value={!!options.noOverwrites} onChange={() => update({ noOverwrites: !options.noOverwrites })} label="Nao sobrescrever arquivos existentes" />
-                  <SmallToggle value={!!options.keepVideo} onChange={() => update({ keepVideo: !options.keepVideo })} label="Manter video apos extrair audio" />
-                </div>
-              </div>
-            </div>
+            </AccordionSection>
           </motion.div>
         )}
       </AnimatePresence>

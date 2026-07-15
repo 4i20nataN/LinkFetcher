@@ -15,6 +15,73 @@ import { DownloadEngine } from '../../core/engine/DownloadEngine';
 import { FormatSelector, FormatOptions } from '../downloads/FormatSelector';
 import { probeUrlWithAdapter } from '../../core/ytdlp/YtDlpAdapter';
 
+const SummaryPanel: React.FC<{ formatOptions: FormatOptions; selectedFormat: MediaFormat | null; mediaInfo: MediaInfo }> = ({ formatOptions, selectedFormat, mediaInfo }) => {
+  const items: { icon: string; label: string }[] = [];
+
+  if (formatOptions.audioOnly) {
+    items.push({ icon: '🎵', label: formatOptions.audioFormat.toUpperCase() });
+    if (formatOptions.audioQuality) {
+      const q = Number(formatOptions.audioQuality);
+      items.push({ icon: '🔊', label: q === 0 ? 'Melhor qualidade' : `${q} kbps` });
+    }
+  } else {
+    if (formatOptions.videoFormat) items.push({ icon: '🎬', label: formatOptions.videoFormat.toUpperCase() });
+    // Extract resolution from format string pattern height<=XXXX
+    const fmt = formatOptions.format || '';
+    const heightMatch = fmt.match(/height[<=>]+(\d+)/);
+    if (heightMatch) {
+      const h = Number(heightMatch[1]);
+      const resMap: Record<number, string> = { 2160: '4K', 1440: '1440p', 1080: '1080p', 720: '720p', 480: '480p', 360: '360p' };
+      items.push({ icon: '📺', label: resMap[h] || `${h}p` });
+    } else if (fmt.includes('best') || fmt === '') {
+      items.push({ icon: '📺', label: 'Melhor' });
+    } else if (selectedFormat?.quality) {
+      items.push({ icon: '📺', label: selectedFormat.quality });
+    }
+    if (formatOptions.videoCodec) {
+      const codecMap: Record<string, string> = { h264: 'H.264', h265: 'H.265', vp9: 'VP9', av01: 'AV1' };
+      items.push({ icon: '🎞', label: codecMap[formatOptions.videoCodec] || formatOptions.videoCodec });
+    }
+  }
+
+  if (formatOptions.sponsorblockRemove && formatOptions.sponsorblockRemove !== '') {
+    const sb = formatOptions.sponsorblockRemove === 'all' ? 'Tudo' : formatOptions.sponsorblockRemove.replace(/,/g, ' + ');
+    items.push({ icon: '⚡', label: `SponsorBlock: ${sb}` });
+  }
+  if (formatOptions.downloadSections) items.push({ icon: '✂', label: `Corte: ${formatOptions.downloadSections.replace(/\*/g, '')}` });
+  if (formatOptions.fpsMax && formatOptions.fpsMax > 0) items.push({ icon: '🎞', label: `${formatOptions.fpsMax} FPS` });
+  if (formatOptions.writeSubs || formatOptions.writeAutoSubs) {
+    const lang = formatOptions.subLangs || 'en';
+    items.push({ icon: '📋', label: lang.toUpperCase() });
+  }
+  if (formatOptions.customFilename) items.push({ icon: '📁', label: formatOptions.customFilename });
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Resultado</span>
+        <div className="flex-1 h-px bg-white/5" />
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {items.map((item, i) => (
+          <span key={i} className="flex items-center gap-1.5 text-[11px] text-zinc-300">
+            <span className="text-[10px]">{item.icon}</span>
+            {item.label}
+          </span>
+        ))}
+        {mediaInfo.duration && (
+          <span className="flex items-center gap-1.5 text-[11px] text-zinc-300">
+            <span className="text-[10px]">🕒</span>
+            {mediaInfo.duration}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const LinkAnalyzer: React.FC = () => {
   const { 
     settings, 
@@ -535,6 +602,9 @@ export const LinkAnalyzer: React.FC = () => {
                 onFormatChange={setSelectedFormat}
                 formatOptions={formatOptions}
               />
+
+              {/* ── Summary Panel ── */}
+              <SummaryPanel formatOptions={formatOptions} selectedFormat={selectedFormat} mediaInfo={mediaInfo} />
             </div>
 
             {/* Execute Download trigger */}

@@ -88,5 +88,5 @@ export const BlockIcon: React.FC<{ blockId: BlockId; size?: number }> = ({ block
 };
 
 export const BlockTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <label className="text-xs font-bold text-zinc-300 uppercase tracking-wide">{children}</label>
+  <label className="text-xs font-bold text-zinc-300 tracking-wide">{children}</label>
 );
