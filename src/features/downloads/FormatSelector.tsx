@@ -647,7 +647,11 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
               <input
                 type="text"
                 value={options.customFilename || ''}
-                onChange={e => update({ customFilename: e.target.value })}
+                onChange={e => {
+                  let val = e.target.value;
+                  if (useUnderscore) val = val.replace(/ /g, '_');
+                  update({ customFilename: val });
+                }}
                 placeholder="Se vazio, usa o titulo original do video"
                 className="w-full px-3 py-2 rounded-lg bg-zinc-800/60 border border-white/5 text-[13px] text-white placeholder-zinc-500 focus:outline-none focus:border-white/15 transition-colors font-mono"
               />
