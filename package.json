@@ -18,7 +18,8 @@
     "clean": "rm -rf dist server.js",
     "package:win": "npm run build && npx electron-builder --win",
     "prepare:resources": "node scripts/prepare-resources.cjs",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "devtools:mcp": "npx chrome-devtools-mcp@latest --browser-url=http://127.0.0.1:9222"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -36,6 +37,7 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
+    "chrome-devtools-mcp": "^1.6.0",
     "electron": "^37.2.0",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.25.0",

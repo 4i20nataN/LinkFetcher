@@ -30,7 +30,7 @@ function createWindow() {
   if (isDev) {
     mainWindow.loadURL('http://localhost:3000');
   } else {
-    const htmlPath = path.join(__dirname, '..', 'index.html');
+    const htmlPath = path.join(app.getAppPath(), 'dist-web', 'index.html');
     mainWindow.loadFile(htmlPath);
   }
 }
