@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkFatcher - Premium Obsidian Dashboard</title>
+    <style>
+        /* ==========================================
+           IMPORTAÇÃO DE FONTE & VARIÁVEIS DE TEMA
+           ========================================== */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        
+        :root {
+            /* Tema Padrão (Azul Neon - Suave e Elegante, Sem Brilho Excessivo) */
+            --primary: #0076ff;
+            --primary-glow: rgba(0, 118, 255, 0.3); /* Brilho sutil */
+            --primary-rgb: 0, 118, 255;
+            
+            --bg-obsidian: linear-gradient(rgba(0, 118, 255, 0.02), rgba(0, 118, 255, 0.02)), #030406; 
+            --text-main: #ffffff;
+            --text-muted: #94a3b8; /* Slate 400 para melhor legibilidade no vidro */
+            --card-shadow: rgba(0, 0, 0, 0.75);
+            --glass-bg: rgba(10, 14, 23, 0.18); /* Transparência de vidro ultra-líquido aprimorada */ /* Transparência ultra elegante */
+            --glass-border: rgba(255, 255, 255, 0.12); /* Contorno levemente mais definido para o vidro cristalino */ /* Borda cristalina sutil */
+        }
+
+        /* Classes Dinâmicas de Temas (Background inclina de leve para a cor escolhida) */
+        body.theme-red {
+            --primary: #ff3b30;
+            --primary-glow: rgba(255, 59, 48, 0.3);
+            --primary-rgb: 255, 59, 48;
+            --bg-obsidian: linear-gradient(rgba(255, 59, 48, 0.025), rgba(255, 59, 48, 0.025)), #030406;
+        }
+
+        body.theme-green {
+            --primary: #30d158;
+            --primary-glow: rgba(48, 209, 88, 0.3);
+            --primary-rgb: 48, 209, 88;
+            --bg-obsidian: linear-gradient(rgba(48, 209, 88, 0.025), rgba(48, 209, 88, 0.025)), #030406;
+        }
+
+        body.theme-blue {
+            --primary: #0076ff;
+            --primary-glow: rgba(0, 118, 255, 0.3);
+            --primary-rgb: 0, 118, 255;
+            --bg-obsidian: linear-gradient(rgba(0, 118, 255, 0.025), rgba(0, 118, 255, 0.025)), #030406;
+        }
+
+        body.theme-purple {
+            --primary: #bf5af2;
+            --primary-glow: rgba(191, 90, 242, 0.3);
+            --primary-rgb: 191, 90, 242;
+            --bg-obsidian: linear-gradient(rgba(191, 90, 242, 0.025), rgba(191, 90, 242, 0.025)), #030406;
+        }
+
+        /* Reset Geral */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background: var(--bg-obsidian);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: var(--text-main);
+            padding: 40px 20px;
+            overflow-x: hidden;
+            position: relative;
+            transition: background 0.5s ease; /* Transição suave ao mudar de tema */
+        }
+
+        /* ==========================================
+           1. GRADIENTE FLUIDO ULTRA SUAVE (FUNDO)
+           ========================================== */
+        .bg-glow-container {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        
+        #network-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            pointer-events: none;
+            overflow: hidden;
+            display: block;
+            filter: blur(8px); /* Desfoque de lente real (Bokeh / Lens Blur) diretamente na animação */
+            opacity: 0.65; /* Opacidade calibrada para não brigar com o texto */
+            transform: scale(1.05); /* Escala leve para evitar bordas brancas causadas pelo blur */
+        }
+
+        /* Orbes de luz coloridos gigantes no fundo (Simulando luzes desfocadas da cidade na chuva) */
+        .bg-glow-container::before {
+            content: "";
+            position: absolute;
+            inset: -20%;
+            background: 
+                radial-gradient(circle at 15% 25%, rgba(255, 59, 48, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 85% 25%, rgba(48, 209, 88, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 50% 85%, rgba(0, 118, 255, 0.12) 0%, transparent 60%);
+            filter: blur(120px);
+            animation: bgmove 35s ease-in-out infinite alternate;
+        }
+
+        @keyframes bgmove {
+            0% { transform: scale(1) translate(0px, 0px) rotate(0deg); }
+            50% { transform: scale(1.1) translate(30px, -40px) rotate(3deg); }
+            100% { transform: scale(0.95) translate(-20px, 20px) rotate(-3deg); }
+        }
+
+        /* ==========================================
+           2. PARTÍCULAS ORGANICAS DESFOCADAS (BOKEH)
+           ========================================== */
+        #particle-container {
+            position: fixed;
+            inset: 0;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        /* Efeito de Desfoque Gradativo (Depth of Field) */
+        .p-small { 
+            width: 3px; 
+            height: 3px; 
+            opacity: 0.22; 
+            filter: blur(0.5px);
+        }
+        
+        .p-medium { 
+            width: 6px; 
+            height: 6px; 
+            opacity: 0.3; 
+            filter: blur(1.5px);
+        }
+        
+        .p-large { 
+            width: 14px; 
+            height: 14px; 
+            opacity: 0.25; 
+            filter: blur(4px); /* Lindas bolas de bokeh flutuando */
+        }
+
+
+        @keyframes riseOrganic {
+            0% {
+                transform: translateY(20px) translateX(0);
+                opacity: inherit;
+            }
+            50% {
+                transform: translateY(-50vh) translateX(25px);
+            }
+            100% {
+                transform: translateY(-105vh) translateX(-15px);
+                opacity: 0;
+            }
+        }
+
+        @keyframes colorShift {
+            0%, 100% {
+                background: var(--primary);
+                box-shadow: 0 0 8px var(--primary-glow);
+            }
+            50% {
+                background: rgba(255, 255, 255, 0.25);
+                box-shadow: none;
+            }
+        }
+
+        /* ==========================================
+           3. SELETOR DE TEMA FLUTUANTE (GLASSMORPHISM)
+           ========================================== */
+        .theme-selector {
+            display: flex;
+            gap: 16px;
+            background: rgba(10, 14, 23, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 10px 20px;
+            border-radius: 30px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(30px) saturate(140%);
+            z-index: 10;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+        }
+
+        .theme-btn {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .theme-btn:hover {
+            transform: scale(1.2);
+        }
+
+        .theme-btn.active {
+            border-color: #ffffff;
+            box-shadow: 0 0 8px currentColor;
+        }
+
+        .btn-red { background-color: #ff3b30; color: #ff3b30; }
+        .btn-green { background-color: #30d158; color: #30d158; }
+        .btn-blue { background-color: #0076ff; color: #0076ff; }
+        .btn-purple { background-color: #bf5af2; color: #bf5af2; }
+
+        /* ==========================================
+           4. CONTAINER DO PAINEL PRINCIPAL
+           ========================================== */
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 1.1fr 1.3fr 1.6fr;
+            gap: 24px;
+            width: 100%;
+            max-width: 1400px;
+            background: rgba(10, 14, 23, 0.28); /* Super translúcido para fundir com a imagem de fundo */
+            padding: 30px;
+            border-radius: 28px;
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(40px) saturate(160%);
+            z-index: 10;
+            box-shadow: 0 40px 90px rgba(0, 0, 0, 0.95), 
+                        inset 0 1px 1px rgba(255, 255, 255, 0.05);
+        }
+
+        
+        /* Cartões com Glassmorphism de Vidro Fosco de Elite (Apple Weather Style) */
+        .card {
+            background: rgba(10, 14, 23, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 22px;
+            padding: 28px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55),
+                        inset 0 1px 1px rgba(255, 255, 255, 0.12),
+                        inset 0 -1px 2px rgba(0, 0, 0, 0.4); 
+            backdrop-filter: blur(40px) saturate(180%);
+            -webkit-backdrop-filter: blur(40px) saturate(180%);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.4s ease, box-shadow 0.4s ease, transform 0.4s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(255, 255, 255, 0.18);
+            box-shadow: 0 25px 55px rgba(0, 0, 0, 0.7), 
+                        inset 0 1px 2px rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        /* ==========================================
+           ESTILOS: COLUNA 1 - BRANDING & MENUS
+           ========================================== */
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
+        .logo-icon {
+            width: 64px;
+            height: 64px;
+            background: rgba(255, 255, 255, 0.005);
+            border-radius: 18px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--primary);
+            border: 1px solid rgba(var(--primary-rgb), 0.5); /* Borda mais fina e elegante */
+            box-shadow: 0 0 12px var(--primary-glow);
+            flex-shrink: 0;
+        }
+
+        .logo-icon svg {
+            width: 26px;
+            height: 26px;
+        }
+
+        .logo-text h1 {
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: #fff;
+        }
+
+        .logo-text h1 span {
+            color: var(--primary);
+        }
+
+        .logo-text p {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 3px;
+        }
+
+        .nav-menu {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px;
+        }
+
+        .nav-item {
+            background: rgba(255, 255, 255, 0.005);
+            border: 1px solid rgba(255, 255, 255, 0.02);
+            border-radius: 14px;
+            padding: 18px 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            text-decoration: none;
+            color: var(--text-muted);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .nav-item svg {
+            width: 20px;
+            height: 20px;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+        }
+
+        .nav-item span {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+            display: block;
+        }
+
+        .nav-item small {
+            font-size: 10px;
+            color: var(--text-muted);
+            display: block;
+            margin-top: 3px;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background: rgba(var(--primary-rgb), 0.04);
+            border-color: rgba(var(--primary-rgb), 0.4);
+            color: var(--primary);
+            box-shadow: none;
+            transform: translateY(-1px);
+        }
+
+        .nav-item.active svg {
+            color: var(--primary);
+        }
+
+        /* ==========================================
+           ESTILOS: COLUNA 2 - ANALISADOR DE LINKS
+           ========================================== */
+        .analyzer-section {
+            gap: 25px;
+        }
+
+        .section-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .input-group {
+            display: flex;
+            background: rgba(2, 3, 5, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 14px;
+            padding: 5px;
+            align-items: center;
+        }
+
+        .input-group input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-main);
+            padding: 12px 16px;
+            font-size: 13px;
+            width: 100%;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 26px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px var(--primary-glow);
+            transition: all 0.3s;
+        }
+
+        .btn-primary:hover {
+            filter: brightness(1.1);
+        }
+
+        .social-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .tag-btn {
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            color: var(--text-main);
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .tag-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .tag-btn:hover, .tag-btn.active {
+            background: rgba(var(--primary-rgb), 0.05);
+            border-color: rgba(var(--primary-rgb), 0.3);
+        }
+
+        /* ==========================================
+           ESTILOS: COLUNA 3 - WEATHER & METRICS
+           ========================================== */
+        .weather-section {
+            gap: 25px;
+        }
+
+        .weather-header {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 22px;
+            gap: 20px;
+        }
+
+        .weather-main {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+
+        .weather-icon-temp {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .weather-icon {
+            width: 46px;
+            height: 46px;
+            color: var(--primary);
+        }
+
+        .temp {
+            font-size: 46px;
+            font-weight: 300;
+            line-height: 1;
+        }
+
+        .location-info .city {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .weather-desc {
+            font-size: 11px;
+            color: var(--primary);
+            margin-top: 4px;
+            line-height: 1.4;
+            opacity: 0.85;
+        }
+
+        /* Linha do Tempo por Hora */
+        .hourly-forecast {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .hour-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            padding: 10px 8px;
+            border-radius: 10px;
+            flex: 1;
+            min-width: 48px;
+            transition: transform 0.2s, background 0.2s;
+        }
+        .hour-step:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .hour-step span:first-child {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .hour-step svg {
+            width: 14px;
+            height: 14px;
+            color: var(--primary);
+        }
+
+        .hour-step span:last-child {
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        /* Grid de Métricas */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .metric-box {
+            background: rgba(255, 255, 255, 0.008);
+            border: 1px solid rgba(255, 255, 255, 0.02);
+            border-radius: 14px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            min-height: 120px;
+        }
+
+        .metric-label {
+            font-size: 9px;
+            color: var(--text-muted);
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .metric-value {
+            font-size: 20px;
+            font-weight: 700;
+            margin: 4px 0;
+        }
+
+        .metric-sub {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        .progress-track {
+            position: relative;
+            width: 100%;
+            height: 4px;
+            border-radius: 10px;
+            margin-top: 8px;
+            background: rgba(255, 255, 255, 0.08);
+        }
+        
+        .progress-track .track-fill {
+            height: 100%;
+            border-radius: 10px;
+            background: var(--primary);
+        }
+
+        /* Apple Weather style gradient tracks */
+        .progress-track.aqi-gradient {
+            background: linear-gradient(to right, #30d158 0%, #ffcc00 35%, #ff9500 70%, #ff3b30 100%);
+        }
+
+        .progress-track.uv-gradient {
+            background: linear-gradient(to right, #30d158 0%, #ffcc00 25%, #ff9500 50%, #ff3b30 75%, #bf5af2 100%);
+        }
+
+        .progress-track.precip-gradient {
+            background: linear-gradient(to right, rgba(var(--primary-rgb), 0.15) 0%, var(--primary) 100%);
+        }
+
+        .track-dot {
+            position: absolute;
+            top: 50%;
+            width: 8px;
+            height: 8px;
+            background: #ffffff;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 6px rgba(0, 0, 0, 0.8), 0 0 2px #ffffff;
+        }
+
+        .sunset-box {
+            overflow: hidden;
+        }
+
+        .sunset-box .metric-value span {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .sunset-icon {
+            position: absolute;
+            right: 12px;
+            bottom: 12px;
+            width: 24px;
+            height: 24px;
+            color: var(--primary);
+            opacity: 0.5;
+        }
+
+        /* Responsividade */
+        @media (max-width: 1150px) {
+            .dashboard-container {
+                grid-template-columns: 1fr;
+            }
+            .card {
+                min-height: auto;
+                gap: 20px;
+            }
+        }
+
+        @media (max-width: 650px) {
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body class="theme-blue">
+    <canvas id="network-canvas"></canvas>
+
+    <div class="bg-glow-container"></div>
+
+    <div id="particle-container"></div>
+
+    <div class="theme-selector">
+        <button class="theme-btn btn-red" onclick="changeTheme('red', this)" title="Tema Vermelho"></button>
+        <button class="theme-btn btn-green" onclick="changeTheme('green', this)" title="Tema Verde"></button>
+        <button class="theme-btn btn-blue active" onclick="changeTheme('blue', this)" title="Tema Azul"></button>
+        <button class="theme-btn btn-purple" onclick="changeTheme('purple', this)" title="Tema Roxo"></button>
+    </div>
+
+    <div class="dashboard-container">
+        
+        <div class="brand-section card">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <h1>Link<span>Fatcher</span></h1>
+                    <p>Sua central inteligente de links</p>
+                </div>
+            </div>
+            
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                    <div>
+                        <span>Analisar</span>
+                        <small>Links e mídias</small>
+                    </div>
+                </a>
+                <a href="#" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <div>
+                        <span>Buscar</span>
+                        <small>Conteúdo online</small>
+                    </div>
+                </a>
+                <a href="#" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <div>
+                        <span>Baixar</span>
+                        <small>Rápido e Fácil</small>
+                    </div>
+                </a>
+                <a href="#" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                    <div>
+                        <span>Favoritos</span>
+                        <small>Salve seus links</small>
+                    </div>
+                </a>
+            </nav>
+        </div>
+
+        <div class="analyzer-section card">
+            <h3 class="section-title">ANALISAR LINK</h3>
+            <div class="input-group">
+                <input type="text" placeholder="Cole o seu link aqui..." value="https://www.youtube.com/shorts/0fgJoHo_QbU">
+                <button class="btn-primary">Analisar</button>
+            </div>
+            
+            <div class="social-tags">
+                <button class="tag-btn active">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.517 3.545 12 3.545 12 3.545s-7.517 0-9.388.508a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.871.508 9.388.508 9.388.508s7.517 0 9.388-.508a3.003 3.003 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
+                    YouTube
+                </button>
+                <button class="tag-btn">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    </svg>
+                    Facebook
+                </button>
+                <button class="tag-btn">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.051.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/>
+                    </svg>
+                    Instagram
+                </button>
+                <button class="tag-btn">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12.525.02c1.31-.03 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.17-2.86-.74-4.07-1.65-.17-.14-.32-.27-.47-.41v6.5c.03 2.23-.63 4.58-2.16 6.27-1.89 2.1-4.96 2.9-7.66 2.2-2.78-.65-5.07-2.9-5.55-5.71-.55-3.24 1.14-6.76 4.18-7.92 1.05-.42 2.19-.59 3.32-.53v4.02c-.89-.17-1.85-.02-2.64.48-.96.58-1.53 1.68-1.54 2.8-.04 1.48.97 2.93 2.42 3.24 1.45.34 3.11-.29 3.74-1.64.29-.62.38-1.31.36-2v-11.1c.01-1.3.01-2.6.01-3.9z"/>
+                    </svg>
+                    TikTok
+                </button>
+                <button class="tag-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Mais
+                </button>
+            </div>
+        </div>
+
+        <div class="weather-section card">
+            <div class="weather-header">
+                <div class="weather-main">
+                    <div class="weather-icon-temp">
+                        <svg class="weather-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="16" y1="13" x2="16" y2="21"></line>
+                            <line x1="8" y1="13" x2="8" y2="21"></line>
+                            <line x1="12" y1="15" x2="12" y2="23"></line>
+                            <path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"></path>
+                        </svg>
+                        <span class="temp">67°</span>
+                    </div>
+                    <div class="location-info">
+                        <span class="city">Palo Alto</span>
+                        <p class="weather-desc">Chuva leve nas próximas horas, depois nublado. Máx 72° • Mín 54°</p>
+                    </div>
+                </div>
+                
+                <div class="hourly-forecast">
+                    <div class="hour-step">
+                        <span>1PM</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"></path><line x1="12" y1="15" x2="12" y2="21"></line></svg>
+                        <span>67°</span>
+                    </div>
+                    <div class="hour-step">
+                        <span>2PM</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"></path><line x1="12" y1="15" x2="12" y2="21"></line></svg>
+                        <span>66°</span>
+                    </div>
+                    <div class="hour-step">
+                        <span>3PM</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></svg>
+                        <span>65°</span>
+                    </div>
+                    <div class="hour-step">
+                        <span>4PM</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"></path><line x1="12" y1="15" x2="12" y2="21"></line></svg>
+                        <span>66°</span>
+                    </div>
+                    <div class="hour-step">
+                        <span>5PM</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"></path><line x1="12" y1="15" x2="12" y2="21"></line></svg>
+                        <span>68°</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="metrics-grid">
+                <div class="metric-box">
+                    <span class="metric-label">QUALIDADE DO AR</span>
+                    <span class="metric-value">28</span>
+                    <span class="metric-sub">Boa</span>
+                    <div class="progress-track aqi-gradient">
+                        <div class="track-dot" style="left: 28%;"></div>
+                    </div>
+                </div>
+                
+                <div class="metric-box">
+                    <span class="metric-label">PRECIPITAÇÃO</span>
+                    <span class="metric-value">45%</span>
+                    <span class="metric-sub">nas próximas 24h</span>
+                    <div class="progress-track precip-gradient">
+                        <div class="track-fill" style="width: 45%;"></div>
+                        <div class="track-dot" style="left: 45%;"></div>
+                    </div>
+                </div>
+
+                <div class="metric-box">
+                    <span class="metric-label">UV INDEX</span>
+                    <span class="metric-value">3</span>
+                    <span class="metric-sub">Moderado</span>
+                    <div class="progress-track uv-gradient">
+                        <div class="track-dot" style="left: 30%;"></div>
+                    </div>
+                </div>
+
+                <div class="metric-box sunset-box">
+                    <span class="metric-label">PÔR DO SOL</span>
+                    <span class="metric-value">5:12 <span>PM</span></span>
+                    <span class="metric-sub">Hoje</span>
+                    <svg class="sunset-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 18a5 5 0 0 0-10 0"></path>
+                        <line x1="12" y1="9" x2="12" y2="2"></line>
+                        <line x1="4.22" y1="10.22" x2="5.64" y2="11.64"></line>
+                        <line x1="1" y1="18" x2="3" y2="18"></line>
+                        <line x1="21" y1="18" x2="23" y2="18"></line>
+                        <line x1="18.36" y1="11.64" x2="19.78" y2="10.22"></line>
+                        <line x1="23" y1="22" x2="1" y2="22"></line>
+                        <polyline points="16 5 12 1 8 5"></polyline>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- 1. Background Network Particles (Dynamic neural background with RGB Mix) ---
+        const canvas_bg = document.getElementById('network-canvas');
+        const ctx_bg = canvas_bg.getContext('2d');
+        let w_bg, h_bg;
+        
+        function resizeNetwork() {
+            w_bg = canvas_bg.width = window.innerWidth;
+            h_bg = canvas_bg.height = window.innerHeight;
+        }
+        
+        window.addEventListener('resize', resizeNetwork);
+        resizeNetwork();
+        
+        // Cores fixas de alta fidelidade
+        const colors = [
+            { rgb: "255, 59, 48", r: 255, g: 59, b: 48 },   // Vermelho Apple
+            { rgb: "48, 209, 88", r: 48, g: 209, b: 88 },   // Verde Apple
+            { rgb: "0, 118, 255", r: 0, g: 118, b: 255 }    // Azul Apple
+        ];
+
+        // Criação dos nós com velocidades e cores individuais
+        const nodes = [...Array(140)].map(() => {
+            const colorObj = colors[Math.floor(Math.random() * colors.length)];
+            return {
+                x: Math.random() * w_bg, 
+                y: Math.random() * h_bg, 
+                vx: (Math.random() - .5) * 0.95, // Velocidade perfeita para movimento sutil
+                vy: (Math.random() - .5) * 0.95,
+                color: colorObj,
+                size: Math.random() * 2 + 2.5 // Tamanhos ligeiramente diferentes para gerar efeitos bokeh variados
+            };
+        });
+        
+        function neural() {
+            // Fundo escuro profundo constante
+            ctx_bg.fillStyle = 'rgba(3, 4, 6, 1)'; 
+            ctx_bg.fillRect(0, 0, w_bg, h_bg);
+            
+            for (const n of nodes) {
+                n.x += n.vx;
+                n.y += n.vy;
+                if (n.x < 0 || n.x > w_bg) n.vx *= -1;
+                if (n.y < 0 || n.y > h_bg) n.vy *= -1;
+            }
+            
+            // Desenha conexões mesclando as cores dos nós
+            for (let i = 0; i < nodes.length; i++) {
+                for (let j = i + 1; j < nodes.length; j++) {
+                    let a = nodes[i], b = nodes[j], dx = a.x - b.x, dy = a.y - b.y, d = Math.hypot(dx, dy);
+                    if (d < 125) {
+                        // Faz a interpolação exata das duas cores conectadas
+                        const mixR = Math.round((a.color.r + b.color.r) / 2);
+                        const mixG = Math.round((a.color.g + b.color.g) / 2);
+                        const mixB = Math.round((a.color.b + b.color.b) / 2);
+                        const alpha = (1 - d / 125) * 0.75;
+                        
+                        ctx_bg.strokeStyle = `rgba(${mixR}, ${mixG}, ${mixB}, ${alpha})`;
+                        ctx_bg.lineWidth = 1.2;
+                        ctx_bg.beginPath();
+                        ctx_bg.moveTo(a.x, a.y);
+                        ctx_bg.lineTo(b.x, b.y);
+                        ctx_bg.stroke();
+                    }
+                }
+            }
+            
+            // Desenha os pontos brilhantes desfocados
+            for (const n of nodes) {
+                ctx_bg.fillStyle = `rgb(${n.color.rgb})`;
+                ctx_bg.beginPath();
+                ctx_bg.arc(n.x, n.y, n.size, 0, Math.PI * 2);
+                ctx_bg.fill();
+                
+                // Desenha glow em volta das partículas para encorpar o efeito Bokeh
+                ctx_bg.shadowColor = `rgb(${n.color.rgb})`;
+                ctx_bg.shadowBlur = 10;
+                ctx_bg.beginPath();
+                ctx_bg.arc(n.x, n.y, n.size * 0.7, 0, Math.PI * 2);
+                ctx_bg.fill();
+                ctx_bg.shadowBlur = 0; // Desliga shadow para performance
+            }
+            requestAnimationFrame(neural);
+        }
+        neural();
+
+        // --- 2. Dynamic Theme Management ---
+        function changeTheme(themeName, element) {
+            document.body.className = '';
+            document.body.classList.add('theme-' + themeName);
+            
+            // O fundo continua com as três cores originais misturadas de forma espetacular!
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            element.classList.add('active');
+        }
+    </script>
+
+</body>
+</html>
