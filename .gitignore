@@ -52,6 +52,17 @@ yt-dlp/
 .nul
 nul
 
+# Test / signing artifacts
+_test_key*
+_test_pub*
+manifest.json
+manifest.json.sig
+CHECKSUMS*.txt
+
+# Accidentally committed images
+*.jpg
+*.jpeg
+
 # TypeScript
 *.tsbuildinfo
 

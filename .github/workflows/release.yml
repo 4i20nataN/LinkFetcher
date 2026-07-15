@@ -78,10 +78,22 @@ jobs:
             ### Security
             - Manifest signed with Ed25519
             - SHA-512 checksums included
-          files: |
-            release/*.exe
-            manifest.json
-            manifest.json.sig
-            CHECKSUMS_SHA512.txt
           draft: false
           prerelease: ${{ contains(steps.version.outputs.VERSION, 'beta') || contains(steps.version.outputs.VERSION, 'alpha') }}
+
+      - name: Upload release assets
+        shell: bash
+        run: |
+          TAG="${{ steps.version.outputs.VERSION }}"
+          echo "Uploading assets for tag v${TAG}..."
+          for f in release/*.exe manifest.json manifest.json.sig CHECKSUMS_SHA512.txt; do
+            if [ -f "$f" ]; then
+              echo "  -> $f ($(du -h "$f" | cut -f1))"
+              gh release upload "v${TAG}" "$f" --clobber
+            else
+              echo "  SKIP $f (not found)"
+            fi
+          done
+          echo "Done. Release URL: https://github.com/${{ github.repository }}/releases/tag/v${TAG}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
