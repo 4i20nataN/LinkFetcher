@@ -113,3 +113,22 @@ Ao finalizar a tarefa, execute `npm run lint` localmente para verificar a integr
 ⚠️ ALERTAS: Débitos técnicos, potenciais falhas de concorrência ou riscos identificados no fluxo que ficaram intactos por estarem fora do escopo.
 💡 SUGESTÕES: Próximas ações recomendadas para melhoria contínua da arquitetura.
 ```
+
+---
+
+## 10. ATUALIZAÇÃO DO SESSION LOG
+
+Ao concluir cada sessão de trabalho, adicione uma entrada resumida em **docs/session-log.md** sob a data corrente. Cada entrada deve conter:
+
+- **Commit/Change tag** (ex: `fix(desc): ...` ou `...` para trabalho em andamento)
+- **Descrição curta** (1-2 linhas) explicando o que foi feito e como
+- Foco em mudanças significativas, não em cada pequeno ajuste
+
+Exemplo de formato:
+
+```markdown
+## 2026-07-15 (feat/ui-redesign)
+
+- `d83c5d7` fix(desc): spacing and 'Nenhuma' option for description format
+  - Added 'none' default to `descFormat`; SummaryPanel only shows tag when txt/md selected
+```
