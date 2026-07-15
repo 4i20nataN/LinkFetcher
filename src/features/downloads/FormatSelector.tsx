@@ -383,11 +383,11 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
   }, [mediaInfo.formats, options.format, options.audioOnly, options.audioFormat]);
 
   useEffect(() => {
-    if (onFormatChange) {
+    if (onFormatChange && mediaInfo.type !== 'image') {
       const fmt = findMatchingFormat();
       if (fmt) onFormatChange(fmt);
     }
-  }, [onFormatChange, findMatchingFormat]);
+  }, [onFormatChange, findMatchingFormat, mediaInfo.type]);
 
   const update = useCallback((partial: Partial<FormatOptions>) => {
     setOptions(prev => ({ ...prev, ...partial }));
