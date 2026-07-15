@@ -541,7 +541,7 @@ export const LinkAnalyzer: React.FC = () => {
             <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-2.5 text-xs text-zinc-400 font-medium">
                 <Info size={14} className="text-zinc-500" />
-                <span>{settings.language === 'en' ? 'The file will be saved in the default download folder of your browser.' : 'O arquivo será salvo no diretório padrão de downloads do seu navegador.'}</span>
+                <span>{settings.language === 'en' ? 'The file will be saved in your configured download directory.' : 'O arquivo será salvo no diretório de downloads configurado no programa.'}</span>
               </div>
               
               <button
