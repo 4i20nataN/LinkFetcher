@@ -766,33 +766,32 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   ))}
                 </div>
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <BlockIcon blockId="custom-format" />
+                  <div className="space-y-1.5">
                     <BlockTitle>Codec de Video</BlockTitle>
-                  </div>
-                  <div className="flex gap-1.5">
-                    {VIDEO_CODECS.map(codec => (
-                      <TooltipWrapper key={codec.id} tip={codec.tip}>
-                        <Btn
-                          active={options.videoCodec === codec.id}
-                          onClick={() => {
-                            const codecVal = codec.id;
-                            update({ videoCodec: codecVal });
-                            if (!options.audioOnly && options.format) {
-                              let fmt = options.format;
-                              fmt = fmt.replace(/\[vcodec~?[^]]*\]/g, '');
-                              if (codecVal) {
-                                fmt = fmt.replace(/bv\*\[/g, `bv*[vcodec~=${codecVal}][`);
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                      {VIDEO_CODECS.map(codec => (
+                        <TooltipWrapper key={codec.id} tip={codec.tip}>
+                          <Btn
+                            active={options.videoCodec === codec.id}
+                            onClick={() => {
+                              const codecVal = codec.id;
+                              update({ videoCodec: codecVal });
+                              if (!options.audioOnly && options.format) {
+                                let fmt = options.format;
+                                fmt = fmt.replace(/\[vcodec~?[^]]*\]/g, '');
+                                if (codecVal) {
+                                  fmt = fmt.replace(/bv\*\[/g, `bv*[vcodec~=${codecVal}][`);
+                                }
+                                update({ format: fmt });
                               }
-                              update({ format: fmt });
-                            }
-                          }}
-                          className="py-2 flex-1"
-                        >
-                          {codec.label}
-                        </Btn>
-                      </TooltipWrapper>
-                    ))}
+                            }}
+                            className="py-2"
+                          >
+                            {codec.label}
+                          </Btn>
+                        </TooltipWrapper>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
