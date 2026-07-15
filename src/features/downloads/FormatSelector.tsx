@@ -49,7 +49,7 @@ export interface FormatOptions {
   videoCodec?: string; // '', 'h264', 'h265', 'vp9', 'av01'
   videoFormat?: string; // 'mp4', 'mkv', 'webm', 'avi', 'flv', 'mov', 'ts'
   customFilename?: string;
-  descFormat?: 'txt' | 'md';
+  descFormat?: 'txt' | 'md' | 'none';
 }
 
 const VIDEO_PRESETS = [
@@ -343,7 +343,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
     bandLimit: 0,
     videoCodec: '',
     customFilename: '',
-    descFormat: 'txt',
+    descFormat: 'none',
     ...formatOptions,
   }));
 
@@ -814,6 +814,9 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                       {descExpanded ? 'Recolher' : 'Ver completa'}
                     </button>
                     <div className="flex items-center gap-1.5 ml-auto">
+                      <Btn active={options.descFormat === 'none'} onClick={() => update({ descFormat: 'none' })} className="py-1 px-2 text-[10px]">
+                        Nao incluir
+                      </Btn>
                       <Btn active={options.descFormat === 'txt'} onClick={() => update({ descFormat: 'txt' })} className="py-1 px-2 text-[10px]">
                         <FileText size={10} className="inline mr-1" />.txt
                       </Btn>

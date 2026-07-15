@@ -55,7 +55,7 @@ const SummaryPanel: React.FC<{ formatOptions: FormatOptions; selectedFormat: Med
     items.push({ icon: '📋', label: lang.toUpperCase() });
   }
   if (formatOptions.customFilename) items.push({ icon: '📁', label: formatOptions.customFilename });
-  if (formatOptions.descFormat && mediaInfo.description) items.push({ icon: '📄', label: `Descrição .${formatOptions.descFormat}` });
+  if (formatOptions.descFormat && formatOptions.descFormat !== 'none' && mediaInfo.description) items.push({ icon: '📄', label: `Descrição .${formatOptions.descFormat}` });
 
   if (items.length === 0) return null;
 
