@@ -498,7 +498,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
   );
 
   const TooltipWrapper: React.FC<{ tip: string; children: React.ReactNode }> = ({ tip, children }) => (
-    <div className="relative group/tip inline-flex">
+    <div className="relative group/tip flex-1 min-w-0">
       {children}
       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg bg-zinc-800 border border-white/10 text-[10px] text-zinc-300 whitespace-nowrap opacity-0 pointer-events-none group-hover/tip:opacity-100 transition-opacity z-50 shadow-xl">
         {tip}
