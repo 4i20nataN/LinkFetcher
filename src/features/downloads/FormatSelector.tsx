@@ -561,7 +561,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
       animate={active ? { scale: 1.02, boxShadow: '0 2px 12px rgba(0,0,0,0.3)' } : { scale: 1, boxShadow: '0 0px 0px rgba(0,0,0,0)' }}
       transition={{ duration: 0.2 }}
       className={`
-        border rounded-xl text-[11px] font-bold transition-colors text-center
+        border rounded-xl px-3 py-1.5 text-[11px] font-bold transition-colors text-center
         ${disabled ? 'bg-zinc-900/20 border-white/5 text-zinc-600 cursor-not-allowed' :
           active ? 'bg-[#282B33] border-white/15 text-white' : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}
         ${className}
@@ -710,15 +710,9 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
               </div>
             </AccordionSection>
 
-            {/* ── Formato Video + Codecs | Legendas + Audio (2 colunas) ── */}
-            <AccordionSection id="media-options" title="Formato e Legendas" blockId="video-format">
-              <div className="px-3 pb-3 pt-0 grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {/* Coluna esquerda: Formato do Video + Codecs */}
-              <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-3">
-                <div className="flex items-center gap-2">
-                  <BlockIcon blockId="video-format" />
-                  <BlockTitle>Formato do Video</BlockTitle>
-                </div>
+            {/* ── Formato Video + Codecs ── */}
+            <AccordionSection id="video-format" title="Formatos" blockId="video-format">
+              <div className="px-3 pb-3 pt-0 space-y-3">
                 <div className="grid grid-cols-4 gap-1.5">
                   {VIDEO_FORMATS.map(fmt => (
                     <Btn
@@ -765,13 +759,11 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   </div>
                 </div>
               </div>
+            </AccordionSection>
 
-              {/* Coluna direita: Legendas + Extrair apenas audio */}
-              <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-3">
-                <div className="flex items-center gap-2">
-                  <BlockIcon blockId="subtitles" />
-                  <BlockTitle>Legendas</BlockTitle>
-                </div>
+            {/* ── Legendas + Extrair Apenas Audio ── */}
+            <AccordionSection id="subtitles" title="Legendas" blockId="subtitles">
+              <div className="px-3 pb-3 pt-0 space-y-3">
                 <Toggle
                   value={showSubs}
                   onChange={() => {
@@ -798,7 +790,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                     </div>
                     <div className="space-y-1.5">
                       <BlockTitle>Formato</BlockTitle>
-                      <div className="flex gap-1.5">
+                  <div className="grid grid-cols-5 gap-1.5">
                         {SUB_FORMATS.map(fmt => (
                           <Btn key={fmt} active={options.subFormat === fmt} onClick={() => update({ subFormat: fmt })} className="py-2 flex-1">
                             {fmt.toUpperCase()}
@@ -821,7 +813,6 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                     icon={<BlockIcon blockId="audio-extract" />}
                   />
                 </div>
-              </div>
               </div>
             </AccordionSection>
 
