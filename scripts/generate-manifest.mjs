@@ -7,7 +7,7 @@
 
 import { readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { createHash, sign } from 'node:crypto';
+import { createHash, createPrivateKey, sign } from 'node:crypto';
 
 const VERSION = process.env.RELEASE_VERSION;
 const releaseDir = 'release';
@@ -82,8 +82,9 @@ if (!privKeyPem) {
   console.error('UPDATE_SIGNING_PRIVATE_KEY not set');
   process.exit(1);
 }
+const keyObject = createPrivateKey(privKeyPem);
 const manifestBytes = readFileSync('manifest.json');
-const signature = sign(null, manifestBytes, privKeyPem);
+const signature = sign(null, manifestBytes, keyObject);
 writeFileSync('manifest.json.sig', signature);
 console.log('manifest.json.sig written');
 
