@@ -605,27 +605,22 @@ export const LinkAnalyzer: React.FC = () => {
             </div>
 
             {/* Execute Download trigger */}
-            <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-2.5 text-xs text-zinc-400 font-medium">
-                <Info size={14} className="text-zinc-500" />
-                <span>{settings.language === 'en' ? 'The file will be saved in your configured download directory.' : 'O arquivo será salvo no diretório de downloads configurado no programa.'}</span>
+            <div className="border-t border-white/5 pt-6 space-y-4">
+              <SummaryPanel formatOptions={formatOptions} selectedFormat={selectedFormat} mediaInfo={mediaInfo} />
+              <div className="flex justify-end">
+                <button
+                  onClick={handleStartDownload}
+                  disabled={!selectedFormat}
+                  className={`
+                    w-full sm:w-auto px-6 py-3 rounded-xl text-white font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition-all
+                    ${getAccentBgClass(settings)} hover:scale-[1.02] active:scale-[0.98]
+                  `}
+                >
+                  <Download size={18} />
+                  {t('btnDownloadSelected')}
+                </button>
               </div>
-              
-              <button
-                onClick={handleStartDownload}
-                disabled={!selectedFormat}
-                className={`
-                  w-full sm:w-auto px-6 py-3 rounded-xl text-white font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition-all
-                  ${getAccentBgClass(settings)} hover:scale-[1.02] active:scale-[0.98]
-                `}
-              >
-                <Download size={18} />
-                {t('btnDownloadSelected')}
-              </button>
             </div>
-
-            {/* ── Summary Panel ── */}
-            <SummaryPanel formatOptions={formatOptions} selectedFormat={selectedFormat} mediaInfo={mediaInfo} />
           </motion.div>
         )}
       </AnimatePresence>
