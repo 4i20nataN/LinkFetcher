@@ -1,0 +1,129 @@
+# Release Workflow — LinkFetcher
+#
+# Builds Windows portable + NSIS installer, signs the manifest with Ed25519,
+# and publishes a GitHub Release with all artifacts.
+#
+# Trigger: push a tag like v1.0.0-beta.1
+#
+# Required GitHub repo secret:
+#   UPDATE_SIGNING_PRIVATE_KEY — Ed25519 private key PEM for manifest signing
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Set version in package.json
+        run: npm version ${{ steps.version.outputs.VERSION }} --no-git-tag-version
+
+      - name: Build app
+        run: npm run build
+
+      - name: Build Windows installers
+        run: npx electron-builder --win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate checksums
+        run: |
+          cd release
+          sha256sum *.exe *.nsis > ../CHECKSUMS.txt 2>/dev/null || true
+          sha512sum *.exe > ../CHECKSUMS_SHA512.txt 2>/dev/null || true
+
+      - name: Generate manifest.json
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+
+          # NSIS installer (primary)
+          SETUP=$(ls release/*Setup*.exe 2>/dev/null | head -1)
+          SETUP_NAME=$(basename "$SETUP")
+          SETUP_SIZE=$(stat -c%s "$SETUP")
+          SETUP_SHA256=$(sha256sum "$SETUP" | cut -d' ' -f1)
+          SETUP_SHA512=$(sha512sum "$SETUP" | cut -d' ' -f1)
+
+          # Portable (secondary)
+          PORTABLE=$(ls release/*Portable*.exe 2>/dev/null | head -1)
+          PORTABLE_NAME=$(basename "$PORTABLE")
+          PORTABLE_SIZE=$(stat -c%s "$PORTABLE")
+          PORTABLE_SHA256=$(sha256sum "$PORTABLE" | cut -d' ' -f1)
+          PORTABLE_SHA512=$(sha512sum "$PORTABLE" | cut -d' ' -f1)
+
+          cat > manifest.json << EOF
+          {
+            "schemaVersion": 1,
+            "repository": "4i20nataN/LinkFetcher",
+            "version": "$VERSION",
+            "minimumSupportedVersion": "1.0.0",
+            "publishedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "signingKeyId": "v1",
+            "artifacts": [
+              {
+                "platform": "win32-x64",
+                "fileName": "$SETUP_NAME",
+                "sha256": "$SETUP_SHA256",
+                "sha512": "$SETUP_SHA512",
+                "sizeBytes": $SETUP_SIZE
+              },
+              {
+                "platform": "win32-x64-portable",
+                "fileName": "$PORTABLE_NAME",
+                "sha256": "$PORTABLE_SHA256",
+                "sha512": "$PORTABLE_SHA512",
+                "sizeBytes": $PORTABLE_SIZE
+              }
+            ]
+          }
+          EOF
+
+      - name: Sign manifest with Ed25519
+        run: |
+          echo "${{ secrets.UPDATE_SIGNING_PRIVATE_KEY }}" > /tmp/signing_key.pem
+          openssl pkeyutl -sign -inkey /tmp/signing_key.pem -in manifest.json -out manifest.json.sig
+          rm /tmp/signing_key.pem
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "LinkFetcher ${{ steps.version.outputs.VERSION }}"
+          body: |
+            ## LinkFetcher ${{ steps.version.outputs.VERSION }}
+
+            ### Downloads
+            - **Installer**: Run the `.exe` installer for automatic setup
+            - **Portable**: Extract and run `LinkFetcher.exe` directly
+
+            ### Security
+            - Manifest signed with Ed25519
+            - SHA-512 checksums included
+          files: |
+            release/*.exe
+            manifest.json
+            manifest.json.sig
+            CHECKSUMS_SHA512.txt
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.VERSION, 'beta') || contains(steps.version.outputs.VERSION, 'alpha') }}

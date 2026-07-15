@@ -3,6 +3,10 @@ const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
 
+// ── Auto-Update System ───────────────────────────────────────────────────────
+const { setLogger: setUpdaterLogger } = require('./updater/updateManager.cjs');
+const { registerUpdateHandlers } = require('./updater/handlers.cjs');
+
 const LOG_FILE = path.join(app.getPath('downloads'), 'linkfetcher-debug.log');
 function logDebug(...args) {
   const line = `[${new Date().toISOString()}] ${args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ')}\n`;
@@ -348,6 +352,47 @@ ipcMain.handle('yt-dlp-cancel', async (_event, id) => {
 
 app.whenReady().then(() => {
   createWindow();
+
+  // ── Wire up updater logging + IPC handlers ────────────────────────────────
+  setUpdaterLogger(logDebug, logDebug);
+  registerUpdateHandlers(mainWindow);
+
+  // ── Auto-Update: startup check + periodic polling (skip in dev mode) ─────
+  if (app.isPackaged) {
+    const POLL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+    let autoCheckEnabled = true; // default ON
+
+    // IPC: renderer toggles auto-check preference
+    const { ipcMain } = require('electron');
+    ipcMain.on('update:setAutoCheck', (_event, enabled) => {
+      autoCheckEnabled = !!enabled;
+      logDebug('[updater] auto-check set to:', autoCheckEnabled);
+    });
+
+    // IPC: renderer requests current state
+    ipcMain.handle('update:getAutoCheck', () => autoCheckEnabled);
+
+    async function pollForUpdates() {
+      if (!autoCheckEnabled) return;
+      try {
+        const { checkForUpdate } = require('./updater/updateManager.cjs');
+        const result = await checkForUpdate();
+        if (result.updateAvailable && mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('update:available', {
+            version: result.manifest.version,
+          });
+          logDebug('[updater] background poll: update found →', result.manifest.version);
+        }
+      } catch (err) {
+        logDebug('[updater] poll failed:', err.code || err.message);
+      }
+    }
+
+    // First check: 5 seconds after launch
+    setTimeout(pollForUpdates, 5000);
+    // Then every 30 minutes while the app is running
+    setInterval(pollForUpdates, POLL_INTERVAL_MS);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

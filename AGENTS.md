@@ -117,7 +117,23 @@ Ao finalizar a tarefa, execute `npm run lint` localmente para verificar a integr
 
 ---
 
-## 10. ATUALIZAÇÃO DO SESSION LOG
+## 10. LIMPEZA E BUILD CORRETO
+
+**NUNCA** rode `package:win` sem limpar antes — o asar fica stale e o app abre tela branca.
+
+```powershell
+# 1. Limpar tudo
+Remove-Item -Recurse -Force dist, dist-web, release -ErrorAction SilentlyContinue
+
+# 2. Build + Package
+npm run build && npx electron-builder --win
+```
+
+O `npm run build` gera `dist-web/` (Vite) e `dist/electron/` (esbuild). O `electron-builder` empacota no asar. Se pular a limpeza, arquivos antigos com hashes diferentes ficam no asar e o Electron não encontra o `index.html`.
+
+---
+
+## 11. ATUALIZAÇÃO DO SESSION LOG
 
 Ao concluir cada sessão de trabalho, adicione uma entrada resumida em **docs/session-log.md** sob a data corrente. Cada entrada deve conter:
 

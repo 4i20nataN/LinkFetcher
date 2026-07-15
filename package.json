@@ -1,7 +1,7 @@
 {
   "name": "linkfetcher",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.0-beta.1",
   "description": "LinkFetcher - desktop yt-dlp frontend",
   "author": {
     "name": "Natan Vanim",
@@ -19,7 +19,8 @@
     "package:win": "npm run build && npx electron-builder --win",
     "prepare:resources": "node scripts/prepare-resources.cjs",
     "lint": "tsc --noEmit",
-    "devtools:mcp": "npx chrome-devtools-mcp@latest --browser-url=http://127.0.0.1:9222"
+    "devtools:mcp": "npx chrome-devtools-mcp@latest --browser-url=http://127.0.0.1:9222",
+    "generate:signing-key": "node scripts/generate-signing-key.cjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -74,9 +75,26 @@
     ],
     "win": {
       "target": [
-        "nsis",
-        "portable"
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
       ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "LinkFetcher",
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-${version}-${arch}.${ext}"
     }
   }
 }

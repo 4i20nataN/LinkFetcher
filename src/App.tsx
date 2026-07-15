@@ -13,6 +13,7 @@ import { DownloadManager } from './features/downloads/DownloadManager';
 import { FavoritesView } from './features/favorites/FavoritesView';
 import { DownloadLaterView } from './features/later/DownloadLaterView';
 import { SettingsView } from './features/settings/SettingsView';
+import UpdateBanner from './features/update/UpdateBanner';
 import { motion, AnimatePresence } from 'motion/react';
 
 function DashboardContent() {
@@ -48,6 +49,9 @@ function DashboardContent() {
         {/* Subtle background abstract decorations matching premium Nothing OS feel */}
         <div className="absolute top-[-10%] left-[20%] w-[350px] h-[350px] rounded-full bg-indigo-500/5 blur-[100px] pointer-events-none" />
         <div className="absolute bottom-[-10%] right-[10%] w-[450px] h-[450px] rounded-full bg-emerald-500/3 blur-[120px] pointer-events-none" />
+
+        {/* Auto-Update Banner */}
+        <UpdateBanner />
 
         {/* Dynamic transition container */}
         <div className="relative z-10">

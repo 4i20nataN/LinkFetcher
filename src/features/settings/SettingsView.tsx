@@ -65,6 +65,13 @@ export const SettingsView: React.FC = () => {
     }
   }, []);
 
+  // Sync auto-update preference to main process
+  useEffect(() => {
+    if (isElectron && window.electron?.setAutoCheck) {
+      window.electron.setAutoCheck(settings.updates);
+    }
+  }, [settings.updates, isElectron]);
+
   const handleCheckUpdates = async () => {
     setCheckingUpdates(true);
     setUpdateAvailable(false);
