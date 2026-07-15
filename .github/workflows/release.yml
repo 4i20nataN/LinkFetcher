@@ -64,36 +64,52 @@ jobs:
           RELEASE_VERSION: ${{ steps.version.outputs.VERSION }}
           UPDATE_SIGNING_PRIVATE_KEY: ${{ secrets.UPDATE_SIGNING_PRIVATE_KEY }}
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: "LinkFetcher ${{ steps.version.outputs.VERSION }}"
-          body: |
-            ## LinkFetcher ${{ steps.version.outputs.VERSION }}
-
-            ### Downloads
-            - **Installer**: Run the `.exe` installer for automatic setup
-            - **Portable**: Extract and run `LinkFetcher.exe` directly
-
-            ### Security
-            - Manifest signed with Ed25519
-            - SHA-512 checksums included
-          draft: false
-          prerelease: ${{ contains(steps.version.outputs.VERSION, 'beta') || contains(steps.version.outputs.VERSION, 'alpha') }}
-
-      - name: Upload release assets
+      - name: Create GitHub Release + Upload assets
         shell: bash
         run: |
           TAG="${{ steps.version.outputs.VERSION }}"
-          echo "Uploading assets for tag v${TAG}..."
+          PRERELEASE="${{ contains(steps.version.outputs.VERSION, 'beta') || contains(steps.version.outputs.VERSION, 'alpha') }}"
+
+          # Build file list — only include files that exist
+          FILES=""
           for f in release/*.exe manifest.json manifest.json.sig CHECKSUMS_SHA512.txt; do
             if [ -f "$f" ]; then
-              echo "  -> $f ($(du -h "$f" | cut -f1))"
-              gh release upload "v${TAG}" "$f" --clobber
+              echo "Found: $f ($(du -h "$f" | cut -f1))"
+              FILES="$FILES $f"
             else
-              echo "  SKIP $f (not found)"
+              echo "Skip: $f (not found)"
             fi
           done
-          echo "Done. Release URL: https://github.com/${{ github.repository }}/releases/tag/v${TAG}"
+
+          if [ -z "$FILES" ]; then
+            echo "::error::No release artifacts found!"
+            exit 1
+          fi
+
+          # Write notes to temp file
+          NOTES_FILE=$(mktemp)
+          echo "## LinkFetcher ${TAG}" > "$NOTES_FILE"
+          echo "" >> "$NOTES_FILE"
+          echo "### Downloads" >> "$NOTES_FILE"
+          echo "- **Installer**: Run the \`.exe\` installer for automatic setup" >> "$NOTES_FILE"
+          echo "- **Portable**: Extract and run \`LinkFetcher.exe\` directly" >> "$NOTES_FILE"
+          echo "" >> "$NOTES_FILE"
+          echo "### Security" >> "$NOTES_FILE"
+          echo "- Manifest signed with Ed25519" >> "$NOTES_FILE"
+          echo "- SHA-512 checksums included" >> "$NOTES_FILE"
+
+          # Delete existing release if present (re-trigger safe)
+          gh release delete "v${TAG}" --yes 2>/dev/null || true
+
+          # Create release with all assets in one command
+          echo "Creating release v${TAG} with assets..."
+          if [ "$PRERELEASE" = "true" ]; then
+            gh release create "v${TAG}" --title "LinkFetcher ${TAG}" --notes-file "$NOTES_FILE" --prerelease $FILES
+          else
+            gh release create "v${TAG}" --title "LinkFetcher ${TAG}" --notes-file "$NOTES_FILE" $FILES
+          fi
+
+          rm -f "$NOTES_FILE"
+          echo "Release URL: https://github.com/${{ github.repository }}/releases/tag/v${TAG}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
