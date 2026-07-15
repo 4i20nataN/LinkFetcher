@@ -49,6 +49,7 @@ export interface FormatOptions {
   videoCodec?: string; // '', 'h264', 'h265', 'vp9', 'av01'
   videoFormat?: string; // 'mp4', 'mkv', 'webm', 'avi', 'flv', 'mov', 'ts'
   customFilename?: string;
+  descFormat?: 'txt' | 'md';
 }
 
 const VIDEO_PRESETS = [
@@ -342,6 +343,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
     bandLimit: 0,
     videoCodec: '',
     customFilename: '',
+    descFormat: 'txt',
     ...formatOptions,
   }));
 
@@ -393,45 +395,6 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
   const update = useCallback((partial: Partial<FormatOptions>) => {
     setOptions(prev => ({ ...prev, ...partial }));
   }, []);
-
-  const handleDownloadDescription = useCallback(async (format: 'txt' | 'md') => {
-    const desc = mediaInfo.description;
-    if (!desc) return;
-    const title = mediaInfo.title || 'video';
-    const safeTitle = title.replace(/[<>:"/\\|?*]/g, '_').substring(0, 80);
-    let content = '';
-    let filename = '';
-    if (format === 'md') {
-      content = `# ${title}\n\n`;
-      if (mediaInfo.channel) content += `**Canal:** ${mediaInfo.channel}\n`;
-      if (mediaInfo.publishDate) content += `**Data:** ${fmtDate(mediaInfo.publishDate)}\n`;
-      if (mediaInfo.views) content += `**Views:** ${mediaInfo.views}\n`;
-      if (mediaInfo.duration) content += `**Duração:** ${mediaInfo.duration}\n`;
-      content += `\n---\n\n${desc}`;
-      filename = `${safeTitle}.md`;
-    } else {
-      content = `${title}\n${'='.repeat(title.length)}\n\n`;
-      if (mediaInfo.channel) content += `Canal: ${mediaInfo.channel}\n`;
-      if (mediaInfo.publishDate) content += `Data: ${fmtDate(mediaInfo.publishDate)}\n`;
-      if (mediaInfo.views) content += `Views: ${mediaInfo.views}\n`;
-      if (mediaInfo.duration) content += `Duração: ${mediaInfo.duration}\n`;
-      content += `\n${desc}`;
-      filename = `${safeTitle}.txt`;
-    }
-    if (window.electron) {
-      const result = await window.electron.invoke('save-description', { filename, content }) as { success?: boolean; dir?: string };
-      if (result?.success) {
-        window.electron.invoke('shell:openPath', result.dir);
-      }
-    } else {
-      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(a.href);
-    }
-  }, [mediaInfo]);
 
   useEffect(() => {
     onFormatSelect(options);
@@ -850,21 +813,13 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                       {descExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                       {descExpanded ? 'Recolher' : 'Ver completa'}
                     </button>
-                    <div className="flex items-center gap-1 ml-auto">
-                      <button
-                        onClick={() => handleDownloadDescription('txt')}
-                        className="fs-xs px-2 py-1 rounded-md bg-zinc-800/60 border border-white/5 text-zinc-400 hover:text-white hover:border-white/10 transition-colors flex items-center gap-1"
-                      >
-                        <FileText size={10} />
-                        .txt
-                      </button>
-                      <button
-                        onClick={() => handleDownloadDescription('md')}
-                        className="fs-xs px-2 py-1 rounded-md bg-zinc-800/60 border border-white/5 text-zinc-400 hover:text-white hover:border-white/10 transition-colors flex items-center gap-1"
-                      >
-                        <Download size={10} />
-                        .md
-                      </button>
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      <Btn active={options.descFormat === 'txt'} onClick={() => update({ descFormat: 'txt' })} className="py-1 px-2 text-[10px]">
+                        <FileText size={10} className="inline mr-1" />.txt
+                      </Btn>
+                      <Btn active={options.descFormat === 'md'} onClick={() => update({ descFormat: 'md' })} className="py-1 px-2 text-[10px]">
+                        <Download size={10} className="inline mr-1" />.md
+                      </Btn>
                     </div>
                   </div>
                 </div>

@@ -55,6 +55,7 @@ const SummaryPanel: React.FC<{ formatOptions: FormatOptions; selectedFormat: Med
     items.push({ icon: '📋', label: lang.toUpperCase() });
   }
   if (formatOptions.customFilename) items.push({ icon: '📁', label: formatOptions.customFilename });
+  if (formatOptions.descFormat && mediaInfo.description) items.push({ icon: '📄', label: `Descrição .${formatOptions.descFormat}` });
 
   if (items.length === 0) return null;
 
@@ -245,7 +246,45 @@ export const LinkAnalyzer: React.FC = () => {
       selectedFormat,
       formatOptions
     );
-    setSuccessMsg(settings.language === 'en' ? `Added to queue: ${mediaInfo.title.substring(0, 45)}...` : `Adicionado à fila: ${mediaInfo.title.substring(0, 45)}...`);
+
+    // Download description if format selected and description exists
+    if (formatOptions.descFormat && mediaInfo.description) {
+      const fmt = formatOptions.descFormat;
+      const title = mediaInfo.title || 'video';
+      const safeTitle = title.replace(/[<>:"/\\|?*]/g, '_').substring(0, 80);
+      let content = '';
+      let filename = '';
+      const fmtDate = (d: string) => /^\d{8}$/.test(d) ? `${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}` : d;
+      if (fmt === 'md') {
+        content = `# ${title}\n\n`;
+        if (mediaInfo.channel) content += `**Canal:** ${mediaInfo.channel}\n`;
+        if (mediaInfo.publishDate) content += `**Data:** ${fmtDate(mediaInfo.publishDate)}\n`;
+        if (mediaInfo.views) content += `**Views:** ${mediaInfo.views}\n`;
+        if (mediaInfo.duration) content += `**Duracao:** ${mediaInfo.duration}\n`;
+        content += `\n---\n\n${mediaInfo.description}`;
+        filename = `${safeTitle}.md`;
+      } else {
+        content = `${title}\n${'='.repeat(title.length)}\n\n`;
+        if (mediaInfo.channel) content += `Canal: ${mediaInfo.channel}\n`;
+        if (mediaInfo.publishDate) content += `Data: ${fmtDate(mediaInfo.publishDate)}\n`;
+        if (mediaInfo.views) content += `Views: ${mediaInfo.views}\n`;
+        if (mediaInfo.duration) content += `Duracao: ${mediaInfo.duration}\n`;
+        content += `\n${mediaInfo.description}`;
+        filename = `${safeTitle}.txt`;
+      }
+      if (window.electron) {
+        window.electron.invoke('save-description', { filename, content });
+      } else {
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+    }
+
+    setSuccessMsg(settings.language === 'en' ? `Added to queue: ${mediaInfo.title.substring(0, 45)}...` : `Adicionado a fila: ${mediaInfo.title.substring(0, 45)}...`);
     
     // Auto-redirect to downloads manager
     setTimeout(() => {
