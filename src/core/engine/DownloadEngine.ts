@@ -655,15 +655,10 @@ class DownloadEngineClass {
     };
     const outMime = outMimeMap[targetExt] || 'image/png';
 
-    const convertedBlob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob((b) => resolve(b), outMime, 0.92);
-    });
-    if (!convertedBlob) throw new Error('Canvas conversion failed');
+    const convertedDataUrl = canvas.toDataURL(outMime, 0.92);
 
-    const arrayBuf = await convertedBlob.arrayBuffer();
-    const convertedBase64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
-    const result = await (window as any).electron.invoke('download-file-proxy', {
-      url: `data:${outMime};base64,${convertedBase64}`,
+    const result = await (window as any).electron.invoke('save-image-dataurl', {
+      dataUrl: convertedDataUrl,
       filename,
       dir: this.settings.defaultDir || undefined,
     });

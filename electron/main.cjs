@@ -136,6 +136,35 @@ ipcMain.handle('fetch-image-base64', async (_event, { url }) => {
   return { base64: buffer.toString('base64'), mime };
 });
 
+// Save image from data URL (Canvas-converted) — writes buffer directly to disk
+ipcMain.handle('save-image-dataurl', async (_event, { dataUrl, filename, dir }) => {
+  if (!dataUrl) throw new Error('No data URL provided');
+  const downloadsDir = (dir && path.isAbsolute(dir)) ? dir : app.getPath('downloads');
+  const safeName = (filename || 'download').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+  let filePath = path.join(downloadsDir, safeName);
+
+  if (fs.existsSync(filePath)) {
+    const ext = path.extname(safeName);
+    const base = path.basename(safeName, ext);
+    let counter = 1;
+    while (fs.existsSync(filePath)) {
+      filePath = path.join(downloadsDir, `${base}_${counter}${ext}`);
+      counter++;
+    }
+  }
+
+  try {
+    const match = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
+    if (!match) throw new Error('Invalid data URL format');
+    const buffer = Buffer.from(match[1], 'base64');
+    fs.writeFileSync(filePath, buffer);
+    return { filePath };
+  } catch (err) {
+    logDebug('[save-image-dataurl] ERROR:', String(err));
+    throw err;
+  }
+});
+
 // Image proxy download — saves directly to default downloads folder (no dialog)
 ipcMain.handle('download-file-proxy', async (_event, { url, filename, dir }) => {
   if (!url) throw new Error('No URL provided');
