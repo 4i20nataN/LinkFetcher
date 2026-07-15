@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
+import { ParticleBackground } from './ParticleBackground';
 
 export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { settings } = useApp();
@@ -45,6 +46,7 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
       <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-blue-600/10 blur-[130px] rounded-full pointer-events-none z-0" />
       <div className="absolute top-[30%] right-[-5%] w-[40%] h-[40%] bg-purple-600/8 blur-[110px] rounded-full pointer-events-none z-0" />
       <div className="absolute bottom-[-10%] left-[20%] w-[35%] h-[35%] bg-indigo-500/4 blur-[120px] pointer-events-none z-0" />
+      <ParticleBackground />
 
       {/* Content wrapper with higher z-index to stay above meshes */}
       <div className="relative z-10 h-full">

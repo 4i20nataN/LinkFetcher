@@ -309,9 +309,19 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
   const [showSubs, setShowSubs] = useState(false);
   const [showCustomFormat, setShowCustomFormat] = useState(false);
 
-  const fmtDate = (d: string) => {
-    if (/^\d{8}$/.test(d)) return `${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}`;
-    return d;
+  const fmtDate = (d: string, forFilename = false) => {
+    if (/^\d{8}$/.test(d)) {
+      const sep = forFilename ? '-' : '/';
+      return `${d.slice(6,8)}${sep}${d.slice(4,6)}${sep}${d.slice(0,4)}`;
+    }
+    return forFilename ? d.replace(/\//g, '-') : d;
+  };
+  /** Converte "37:48" → "37m48s", "1:02:30" → "1h02m30s" */
+  const fmtDuration = (dur: string) => {
+    const parts = dur.split(':');
+    if (parts.length === 3) return `${parts[0]}h${parts[1]}m${parts[2]}s`;
+    if (parts.length === 2) return `${parts[0]}m${parts[1]}s`;
+    return dur;
   };
   const [useUnderscore, setUseUnderscore] = useState(true);
   const [uiScale, setUiScale] = useState(50);
@@ -458,7 +468,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   className={`
                     border rounded-lg fs-sm font-bold transition-all text-center py-2.5
                     ${options.format === fmt.id
-                      ? `${accentBg} text-white ${accentBorder}`
+                      ? `bg-zinc-900/40 text-white ${accentBorder}`
                       : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}
                   `}
                 >
@@ -485,8 +495,8 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
           {desc && <p className="fs-sm text-zinc-500 mt-0.5">{desc}</p>}
         </div>
       </div>
-      <button onClick={onChange} className={`relative w-[52px] h-[28px] rounded-full transition-colors duration-300 shrink-0 ${value ? accentBg : 'bg-zinc-700'}`}>
-        <div className={`absolute top-[3px] w-5 h-5 rounded-full bg-white transition-all duration-300 shadow-md ${value ? 'left-[27px]' : 'left-[3px]'}`} />
+      <button onClick={onChange} className={`relative w-[52px] h-[28px] rounded-full transition-colors duration-300 shrink-0 border ${value ? `${accentBorder} bg-zinc-900/40` : 'border-zinc-700 bg-zinc-800'}`}>
+        <div className={`absolute top-[2px] w-[22px] h-[22px] rounded-full transition-all duration-300 shadow-md ${value ? `left-[26px] ${accentBg}` : 'left-[2px] bg-zinc-400'}`} />
       </button>
     </div>
   );
@@ -494,21 +504,38 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
   const SmallToggle: React.FC<{ value: boolean; onChange: () => void; label: string }> = ({ value, onChange, label }) => (
     <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900/30 border border-white/5">
       <label className="fs-sm text-zinc-400">{label}</label>
-      <button onClick={onChange} className={`relative w-10 h-[24px] rounded-full transition-colors duration-300 shrink-0 ${value ? accentBg : 'bg-zinc-800'}`}>
-        <div className={`absolute top-[3px] w-[18px] h-[18px] rounded-full bg-white transition-all duration-300 ${value ? 'left-[21px]' : 'left-[3px]'}`} />
+      <button onClick={onChange} className={`relative w-10 h-[24px] rounded-full transition-colors duration-300 shrink-0 border ${value ? `${accentBorder} bg-zinc-900/40` : 'border-zinc-700 bg-zinc-800'}`}>
+        <div className={`absolute top-[2px] w-[18px] h-[18px] rounded-full transition-all duration-300 ${value ? `left-[18px] ${accentBg}` : 'left-[2px] bg-zinc-400'}`} />
       </button>
     </div>
   );
 
-  const TooltipWrapper: React.FC<{ tip: string; children: React.ReactNode }> = ({ tip, children }) => (
-    <div className="relative group/tip flex-1 min-w-0">
-      {children}
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg bg-zinc-800 border border-white/10 fs-sm text-zinc-300 whitespace-nowrap opacity-0 pointer-events-none group-hover/tip:opacity-100 transition-opacity z-50 shadow-xl">
-        {tip}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-zinc-800" />
+  const TooltipWrapper: React.FC<{ tip: string; children: React.ReactNode }> = ({ tip, children }) => {
+    const [isHovered, setIsHovered] = useState(false);
+    return (
+      <div 
+        className="relative"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {children}
+        <AnimatePresence>
+          {isHovered && (
+            <motion.div 
+              initial={{ opacity: 0, y: 8, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 450, damping: 25 }}
+              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg bg-zinc-800 border border-white/10 fs-sm text-zinc-300 whitespace-nowrap z-[100] shadow-2xl pointer-events-none"
+            >
+              {tip}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-zinc-800" />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </div>
-  );
+    );
+  };
 
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const toggleSection = useCallback((id: string) => {
@@ -545,7 +572,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ height: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }, opacity: { duration: 0.25, ease: 'easeOut' } }}
+              transition={{ height: { type: 'spring', stiffness: 400, damping: 30 }, opacity: { duration: 0.2 } }}
               className="overflow-hidden"
             >
               {children}
@@ -564,9 +591,10 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
       animate={active ? { scale: 1.02, boxShadow: '0 2px 12px rgba(0,0,0,0.3)' } : { scale: 1, boxShadow: '0 0px 0px rgba(0,0,0,0)' }}
       transition={{ duration: 0.2 }}
       className={`
-        relative border rounded-xl px-3 py-1.5 fs-sm font-bold transition-colors text-center
+        relative !overflow-visible border rounded-xl px-3 py-1.5 fs-sm font-bold transition-colors text-center
+        ${active ? 'z-10' : 'z-0'}
         ${disabled ? 'bg-zinc-900/20 border-white/5 text-zinc-600 cursor-not-allowed' :
-          active ? 'bg-[#282B33] border-white/15 text-white' : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}
+          active ? `bg-zinc-900/40 ${accentBorder} text-white` : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}
         ${className}
       `}
     >
@@ -650,7 +678,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
 
       <AnimatePresence mode="wait">
         {activeTab === 'media' && (
-          <motion.div key="media" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="space-y-4">
+          <motion.div key="media" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ type: 'spring', stiffness: 400, damping: 28 }} className="space-y-4">
 
             {/* ── Nome do Arquivo + Nome Limpo ── */}
             <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
@@ -669,12 +697,12 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                 placeholder="Se vazio, usa o titulo original do video"
                 className="w-full px-3 py-2 rounded-lg bg-zinc-800/60 border border-white/5 fs-lg text-white placeholder-zinc-500 focus:outline-none focus:border-white/15 transition-colors font-mono"
               />
-              <div className="flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-2.5">
                 {[
                   { resolved: mediaInfo.title || 'video', label: 'Titulo' },
                   { resolved: mediaInfo.channel || 'canal', label: 'Canal' },
-                  { resolved: fmtDate(mediaInfo.publishDate || ''), label: 'Data' },
-                  { resolved: mediaInfo.duration || '', label: 'Duracao' },
+                  { resolved: fmtDate(mediaInfo.publishDate || '', true), label: 'Data' },
+                  { resolved: fmtDuration(mediaInfo.duration || ''), label: 'Duracao' },
                 ].filter(t => t.resolved).map(t => (
                   <button
                     key={t.label}
@@ -715,8 +743,8 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
 
             {/* ── Resolução ── */}
             <AccordionSection id="resolution" title="Resolução" blockId="resolution">
-              <div className="px-3 pb-3 pt-0 space-y-2">
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+              <div className="px-3 pb-3 pt-2 space-y-2">
+                <div className="flex flex-wrap gap-2.5">
                   {VIDEO_PRESETS.map(preset => {
                     const unavailable = preset.height !== Infinity && maxRes > 0 && preset.height > maxRes;
                     return (
@@ -749,8 +777,8 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
 
             {/* ── Formato Video + Codecs ── */}
             <AccordionSection id="video-format" title="Formatos" blockId="video-format">
-              <div className="px-3 pb-3 pt-0 space-y-3">
-                <div className="grid grid-cols-4 gap-1.5">
+              <div className="px-3 pb-3 pt-2 space-y-3">
+                <div className="flex flex-wrap gap-2.5">
                   {VIDEO_FORMATS.map(fmt => (
                     <Btn
                       key={fmt}
@@ -765,10 +793,13 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                     </Btn>
                   ))}
                 </div>
-                <div className="space-y-2">
-                  <div className="space-y-1.5">
-                    <BlockTitle>Codec de Video</BlockTitle>
-                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                <div className="space-y-2 pt-2 mt-2 border-t border-white/5">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <BlockIcon blockId="behavior" />
+                      <BlockTitle>Codec de Video</BlockTitle>
+                    </div>
+                    <div className="flex flex-wrap gap-2.5">
                       {VIDEO_CODECS.map(codec => (
                         <TooltipWrapper key={codec.id} tip={codec.tip}>
                           <Btn
@@ -800,7 +831,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             {/* ── Descrição ── */}
             {mediaInfo.description && (
               <AccordionSection id="description" title="Descrição" blockId="metadata">
-                <div className="px-3 pb-3 pt-0 space-y-2">
+                <div className="px-3 pb-3 pt-2 space-y-2">
                   <div className={`relative fs-sm text-zinc-400 leading-relaxed whitespace-pre-line ${descExpanded ? '' : 'line-clamp-5'}`}>
                     {mediaInfo.description}
                   </div>
@@ -830,7 +861,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
 
             {/* ── Áudio ── */}
             <AccordionSection id="audio" title="Áudio" blockId="audio-format">
-              <div className="px-3 pb-3 pt-0 space-y-3">
+              <div className="px-3 pb-3 pt-2 space-y-3">
                 <Toggle
                   value={options.audioOnly}
                   onChange={() => update({ audioOnly: !options.audioOnly })}
@@ -844,7 +875,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                     <BlockIcon blockId="audio-format" />
                     <BlockTitle>Formato do Audio</BlockTitle>
                   </div>
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="flex flex-wrap gap-2.5">
                     {AUDIO_FORMATS.map(fmt => (
                       <Btn key={fmt.id} active={options.audioFormat === fmt.id} onClick={() => update({ audioFormat: fmt.id })} className="py-2">
                         {fmt.label}
@@ -857,7 +888,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                     <BlockIcon blockId="audio-quality" />
                     <BlockTitle>Qualidade do Audio</BlockTitle>
                   </div>
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="flex flex-wrap gap-2.5">
                     {AUDIO_QUALITY_PRESETS.map(q => (
                       <Btn key={q.value} active={options.audioQuality === q.value} onClick={() => update({ audioQuality: q.value })} className="py-2">
                         {q.label}
@@ -871,7 +902,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
 
             {/* ── Legendas ── */}
             <AccordionSection id="subtitles" title="Legendas" blockId="subtitles">
-              <div className="px-3 pb-3 pt-0 space-y-3">
+              <div className="px-3 pb-3 pt-2 space-y-3">
                 <Toggle
                   value={showSubs}
                   onChange={() => {
@@ -884,11 +915,11 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   desc="Baixar e opcionalmente embutir"
                 />
                 {showSubs && (
-                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden space-y-3 pl-2 border-l-2 border-zinc-800">
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ height: { type: 'spring', stiffness: 400, damping: 30 }, opacity: { duration: 0.2 } }} className="overflow-hidden space-y-3 pl-2 border-l-2 border-zinc-800">
                     <SmallToggle value={options.writeAutoSubs} onChange={() => update({ writeAutoSubs: !options.writeAutoSubs })} label="Legendas automaticas" />
                     <div className="space-y-1.5">
                       <BlockTitle>Idioma</BlockTitle>
-                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                      <div className="flex flex-wrap gap-2.5">
                         {SUB_LANGS.map(lang => (
                           <Btn key={lang.id} active={options.subLangs === lang.id} onClick={() => update({ subLangs: lang.id })} className="py-2">
                             {lang.label}
@@ -898,9 +929,9 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                     </div>
                     <div className="space-y-1.5">
                       <BlockTitle>Formato</BlockTitle>
-                  <div className="grid grid-cols-5 gap-1.5">
+                  <div className="flex flex-wrap gap-2.5">
                         {SUB_FORMATS.map(fmt => (
-                          <Btn key={fmt} active={options.subFormat === fmt} onClick={() => update({ subFormat: fmt })} className="py-2 flex-1">
+                          <Btn key={fmt} active={options.subFormat === fmt} onClick={() => update({ subFormat: fmt })} className="py-2">
                             {fmt.toUpperCase()}
                           </Btn>
                         ))}
@@ -918,7 +949,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
         )}
 
         {activeTab === 'advanced' && (
-          <motion.div key="advanced" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="space-y-4">
+          <motion.div key="advanced" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ type: 'spring', stiffness: 400, damping: 28 }} className="space-y-4">
 
             {/* ── Formato customizado ── */}
             <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
@@ -939,7 +970,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
 
             {/* ── Recorte de tempo ── */}
             <AccordionSection id="trim" title="Recortar vídeo" blockId="trim">
-              <div className="px-3 pb-3 pt-0 space-y-2">
+              <div className="px-3 pb-3 pt-2 space-y-2">
                 {mediaInfo.durationSeconds > 0 ? (
                   <TimeRangeSlider
                     durationSeconds={mediaInfo.durationSeconds}
@@ -985,13 +1016,13 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
 
             {/* ── Modo de Saída + FPS (2 colunas) ── */}
             <AccordionSection id="output" title="Modo de saída" blockId="output-mode">
-              <div className="px-3 pb-3 pt-0 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="px-3 pb-3 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <BlockIcon blockId="output-mode" />
                     <BlockTitle>Modo de saida</BlockTitle>
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-3 gap-2.5">
                     <Btn active={!options.videoOnly && !options.audioOnly} onClick={() => update({ videoOnly: false, audioOnly: false })} className="py-2.5">
                       Video + Audio
                     </Btn>
@@ -1008,7 +1039,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                     <BlockIcon blockId="fps" />
                     <BlockTitle>FPS Maximo</BlockTitle>
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-3 gap-2.5">
                     {[0, 24, 30, 60, 120].map(fps => (
                       <Btn key={fps} active={options.fpsMax === fps} onClick={() => update({ fpsMax: fps })} className="py-2 flex-1">
                         {fps === 0 ? 'Original' : `${fps} FPS`}
@@ -1021,9 +1052,9 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
 
             {/* ── SponsorBlock ── */}
             <AccordionSection id="sponsorblock" title="SponsorBlock" blockId="sponsorblock">
-              <div className={`px-3 pb-3 pt-0 space-y-2 ${isWebMode ? 'opacity-40 pointer-events-none' : ''}`}>
+              <div className={`px-3 pb-3 pt-2 space-y-2 ${isWebMode ? 'opacity-40 pointer-events-none' : ''}`}>
                 <p className="fs-sm text-zinc-600">Remover automaticamente partes indesejadas do video</p>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-2.5">
                   {[
                     { id: 'sponsor', label: 'Sponsors' },
                     { id: 'intro', label: 'Intro' },
@@ -1056,7 +1087,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                     );
                   })}
                 </div>
-                <div className="flex gap-1.5">
+                <div className="flex gap-2.5">
                   <Btn
                     active={!options.sponsorblockRemove}
                     onClick={() => update({ sponsorblockRemove: '' })}
@@ -1077,7 +1108,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
 
             {/* ── Metadados + Thumbnail (2 colunas) ── */}
             <AccordionSection id="metadata" title="Metadados" blockId="metadata">
-              <div className="px-3 pb-3 pt-0 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="px-3 pb-3 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <Toggle value={options.embedMetadata} onChange={() => update({ embedMetadata: !options.embedMetadata })} label="Metadados" desc="Incorporar titulo, autor e outros dados" icon={<BlockIcon blockId="metadata" />} />
                 <div>
                   <Toggle value={!!options.writeThumbnail} onChange={() => update({ writeThumbnail: !options.writeThumbnail })} label="Thumbnail" desc="Salvar imagem da miniatura" icon={<BlockIcon blockId="thumbnail" />} />
@@ -1093,13 +1124,13 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
 
             {/* ── Comportamento + Limite de Velocidade (2 colunas) ── */}
             <AccordionSection id="behavior" title="Comportamento" blockId="behavior">
-              <div className="px-3 pb-3 pt-0 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="px-3 pb-3 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <BlockIcon blockId="speed-limit" />
                     <BlockTitle>Limite de Velocidade</BlockTitle>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-2.5">
                     {[0, 512, 1024, 5120, 10240, 25600, 51200].map(kbps => (
                       <Btn
                         key={kbps}

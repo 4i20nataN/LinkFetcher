@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ProviderRegistry } from '../../core/plugins/Providers';
 import { MediaInfo, MediaFormat } from '../../types';
@@ -100,6 +100,36 @@ export const LinkAnalyzer: React.FC = () => {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const animationFrameRef = useRef<number | null>(null);
+  const smoothSetPlaybackRate = (element: HTMLElement | null, targetRate: number) => {
+    if (!element) return;
+    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+    
+    const animations = element.getAnimations();
+    if (animations.length === 0) return;
+    
+    const startRate = animations[0].playbackRate;
+    const duration = 400; // ms
+    let startTime: number | null = null;
+    
+    const animate = (currentTime: number) => {
+      if (!startTime) startTime = currentTime;
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      const ease = 1 - Math.pow(1 - progress, 3); // cubic ease-out
+      const currentRate = startRate + (targetRate - startRate) * ease;
+      
+      animations.forEach(a => a.playbackRate = currentRate);
+      
+      if (progress < 1) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+      }
+    };
+    
+    animationFrameRef.current = requestAnimationFrame(animate);
+  };
   const [mediaInfo, setMediaInfo] = useState<MediaInfo | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<MediaFormat | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -213,13 +243,29 @@ export const LinkAnalyzer: React.FC = () => {
     }
   };
 
+  const sanitizeUrl = (rawUrl: string): string => {
+    try {
+      const parsed = new URL(rawUrl);
+      parsed.searchParams.delete('t');
+      parsed.searchParams.delete('time_continue');
+      parsed.searchParams.delete('start');
+      return parsed.toString();
+    } catch {
+      return rawUrl;
+    }
+  };
+
   const handleSubmit = async () => {
-    const trimmed = url.trim();
+    let trimmed = url.trim();
     if (!trimmed) return;
     if (!/^https?:\/\/.+/i.test(trimmed)) {
       setError(settings.language === 'en' ? 'Please enter a valid URL starting with http:// or https://' : 'Insira uma URL válida começando com http:// ou https://');
       return;
     }
+    
+    trimmed = sanitizeUrl(trimmed);
+    setUrl(trimmed); // Atualiza o input visualmente com a URL limpa
+    
     await handleAnalyze(trimmed);
     handleProbe(trimmed);
   };
@@ -452,14 +498,73 @@ export const LinkAnalyzer: React.FC = () => {
         </div>
 
         {/* Supported platforms strip */}
-        <div className="mt-4 pt-4 border-t border-white/5 flex flex-wrap items-center justify-center md:justify-start gap-4 text-xs text-zinc-500">
-          <span className="font-mono uppercase tracking-wider text-[10px]">{t('supportedPlats')}</span>
-          <div className="flex flex-wrap gap-2">
-            {['YouTube', 'TikTok', 'Instagram', 'Facebook', 'X (Twitter)', 'SoundCloud', 'Spotify', 'Twitch'].map((plat) => (
-              <span key={plat} className="px-2.5 py-1 rounded-lg glass-pill text-zinc-300 font-medium hover:bg-white/10 transition-colors">
-                {plat}
-              </span>
-            ))}
+        <div 
+          className="slider-container"
+          onMouseEnter={(e) => {
+            const row = e.currentTarget.querySelector('.scroll-row');
+            if (row) smoothSetPlaybackRate(row as HTMLElement, 0.35);
+          }}
+          onMouseLeave={(e) => {
+            const row = e.currentTarget.querySelector('.scroll-row');
+            if (row) smoothSetPlaybackRate(row as HTMLElement, 1);
+          }}
+        >
+          <div className="scroll-row" id="scrollRow">
+            <div className="tag youtube"><i className="fa-brands fa-youtube"></i>YouTube</div>
+            <div className="tag tiktok"><i className="fa-brands fa-tiktok"></i>TikTok</div>
+            <div className="tag instagram"><i className="fa-brands fa-instagram"></i>Instagram</div>
+            <div className="tag facebook"><i className="fa-brands fa-facebook"></i>Facebook</div>
+            <div className="tag twitter"><i className="fa-brands fa-x-twitter"></i>X</div>
+            <div className="tag soundcloud"><i className="fa-brands fa-soundcloud"></i>SoundCloud</div>
+            <div className="tag twitch"><i className="fa-brands fa-twitch"></i>Twitch</div>
+            <div className="tag reddit"><i className="fa-brands fa-reddit"></i>Reddit</div>
+            <div className="tag discord"><i className="fa-brands fa-discord"></i>Discord</div>
+            <div className="tag kick"><i className="fa-solid fa-play"></i>Kick</div>
+            <div className="tag vimeo"><i className="fa-brands fa-vimeo-v"></i>Vimeo</div>
+            <div className="tag pinterest"><i className="fa-brands fa-pinterest"></i>Pinterest</div>
+            <div className="tag linkedin"><i className="fa-brands fa-linkedin"></i>LinkedIn</div>
+            <div className="tag github"><i className="fa-brands fa-github"></i>GitHub</div>
+            <div className="tag patreon"><i className="fa-brands fa-patreon"></i>Patreon</div>
+            <div className="tag telegram"><i className="fa-brands fa-telegram"></i>Telegram</div>
+            <div className="tag snapchat"><i className="fa-brands fa-snapchat"></i>Snapchat</div>
+            <div className="tag steam"><i className="fa-brands fa-steam"></i>Steam</div>
+            <div className="tag threads"><i className="fa-brands fa-threads"></i>Threads</div>
+            <div className="tag medium"><i className="fa-brands fa-medium"></i>Medium</div>
+            <div className="tag behance"><i className="fa-brands fa-behance"></i>Behance</div>
+            <div className="tag dribbble"><i className="fa-brands fa-dribbble"></i>Dribbble</div>
+            <div className="tag gitlab"><i className="fa-brands fa-gitlab"></i>GitLab</div>
+            <div className="tag tumblr"><i className="fa-brands fa-tumblr"></i>Tumblr</div>
+            <div className="tag flickr"><i className="fa-brands fa-flickr"></i>Flickr</div>
+            <div className="tag mastodon"><i className="fa-brands fa-mastodon"></i>Mastodon</div>
+            <div className="tag bandcamp"><i className="fa-brands fa-bandcamp"></i>Bandcamp</div>
+
+            <div className="tag youtube"><i className="fa-brands fa-youtube"></i>YouTube</div>
+            <div className="tag tiktok"><i className="fa-brands fa-tiktok"></i>TikTok</div>
+            <div className="tag instagram"><i className="fa-brands fa-instagram"></i>Instagram</div>
+            <div className="tag facebook"><i className="fa-brands fa-facebook"></i>Facebook</div>
+            <div className="tag twitter"><i className="fa-brands fa-x-twitter"></i>X</div>
+            <div className="tag soundcloud"><i className="fa-brands fa-soundcloud"></i>SoundCloud</div>
+            <div className="tag twitch"><i className="fa-brands fa-twitch"></i>Twitch</div>
+            <div className="tag reddit"><i className="fa-brands fa-reddit"></i>Reddit</div>
+            <div className="tag discord"><i className="fa-brands fa-discord"></i>Discord</div>
+            <div className="tag kick"><i className="fa-solid fa-play"></i>Kick</div>
+            <div className="tag vimeo"><i className="fa-brands fa-vimeo-v"></i>Vimeo</div>
+            <div className="tag pinterest"><i className="fa-brands fa-pinterest"></i>Pinterest</div>
+            <div className="tag linkedin"><i className="fa-brands fa-linkedin"></i>LinkedIn</div>
+            <div className="tag github"><i className="fa-brands fa-github"></i>GitHub</div>
+            <div className="tag patreon"><i className="fa-brands fa-patreon"></i>Patreon</div>
+            <div className="tag telegram"><i className="fa-brands fa-telegram"></i>Telegram</div>
+            <div className="tag snapchat"><i className="fa-brands fa-snapchat"></i>Snapchat</div>
+            <div className="tag steam"><i className="fa-brands fa-steam"></i>Steam</div>
+            <div className="tag threads"><i className="fa-brands fa-threads"></i>Threads</div>
+            <div className="tag medium"><i className="fa-brands fa-medium"></i>Medium</div>
+            <div className="tag behance"><i className="fa-brands fa-behance"></i>Behance</div>
+            <div className="tag dribbble"><i className="fa-brands fa-dribbble"></i>Dribbble</div>
+            <div className="tag gitlab"><i className="fa-brands fa-gitlab"></i>GitLab</div>
+            <div className="tag tumblr"><i className="fa-brands fa-tumblr"></i>Tumblr</div>
+            <div className="tag flickr"><i className="fa-brands fa-flickr"></i>Flickr</div>
+            <div className="tag mastodon"><i className="fa-brands fa-mastodon"></i>Mastodon</div>
+            <div className="tag bandcamp"><i className="fa-brands fa-bandcamp"></i>Bandcamp</div>
           </div>
         </div>
       </div>

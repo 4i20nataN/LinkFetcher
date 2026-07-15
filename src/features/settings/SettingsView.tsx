@@ -279,6 +279,29 @@ export const SettingsView: React.FC = () => {
                   : 'Escolha como os icones aparecem nos blocos de opcoes de download e cards do seletor de formato.'}
               </p>
             </div>
+
+            <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/40 border border-white/5">
+              <div className="space-y-1">
+                <span className="text-xs text-white font-medium flex items-center gap-1.5">
+                  <Smile size={14} className="text-zinc-400" />
+                  {settings.language === 'en' ? 'Colorful Sidebar Emojis' : 'Emojis Coloridos na Lateral'}
+                </span>
+                <p className="text-[10px] text-zinc-500">
+                  {settings.language === 'en' ? 'Keep sidebar emojis colored at all times instead of grayscale' : 'Manter emojis da barra lateral sempre coloridos em vez de preto e branco'}
+                </p>
+              </div>
+              <button
+                onClick={() => updateSettings({ colorfulIcons: !settings.colorfulIcons })}
+                className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.colorfulIcons ? getAccentBgClass(settings) : 'bg-zinc-800'}`}
+              >
+                <motion.div
+                  layout
+                  className="absolute top-[2px] left-[2px] w-[16px] h-[16px] rounded-full bg-white shadow-sm"
+                  animate={{ x: settings.colorfulIcons ? 16 : 0 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                />
+              </button>
+            </div>
           </div>
 
           <div className="p-5 rounded-3xl glass-card space-y-4 shadow-md">

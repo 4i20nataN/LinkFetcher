@@ -15,12 +15,12 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = ({
   const authorInitials = authorName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
   const menuItems = [
-    { id: 'analyze', label: t('analyzeLink'), icon: Link2, desc: t('analyzeDesc') },
-    { id: 'search', label: t('onlineSearch'), icon: Search, desc: t('searchDesc') },
-    { id: 'manager', label: t('downloads'), icon: ArrowDownToLine, desc: t('downloadsDesc'), badge: downloads.filter(d => ['downloading', 'queued'].includes(d.status)).length },
-    { id: 'favorites', label: t('favorites'), icon: Star, desc: t('favoritesDesc') },
-    { id: 'later', label: t('downloadLater'), icon: Clock, desc: t('laterDesc') },
-    { id: 'settings', label: t('settings'), icon: Settings, desc: t('settingsDesc') }
+    { id: 'analyze', label: t('analyzeLink'), icon: '🔗', desc: t('analyzeDesc') },
+    { id: 'search', label: t('onlineSearch'), icon: '🔍', desc: t('searchDesc') },
+    { id: 'manager', label: t('downloads'), icon: '📥', desc: t('downloadsDesc'), badge: downloads.filter(d => ['downloading', 'queued'].includes(d.status)).length },
+    { id: 'favorites', label: t('favorites'), icon: '⭐', desc: t('favoritesDesc') },
+    { id: 'later', label: t('downloadLater'), icon: '⏰', desc: t('laterDesc') },
+    { id: 'settings', label: t('settings'), icon: '⚙️', desc: t('settingsDesc') }
   ];
 
   return (
@@ -102,7 +102,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = ({
                 {isActive && (
                   <motion.div
                     layoutId="active-sidebar-pill"
-                    className={`absolute inset-0 rounded-xl opacity-10 bg-current ${getAccentTextClass(settings)}`}
+                    className={`absolute inset-0 rounded-xl opacity-10 ${getAccentBgClass(settings)}`}
                     transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                   />
                 )}
@@ -117,13 +117,15 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = ({
                 )}
 
                 <div className="flex items-center gap-3.5 z-10">
-                  <Icon 
-                    size={20} 
+                  <span 
                     className={`
-                      transition-transform duration-300 group-hover:scale-110 
-                      ${isActive ? getAccentTextClass(settings) : 'text-zinc-500 group-hover:text-zinc-300'}
-                    `} 
-                  />
+                      text-xl transition-transform duration-300 group-hover:scale-110 
+                      ${!isActive ? 'opacity-50 group-hover:opacity-100' : ''}
+                      ${!isActive && !settings.colorfulIcons ? 'grayscale group-hover:grayscale-0' : ''}
+                    `}
+                  >
+                    {item.icon}
+                  </span>
                   <div>
                     <span className="font-medium text-sm block leading-none">{item.label}</span>
                     <span className="text-[10px] text-zinc-500 block mt-1 group-hover:text-zinc-400 font-sans">

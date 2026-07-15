@@ -251,8 +251,37 @@ export function spawnDownload(params: {
     args.push('--retries', String(params.retries));
   }
 
-  const outputTemplate = params.customFilename
-    ? path.join(outputDir, `${params.customFilename}.%(ext)s`)
+  /**
+   * Sanitiza o nome de arquivo personalizado removendo caracteres proibidos
+   * no Windows/Linux. Converte padrões comuns em alternativas seguras:
+   *   - Duração "37:48" → "37m48s", "1:02:30" → "1h02m30s"
+   *   - Data "17/06/2025" → "17-06-2025"
+   *   - Caracteres proibidos :, \, |, *, ?, <, >, " → _
+   */
+  const sanitizeFilename = (name: string, strict = false): string => {
+    let s = name;
+    // Converter padrões de duração HH:MM:SS ou MM:SS
+    s = s.replace(/(\d{1,2}):(\d{2}):(\d{2})/g, '$1h$2m$3s');
+    s = s.replace(/(\d{1,2}):(\d{2})/g, '$1m$2s');
+    // Converter datas DD/MM/YYYY ou YYYY/MM/DD
+    s = s.replace(/(\d{1,4})\/(\d{1,2})\/(\d{1,4})/g, '$1-$2-$3');
+    // Remover caracteres proibidos restantes
+    s = s.replace(/[:\\|*?<>"]/g, '_');
+    s = s.replace(/\//g, '-');
+    s = s.replace(/\\/g, '_');
+    // Modo estrito (--restrict-filenames): apenas ASCII alfanumérico, _, - e .
+    if (strict) {
+      s = s.replace(/[^a-zA-Z0-9_.\-]/g, '_');
+      s = s.replace(/_+/g, '_').replace(/^_|_$/g, '');
+    }
+    return s;
+  };
+
+  const safeName = params.customFilename
+    ? sanitizeFilename(params.customFilename, params.restrictFilenames)
+    : '';
+  const outputTemplate = safeName
+    ? path.join(outputDir, `${safeName}.%(ext)s`)
     : path.join(outputDir, '%(title)s.%(ext)s');
   args.push('-o', outputTemplate);
 

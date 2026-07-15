@@ -128,6 +128,7 @@ export interface AppSettings {
   autoDownload: boolean;
   notifications: boolean;
   updates: boolean;
+  colorfulIcons: boolean;
   customApiUrl?: string;
 }
 

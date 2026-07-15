@@ -104,6 +104,7 @@ export class StorageService {
       autoDownload: true,
       notifications: true,
       updates: false,
+      colorfulIcons: false,
     };
   }
 

@@ -53,6 +53,7 @@ Antes de propor alterações ou debugar, você deve ler o arquivo correspondente
 | Refatorar código funcional adjacente por estética | Aplicar a alteração unicamente no escopo restrito do problema reportado. |
 | Montar strings de argumentos do yt-dlp na camada de UI | Alterar apenas `FormatOptions` em `types.ts`. A conversão para string ocorre em `YtDlpManager.buildArgs()`. |
 | Repetir comandos idênticos que falharam no terminal | Falhou 2 vezes seguidas? Pare a execução, mude a abordagem técnica ou pergunte ao usuário. |
+| Implementar ou corrigir features diretamente na versão Web antes do Desktop | Toda feature/fix deve funcionar perfeito na versão **Electron Desktop** primeiro, e só depois ser adaptada para a versão **Web (Express + SSE)**. |
 
 ---
 
