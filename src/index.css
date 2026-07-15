@@ -15,6 +15,12 @@
   --radius-sm: 2px;
 }
 
+/* UI Scale variable for FormatSelector zoom */
+.fs-xs { font-size: calc(var(--ui-scale, 12) * 0.0833rem); }
+.fs-sm { font-size: calc(var(--ui-scale, 12) * 0.1rem); }
+.fs-md { font-size: calc(var(--ui-scale, 12) * 0.1167rem); }
+.fs-lg { font-size: calc(var(--ui-scale, 12) * 0.1333rem); }
+
 /* Custom scrollbars matching Nothing OS / minimalist design */
 ::-webkit-scrollbar {
   width: 6px;

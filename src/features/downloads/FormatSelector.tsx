@@ -5,6 +5,7 @@ import { getAccentBgClass, getAccentTextClass, getAccentBorderClass, getAccentTe
 import { BlockIcon, BlockTitle, BlockId } from '../../components/BlockIcon';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronDown, ChevronUp, Info, User, Eye, Calendar, ArrowDownToLine, AlertTriangle } from 'lucide-react';
+import { AUDIO_QUALITY_PRESETS } from './constants';
 
 const isWebMode = typeof window !== 'undefined' && !window.electron;
 
@@ -75,14 +76,6 @@ const AUDIO_FORMATS = [
   { id: 'flac', label: 'FLAC' },
   { id: 'opus', label: 'OPUS' },
   { id: 'wav', label: 'WAV' },
-] as const;
-export const AUDIO_QUALITY_PRESETS = [
-  { value: '0', label: 'Melhor', desc: 'Qualidade maxima' },
-  { value: '3', label: '320 kbps', desc: '' },
-  { value: '4', label: '256 kbps', desc: '' },
-  { value: '5', label: '192 kbps', desc: '' },
-  { value: '7', label: '128 kbps', desc: '' },
-  { value: '9', label: '64 kbps', desc: '' },
 ] as const;
 const SUB_FORMATS = ['srt', 'ass', 'vtt'] as const;
 const SUB_LANGS = [
@@ -285,7 +278,7 @@ function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, accentBg, 
           onBlur={e => commitInput('start', e.target.value)}
           onChange={e => setInputStart(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-          className="w-16 px-2 py-1.5 rounded-lg bg-zinc-900 border border-white/5 text-[12px] font-mono text-white text-center placeholder-zinc-600 focus:outline-none focus:border-white/15"
+          className="w-16 px-2 py-1.5 rounded-lg bg-zinc-900 border border-white/5 fs-sm font-mono text-white text-center placeholder-zinc-600 focus:outline-none focus:border-white/15"
           placeholder="00:00"
         />
         <span className="text-zinc-600 text-xs">-</span>
@@ -296,11 +289,11 @@ function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, accentBg, 
           onBlur={e => commitInput('end', e.target.value)}
           onChange={e => setInputEnd(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-          className="w-16 px-2 py-1.5 rounded-lg bg-zinc-900 border border-white/5 text-[12px] font-mono text-white text-center placeholder-zinc-600 focus:outline-none focus:border-white/15"
+          className="w-16 px-2 py-1.5 rounded-lg bg-zinc-900 border border-white/5 fs-sm font-mono text-white text-center placeholder-zinc-600 focus:outline-none focus:border-white/15"
           placeholder="fim"
         />
         {cutDuration > 0 && (
-          <span className="ml-auto text-[12px] text-zinc-500 font-mono">
+          <span className="ml-auto fs-sm text-zinc-500 font-mono">
             {formatTime(cutDuration)}
           </span>
         )}
@@ -315,7 +308,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
   const [showSubs, setShowSubs] = useState(false);
   const [showCustomFormat, setShowCustomFormat] = useState(false);
   const [useUnderscore, setUseUnderscore] = useState(true);
-  const [uiScale, setUiScale] = useState(100);
+  const [uiScale, setUiScale] = useState(12);
 
   const maxRes = useMemo(() => getMaxVideoHeight(mediaInfo.formats), [mediaInfo.formats]);
 
@@ -427,14 +420,14 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             <img src={mediaInfo.thumbnailUrl || mediaInfo.originalUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" crossOrigin="anonymous" />
           </div>
           <div className="min-w-0 flex-1 space-y-1">
-            <p className="text-[12px] font-semibold text-white truncate">{mediaInfo.title}</p>
+            <p className="fs-sm font-semibold text-white truncate">{mediaInfo.title}</p>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[12px] text-zinc-400 font-mono">{mediaInfo.resolution || 'Imagem'}</span>
+              <span className="fs-sm text-zinc-400 font-mono">{mediaInfo.resolution || 'Imagem'}</span>
               {origExt && (
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-zinc-800 text-zinc-400 uppercase">{origExt}</span>
               )}
               {mediaInfo.sizeEst !== 'N/A' && (
-                <span className="text-[12px] text-zinc-500">{mediaInfo.sizeEst}</span>
+                <span className="fs-sm text-zinc-500">{mediaInfo.sizeEst}</span>
               )}
             </div>
           </div>
@@ -455,7 +448,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                     onFormatChange(fmt);
                   }}
                   className={`
-                    border rounded-lg text-[12px] font-bold transition-all text-center py-2.5
+                    border rounded-lg fs-sm font-bold transition-all text-center py-2.5
                     ${options.format === fmt.id
                       ? `${accentBg} text-white ${accentBorder}`
                       : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}
@@ -481,7 +474,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
         {icon && <span className="text-zinc-400">{icon}</span>}
         <div>
           <p className="text-xs font-semibold text-white">{label}</p>
-          {desc && <p className="text-[12px] text-zinc-500 mt-0.5">{desc}</p>}
+          {desc && <p className="fs-sm text-zinc-500 mt-0.5">{desc}</p>}
         </div>
       </div>
       <button onClick={onChange} className={`relative w-[52px] h-[28px] rounded-full transition-colors duration-300 shrink-0 ${value ? accentBg : 'bg-zinc-700'}`}>
@@ -492,7 +485,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
 
   const SmallToggle: React.FC<{ value: boolean; onChange: () => void; label: string }> = ({ value, onChange, label }) => (
     <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900/30 border border-white/5">
-      <label className="text-[12px] text-zinc-400">{label}</label>
+      <label className="fs-sm text-zinc-400">{label}</label>
       <button onClick={onChange} className={`relative w-10 h-[24px] rounded-full transition-colors duration-300 shrink-0 ${value ? accentBg : 'bg-zinc-800'}`}>
         <div className={`absolute top-[3px] w-[18px] h-[18px] rounded-full bg-white transition-all duration-300 ${value ? 'left-[21px]' : 'left-[3px]'}`} />
       </button>
@@ -502,7 +495,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
   const TooltipWrapper: React.FC<{ tip: string; children: React.ReactNode }> = ({ tip, children }) => (
     <div className="relative group/tip flex-1 min-w-0">
       {children}
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg bg-zinc-800 border border-white/10 text-[12px] text-zinc-300 whitespace-nowrap opacity-0 pointer-events-none group-hover/tip:opacity-100 transition-opacity z-50 shadow-xl">
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg bg-zinc-800 border border-white/10 fs-sm text-zinc-300 whitespace-nowrap opacity-0 pointer-events-none group-hover/tip:opacity-100 transition-opacity z-50 shadow-xl">
         {tip}
         <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-zinc-800" />
       </div>
@@ -563,7 +556,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
       animate={active ? { scale: 1.02, boxShadow: '0 2px 12px rgba(0,0,0,0.3)' } : { scale: 1, boxShadow: '0 0px 0px rgba(0,0,0,0)' }}
       transition={{ duration: 0.2 }}
       className={`
-        relative border rounded-xl px-3 py-1.5 text-[12px] font-bold transition-colors text-center
+        relative border rounded-xl px-3 py-1.5 fs-sm font-bold transition-colors text-center
         ${disabled ? 'bg-zinc-900/20 border-white/5 text-zinc-600 cursor-not-allowed' :
           active ? 'bg-[#282B33] border-white/15 text-white' : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}
         ${className}
@@ -579,7 +572,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
   );
 
   return (
-    <div className="space-y-3" style={{ fontSize: `${uiScale}%` }}>
+    <div className="space-y-3" style={{ '--ui-scale': uiScale } as React.CSSProperties}>
       <div className="flex items-center gap-1 border-b border-white/5">
         {([
           { id: 'media' as TabId, blockId: 'video-format' as BlockId, label: 'Mídia' },
@@ -605,8 +598,8 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
           );
         })}
         <div className="flex items-center gap-0.5 ml-1 pl-1 border-l border-white/5">
-          <button onClick={() => setUiScale(s => Math.max(70, s - 5))} className="w-5 h-5 rounded flex items-center justify-center text-[12px] text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">A-</button>
-          <button onClick={() => setUiScale(s => Math.min(150, s + 5))} className="w-5 h-5 rounded flex items-center justify-center text-[12px] text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">A+</button>
+          <button onClick={() => setUiScale(s => Math.max(8, s - 1))} className="w-5 h-5 rounded flex items-center justify-center fs-sm text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">A-</button>
+          <button onClick={() => setUiScale(s => Math.min(20, s + 1))} className="w-5 h-5 rounded flex items-center justify-center fs-sm text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">A+</button>
         </div>
       </div>
 
@@ -615,8 +608,8 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
           <img src={mediaInfo.thumbnailUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
         </div>
         <div className="min-w-0 flex-1 space-y-1">
-          <p className="text-[12px] font-semibold text-white truncate">{mediaInfo.title}</p>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px] text-zinc-500">
+          <p className="fs-sm font-semibold text-white truncate">{mediaInfo.title}</p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 fs-sm text-zinc-500">
             {mediaInfo.channel && (
               <span className="flex items-center gap-1">
                 <User size={10} />
@@ -636,7 +629,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
               </span>
             )}
           </div>
-          <div className="flex items-center gap-3 text-[12px] text-zinc-500 font-mono">
+          <div className="flex items-center gap-3 fs-sm text-zinc-500 font-mono">
             <span>{mediaInfo.formats.length} formatos</span>
             {mediaInfo.duration && <span>{mediaInfo.duration}</span>}
           </div>
@@ -662,7 +655,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   update({ customFilename: val });
                 }}
                 placeholder="Se vazio, usa o titulo original do video"
-                className="w-full px-3 py-2 rounded-lg bg-zinc-800/60 border border-white/5 text-[15px] text-white placeholder-zinc-500 focus:outline-none focus:border-white/15 transition-colors font-mono"
+                className="w-full px-3 py-2 rounded-lg bg-zinc-800/60 border border-white/5 fs-lg text-white placeholder-zinc-500 focus:outline-none focus:border-white/15 transition-colors font-mono"
               />
               <div className="flex flex-wrap items-center gap-1.5">
                 {[
@@ -679,13 +672,13 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                       const sep = useUnderscore ? '_' : ' ';
                       update({ customFilename: cur ? `${cur}${sep}${val}` : val });
                     }}
-                    className="px-2 py-1 rounded-md bg-zinc-800/60 border border-white/5 text-[12px] text-zinc-400 hover:text-white hover:border-white/10 transition-colors"
+                    className="px-2 py-1 rounded-md bg-zinc-800/60 border border-white/5 fs-sm text-zinc-400 hover:text-white hover:border-white/10 transition-colors"
                   >
                     {t.label}
                   </button>
                 ))}
                 <div className="flex items-center gap-1 ml-1 pl-2 border-l border-white/5">
-                  <span className="text-[12px] text-zinc-600">_</span>
+                  <span className="fs-sm text-zinc-600">_</span>
                   <button
                     onClick={() => {
                       const next = !useUnderscore;
@@ -698,11 +691,11 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   >
                     <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${useUnderscore ? 'left-[14px]' : 'left-0.5'}`} />
                   </button>
-                  <span className="text-[12px] text-zinc-600">Sem Espaco</span>
+                  <span className="fs-sm text-zinc-600">Sem Espaco</span>
                 </div>
               </div>
               <div className="flex items-center justify-end gap-2.5 p-2.5 rounded-lg bg-zinc-900/30 border border-white/5">
-                <label className="text-[12px] text-zinc-400">Nome limpo (sem caracteres especiais)</label>
+                <label className="fs-sm text-zinc-400">Nome limpo (sem caracteres especiais)</label>
                 <button onClick={() => update({ restrictFilenames: !options.restrictFilenames })} className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${options.restrictFilenames ? accentBg : 'bg-zinc-800'}`}>
                   <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${options.restrictFilenames ? 'left-[18px]' : 'left-0.5'}`} />
                 </button>
@@ -733,7 +726,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                 {maxRes > 0 && (
                   <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-900/30 border border-white/5">
                     <Info size={12} className="text-zinc-500 shrink-0" />
-                    <p className="text-[12px] text-zinc-400">
+                    <p className="fs-sm text-zinc-400">
                       {settings.language === 'en'
                         ? `This video is available up to ${maxRes}p. Higher presets will download at the maximum available quality.`
                         : `Este video esta disponivel ate ${maxRes}p. Presets maiores serao baixados na maxima qualidade disponivel.`}
@@ -853,7 +846,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             {!options.audioOnly && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
                 <span className="text-yellow-500 text-xs">⚠</span>
-                <span className="text-yellow-500/80 text-[12px]">Funciona apenas com <strong>"Extrair apenas audio"</strong> ativado</span>
+                <span className="text-yellow-500/80 fs-sm">Funciona apenas com <strong>"Extrair apenas audio"</strong> ativado</span>
               </div>
             )}
             <AccordionSection id="audio" title="Áudio" blockId="audio-format">
@@ -894,7 +887,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
 
             {/* ── Formato customizado ── */}
             <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
-              <button onClick={() => setShowCustomFormat(!showCustomFormat)} className="flex items-center gap-1.5 text-[12px] text-zinc-500 hover:text-zinc-300 transition-colors">
+              <button onClick={() => setShowCustomFormat(!showCustomFormat)} className="flex items-center gap-1.5 fs-sm text-zinc-500 hover:text-zinc-300 transition-colors">
                 {showCustomFormat ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                 Formato customizado (yt-dlp)
               </button>
@@ -922,7 +915,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   />
                 ) : (
                   <>
-                    <p className="text-[12px] text-zinc-600">Baixar apenas um trecho. Formato: MM:SS ou HH:MM:SS</p>
+                    <p className="fs-sm text-zinc-600">Baixar apenas um trecho. Formato: MM:SS ou HH:MM:SS</p>
                     <div className="flex gap-2 items-center">
                       <input
                         type="text"
@@ -994,7 +987,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             {/* ── SponsorBlock ── */}
             <AccordionSection id="sponsorblock" title="SponsorBlock" blockId="sponsorblock">
               <div className={`px-3 pb-3 pt-0 space-y-2 ${isWebMode ? 'opacity-40 pointer-events-none' : ''}`}>
-                <p className="text-[12px] text-zinc-600">Remover automaticamente partes indesejadas do video</p>
+                <p className="fs-sm text-zinc-600">Remover automaticamente partes indesejadas do video</p>
                 <div className="flex flex-wrap gap-1.5">
                   {[
                     { id: 'sponsor', label: 'Sponsors' },
@@ -1021,7 +1014,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                             update({ sponsorblockRemove: next.length > 0 ? next.join(',') : '' });
                           }
                         }}
-                        className="py-1.5 px-2.5 text-[12px]"
+                        className="py-1.5 px-2.5 fs-sm"
                       >
                         {selected && '✓ '}{cat.label}
                       </Btn>
@@ -1032,14 +1025,14 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   <Btn
                     active={!options.sponsorblockRemove}
                     onClick={() => update({ sponsorblockRemove: '' })}
-                    className="py-1.5 px-2.5 text-[12px]"
+                    className="py-1.5 px-2.5 fs-sm"
                   >
                     Desligado
                   </Btn>
                   <Btn
                     active={options.sponsorblockRemove === 'all'}
                     onClick={() => update({ sponsorblockRemove: 'all' })}
-                    className="py-1.5 px-2.5 text-[12px]"
+                    className="py-1.5 px-2.5 fs-sm"
                   >
                     {options.sponsorblockRemove === 'all' && '✓ '}Remover Tudo
                   </Btn>
@@ -1077,7 +1070,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                         key={kbps}
                         active={options.bandLimit === kbps}
                         onClick={() => update({ bandLimit: kbps })}
-                        className="py-2 flex-1 text-[12px] min-w-[80px]"
+                        className="py-2 flex-1 fs-sm min-w-[80px]"
                       >
                       {kbps === 0 ? 'Sem limite' : kbps >= 1024 ? `${kbps / 1024}MB/s` : `${kbps}KB/s`}
                     </Btn>
@@ -1092,7 +1085,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   <div className="space-y-1.5 p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/15">
                     <div className="flex items-center gap-1.5 mb-1">
                       <AlertTriangle size={11} className="text-amber-500/70" />
-                      <span className="text-[12px] text-amber-500/70 font-medium">Opcoes avancadas</span>
+                      <span className="fs-sm text-amber-500/70 font-medium">Opcoes avancadas</span>
                     </div>
                     <SmallToggle value={!!options.noOverwrites} onChange={() => update({ noOverwrites: !options.noOverwrites })} label="Nao sobrescrever arquivos existentes" />
                     <SmallToggle value={!!options.keepVideo} onChange={() => update({ keepVideo: !options.keepVideo })} label="Manter video apos extrair audio" />
