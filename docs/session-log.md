@@ -6,6 +6,8 @@ Compact history of development sessions. One line per significant change with br
 
 ## 2026-07-15 (feat/ui-redesign)
 
+- `635073d` docs: add session log and AGENTS.md update guidelines
+  - Created docs/session-log.md for human-readable change history; Added Section 10 to AGENTS.md mandating log updates on each commit
 - `d83c5d7` fix(desc): spacing and 'Nenhuma' option for description format, hide tag when none selected
   - Added 'none' default to `descFormat`; SummaryPanel only shows tag when txt/md selected
 - `260dfcb` fix(spacing): remove border-t separator from codec block to match other blocks pattern
