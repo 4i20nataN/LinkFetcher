@@ -511,17 +511,32 @@ class DownloadEngineClass {
       return;
     }
 
-    // For images: fetch, convert via canvas, then save
+    // For images: try Electron IPC proxy first (bypasses CORS, saves to default folder)
     if (item.format.type === 'image') {
+      const hasElectronBridge = typeof window !== 'undefined' && !!(window as any).electron?.invoke;
+      if (hasElectronBridge) {
+        try {
+          const result = await (window as any).electron.invoke('download-file-proxy', {
+            url: sourceUrl,
+            filename: `${cleanTitle}.${ext}`,
+          });
+          if (result?.filePath) {
+            this.markCompleted(item);
+            return;
+          }
+        } catch (err: any) {
+          console.warn('[Engine] Electron proxy download failed, falling back:', err);
+        }
+      }
+
+      // Fallback: direct fetch (works in web mode or same-origin)
       try {
         let blob: Blob;
         try {
-          // Try direct fetch first (works in Electron / same-origin)
           const resp = await fetch(sourceUrl);
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           blob = await resp.blob();
         } catch {
-          // CORS or network error — fetch through server proxy
           const proxyFetchUrl = `/api/proxy-download?url=${encodeURIComponent(sourceUrl)}&filename=tmp`;
           const resp = await fetch(proxyFetchUrl);
           if (!resp.ok) throw new Error(`Proxy HTTP ${resp.status}`);
@@ -530,7 +545,7 @@ class DownloadEngineClass {
         await this.convertAndDownloadImageBlob(blob, ext, `${cleanTitle}.${ext}`);
         this.markCompleted(item);
       } catch (e: any) {
-        // Final fallback: trigger browser download without conversion
+        // Final fallback: browser download
         const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(sourceUrl)}&filename=${encodeURIComponent(`${cleanTitle}.${ext}`)}`;
         this.triggerFileSave(proxyUrl, `${cleanTitle}.${ext}`);
         this.markCompleted(item);

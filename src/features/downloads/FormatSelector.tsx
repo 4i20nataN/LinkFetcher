@@ -416,15 +416,25 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
 
   if (isImage) {
     const imageFormats = mediaInfo.formats.filter(f => f.type === 'image');
+    const origExt = mediaInfo.originalUrl?.split('.').pop()?.split('?')[0]?.toLowerCase() || '';
     return (
       <div className="space-y-3">
-        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-zinc-900/40 border border-white/5">
-          <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/5 bg-zinc-950 shrink-0">
-            <img src={mediaInfo.thumbnailUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+        {/* Preview card */}
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-zinc-900/40 border border-white/5">
+          <div className="w-16 h-16 rounded-lg overflow-hidden border border-white/10 bg-zinc-950 shrink-0">
+            <img src={mediaInfo.thumbnailUrl || mediaInfo.originalUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" crossOrigin="anonymous" />
           </div>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 space-y-1">
             <p className="text-[11px] font-semibold text-white truncate">{mediaInfo.title}</p>
-            <p className="text-[10px] text-zinc-500 font-mono">{mediaInfo.resolution || 'Imagem'}{mediaInfo.sizeEst !== 'N/A' ? ` • ${mediaInfo.sizeEst}` : ''}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] text-zinc-400 font-mono">{mediaInfo.resolution || 'Imagem'}</span>
+              {origExt && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-zinc-800 text-zinc-400 uppercase">{origExt}</span>
+              )}
+              {mediaInfo.sizeEst !== 'N/A' && (
+                <span className="text-[10px] text-zinc-500">{mediaInfo.sizeEst}</span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -432,7 +442,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
           <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
             <div className="flex items-center gap-2">
               <BlockIcon blockId="resolution" />
-              <BlockTitle>{settings.language === 'en' ? 'Format' : 'Formato'}</BlockTitle>
+              <BlockTitle>{settings.language === 'en' ? 'Convert to' : 'Converter para'}</BlockTitle>
             </div>
             <div className="grid grid-cols-3 gap-1.5">
               {imageFormats.map(fmt => (
@@ -452,6 +462,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                 </button>
               ))}
             </div>
+            <p className="text-[9px] text-zinc-600 italic">A conversão é feita localmente via Canvas API</p>
           </div>
         )}
       </div>
@@ -703,7 +714,13 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             </div>
 
             {/* ── Formato + Qualidade do Áudio (2 colunas) ── */}
-            <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 ${options.audioOnly ? '' : 'opacity-60'}`}>
+            {!options.audioOnly && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                <span className="text-yellow-500 text-xs">⚠</span>
+                <span className="text-yellow-500/80 text-[10px]">Funciona apenas com <strong>"Extrair apenas audio"</strong> ativado</span>
+              </div>
+            )}
+            <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 ${options.audioOnly ? '' : 'opacity-30 pointer-events-none'}`}>
               <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
                 <div className="flex items-center gap-2">
                   <BlockIcon blockId="audio-format" />
@@ -729,9 +746,6 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                     </Btn>
                   ))}
                 </div>
-                {!options.audioOnly && (
-                  <p className="text-[9px] text-zinc-600 italic">* Aplicavel apenas quando "Extrair apenas audio" esta ligado</p>
-                )}
               </div>
             </div>
 

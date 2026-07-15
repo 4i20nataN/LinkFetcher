@@ -104,6 +104,56 @@ ipcMain.handle('shell:openPath', async (_event, targetPath) => {
 
 ipcMain.handle('shell:openExternal', async (_event, url) => shell.openExternal(url));
 
+ipcMain.handle('download-file', async (_event, { url, filename }) => {
+  if (!url) throw new Error('No URL provided');
+  const defaultName = filename || 'thumbnail.jpg';
+
+  const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+    defaultPath: path.join(app.getPath('downloads'), defaultName),
+    filters: [
+      { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp'] },
+      { name: 'All Files', extensions: ['*'] },
+    ],
+  });
+  if (canceled || !filePath) return { canceled: true };
+
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const buffer = Buffer.from(await response.arrayBuffer());
+  fs.writeFileSync(filePath, buffer);
+  return { filePath };
+});
+
+// Image proxy download — saves directly to default downloads folder (no dialog)
+ipcMain.handle('download-file-proxy', async (_event, { url, filename }) => {
+  if (!url) throw new Error('No URL provided');
+  const downloadsDir = app.getPath('downloads');
+  const safeName = (filename || 'download').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+  let filePath = path.join(downloadsDir, safeName);
+
+  // Avoid overwriting: append _1, _2, etc.
+  if (fs.existsSync(filePath)) {
+    const ext = path.extname(safeName);
+    const base = path.basename(safeName, ext);
+    let counter = 1;
+    while (fs.existsSync(filePath)) {
+      filePath = path.join(downloadsDir, `${base}_${counter}${ext}`);
+      counter++;
+    }
+  }
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    fs.writeFileSync(filePath, buffer);
+    return { filePath };
+  } catch (err) {
+    logDebug('[download-file-proxy] ERROR:', String(err));
+    throw err;
+  }
+});
+
 ipcMain.handle('shell:selectFolder', async (_event, defaultPath) => {
   const resolvedDefault = defaultPath && path.isAbsolute(defaultPath)
     ? defaultPath

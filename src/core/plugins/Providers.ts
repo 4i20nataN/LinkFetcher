@@ -432,93 +432,122 @@ export class GenericProvider implements MediaProvider {
   }
 
   async analyze(url: string): Promise<MediaInfo> {
-    try {
-      const metadata = await probeWithYtdlp(url);
-      return buildMediaInfoFromProbe(metadata, url, 'generic');
-    } catch {
-      const domains = ['youtube', 'tiktok', 'instagram', 'facebook', 'x', 'reddit', 'soundcloud', 'spotify', 'twitch', 'pinterest', 'threads', 'vimeo'];
-      let matchedId: PlatformId = 'generic';
-      for (const dom of domains) {
-        if (url.toLowerCase().includes(dom)) {
-          matchedId = dom as PlatformId;
-          break;
-        }
-      }
+    const isImage = /[./](webp|png|jpg|jpeg|gif|bmp|svg|avif|tiff)([?#/]|$)/i.test(url)
+      || url.toLowerCase().includes('image') || url.toLowerCase().includes('photo')
+      || url.toLowerCase().includes('pic') || url.startsWith('data:image/');
 
-      const isAudio = /[./](mp3|wav|ogg|m4a|aac|flac)([?#/]|$)/i.test(url) || url.toLowerCase().includes('audio') || url.toLowerCase().includes('sound');
-      const isVideo = /[./](mp4|webm|mov|mkv)([?#/]|$)/i.test(url) || url.toLowerCase().includes('video') || url.toLowerCase().includes('movie') || url.toLowerCase().includes('clip');
-      const isImage = /[./](webp|png|jpg|jpeg|gif|bmp|svg)([?#/]|$)/i.test(url) || url.toLowerCase().includes('image') || url.toLowerCase().includes('photo') || url.toLowerCase().includes('pic') || url.startsWith('data:image/');
-
-      let type: 'image' | 'audio' | 'video' = 'video';
-      let duration = '02:30';
-      let resolution = '1920x1080';
-      let codec = 'H.264 / AAC';
-      let thumbnailUrl = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=60';
-      let formats: MediaFormat[] = [];
-
-      if (isImage) {
-        type = 'image';
-        duration = 'Imagem';
-        resolution = 'Auto-detectada';
-        codec = 'PNG / JPEG / WebP';
-        thumbnailUrl = url.startsWith('data:') ? url : 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=600&auto=format&fit=crop&q=60';
-        formats = [
-          { id: 'gen_i_png', ext: 'png', quality: 'Formato PNG', sizeEst: 'N/A', sizeBytes: 0, codec: 'png', type: 'image' },
-          { id: 'gen_i_webp', ext: 'webp', quality: 'Formato WebP', sizeEst: 'N/A', sizeBytes: 0, codec: 'webp', type: 'image' },
-          { id: 'gen_i_jpg', ext: 'jpg', quality: 'Formato JPEG', sizeEst: 'N/A', sizeBytes: 0, codec: 'jpeg', type: 'image' }
-        ];
-      } else if (isAudio) {
-        type = 'audio';
-        duration = '03:45';
-        resolution = 'Áudio';
-        codec = 'MP3 / WAV';
-        thumbnailUrl = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=60';
-        formats = [
-          { id: 'gen_a_mp3', ext: 'mp3', quality: 'Qualidade MP3 (320kbps)', sizeEst: 'N/A', sizeBytes: 0, codec: 'mp3', type: 'audio' },
-          { id: 'gen_a_wav', ext: 'wav', quality: 'Qualidade Original (WAV)', sizeEst: 'N/A', sizeBytes: 0, codec: 'pcm', type: 'audio' }
-        ];
-      } else {
-        type = 'video';
-        duration = '02:30';
-        resolution = '1920x1080';
-        codec = 'H.264 / AAC';
-        thumbnailUrl = 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=600&auto=format&fit=crop&q=60';
-        formats = [
-          { id: 'gen_v_hd', ext: 'mp4', quality: 'HD Original', sizeEst: 'N/A', sizeBytes: 0, codec: 'h264 / aac', type: 'video' },
-          { id: 'gen_a_mp3', ext: 'mp3', quality: 'Áudio MP3 (320kbps)', sizeEst: 'N/A', sizeBytes: 0, codec: 'mp3', type: 'audio' }
-        ];
-      }
-
-      let host = 'Servidor Web';
+    // Skip yt-dlp for direct image URLs — it doesn't handle them
+    if (!isImage) {
       try {
-        if (url.startsWith('data:')) {
-          host = 'Data URI';
-        } else {
-          const parsed = new URL(url);
-          host = parsed.hostname.replace('www.', '');
-        }
-      } catch (_) {}
-
-      return {
-        id: 'gen_' + rand(10000, 99999),
-        title: `Conteúdo extraído automaticamente de ${host}`,
-        author: host,
-        channel: host,
-        duration,
-        durationSeconds: 0,
-        resolution,
-        sizeEst: formats[0]?.sizeEst || 'N/A',
-        formats,
-        codec,
-        type,
-        publishDate: 'Não especificado',
-        views: undefined,
-        platform: matchedId,
-        originalUrl: url,
-        thumbnailUrl,
-        status: 'success'
-      };
+        const metadata = await probeWithYtdlp(url);
+        return buildMediaInfoFromProbe(metadata, url, 'generic');
+      } catch { /* fall through to fallback */ }
     }
+
+    const domains = ['youtube', 'tiktok', 'instagram', 'facebook', 'x', 'reddit', 'soundcloud', 'spotify', 'twitch', 'pinterest', 'threads', 'vimeo'];
+    let matchedId: PlatformId = 'generic';
+    for (const dom of domains) {
+      if (url.toLowerCase().includes(dom)) {
+        matchedId = dom as PlatformId;
+        break;
+      }
+    }
+
+    const isAudio = !isImage && /[./](mp3|wav|ogg|m4a|aac|flac)([?#/]|$)/i.test(url) || url.toLowerCase().includes('audio') || url.toLowerCase().includes('sound');
+    const isVideo = !isImage && !isAudio && /[./](mp4|webm|mov|mkv)([?#/]|$)/i.test(url) || url.toLowerCase().includes('video') || url.toLowerCase().includes('movie') || url.toLowerCase().includes('clip');
+
+    let type: 'image' | 'audio' | 'video' = 'video';
+    let duration = '02:30';
+    let resolution = '1920x1080';
+    let codec = 'H.264 / AAC';
+    let thumbnailUrl = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=60';
+    let formats: MediaFormat[] = [];
+
+    if (isImage) {
+      type = 'image';
+      duration = 'Imagem';
+      resolution = 'Detectando...';
+      codec = 'Imagem';
+      thumbnailUrl = url.startsWith('data:') ? url : '';
+
+      // Detect real resolution via Image element
+      try {
+        await new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            resolution = `${img.naturalWidth}\u00d7${img.naturalHeight}`;
+            // Use actual image as thumbnail if we got it
+            if (!thumbnailUrl) thumbnailUrl = url;
+            resolve();
+          };
+          img.onerror = () => {
+            resolution = 'Resolução desconhecida';
+            if (!thumbnailUrl) thumbnailUrl = url;
+            resolve();
+          };
+          img.src = url;
+        });
+      } catch {
+        resolution = 'Resolução desconhecida';
+        thumbnailUrl = url;
+      }
+
+      formats = [
+        { id: 'gen_i_png', ext: 'png', quality: 'Formato PNG', sizeEst: 'N/A', sizeBytes: 0, codec: 'png', type: 'image' },
+        { id: 'gen_i_webp', ext: 'webp', quality: 'Formato WebP', sizeEst: 'N/A', sizeBytes: 0, codec: 'webp', type: 'image' },
+        { id: 'gen_i_jpg', ext: 'jpg', quality: 'Formato JPEG', sizeEst: 'N/A', sizeBytes: 0, codec: 'jpeg', type: 'image' }
+      ];
+    } else if (isAudio) {
+      type = 'audio';
+      duration = '03:45';
+      resolution = 'Áudio';
+      codec = 'MP3 / WAV';
+      thumbnailUrl = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=60';
+      formats = [
+        { id: 'gen_a_mp3', ext: 'mp3', quality: 'Qualidade MP3 (320kbps)', sizeEst: 'N/A', sizeBytes: 0, codec: 'mp3', type: 'audio' },
+        { id: 'gen_a_wav', ext: 'wav', quality: 'Qualidade Original (WAV)', sizeEst: 'N/A', sizeBytes: 0, codec: 'pcm', type: 'audio' }
+      ];
+    } else {
+      type = 'video';
+      duration = '02:30';
+      resolution = '1920x1080';
+      codec = 'H.264 / AAC';
+      thumbnailUrl = 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=600&auto=format&fit=crop&q=60';
+      formats = [
+        { id: 'gen_v_hd', ext: 'mp4', quality: 'HD Original', sizeEst: 'N/A', sizeBytes: 0, codec: 'h264 / aac', type: 'video' },
+        { id: 'gen_a_mp3', ext: 'mp3', quality: 'Áudio MP3 (320kbps)', sizeEst: 'N/A', sizeBytes: 0, codec: 'mp3', type: 'audio' }
+      ];
+    }
+
+    let host = 'Servidor Web';
+    try {
+      if (url.startsWith('data:')) {
+        host = 'Data URI';
+      } else {
+        const parsed = new URL(url);
+        host = parsed.hostname.replace('www.', '');
+      }
+    } catch (_) {}
+
+    return {
+      id: 'gen_' + rand(10000, 99999),
+      title: `Conteúdo extraído automaticamente de ${host}`,
+      author: host,
+      channel: host,
+      duration,
+      durationSeconds: 0,
+      resolution,
+      sizeEst: formats[0]?.sizeEst || 'N/A',
+      formats,
+      codec,
+      type,
+      publishDate: 'Não especificado',
+      views: undefined,
+      platform: matchedId,
+      originalUrl: url,
+      thumbnailUrl,
+      status: 'success'
+    };
   }
 }
 
