@@ -516,46 +516,56 @@ class DownloadEngineClass {
     if (item.format.type === 'image') {
       const originalExt = sourceUrl.split('.').pop()?.split('?')[0]?.toLowerCase() || '';
       const needsConversion = ext.toLowerCase() !== originalExt && originalExt !== '';
+      const hasElectronBridge = typeof window !== 'undefined' && !!(window as any).electron?.invoke;
 
-      if (!needsConversion) {
-        const hasElectronBridge = typeof window !== 'undefined' && !!(window as any).electron?.invoke;
-        if (hasElectronBridge) {
-          try {
-            const result = await (window as any).electron.invoke('download-file-proxy', {
-              url: sourceUrl,
-              filename: `${cleanTitle}.${ext}`,
-              dir: this.settings.defaultDir || undefined,
-            });
-            if (result?.filePath) {
-              this.markCompleted(item);
-              return;
-            }
-          } catch (err: any) {
-            console.warn('[Engine] Electron proxy download failed, falling back:', err);
+      if (!needsConversion && hasElectronBridge) {
+        // Same format — direct save via IPC (fast path, no conversion)
+        try {
+          const result = await (window as any).electron.invoke('download-file-proxy', {
+            url: sourceUrl,
+            filename: `${cleanTitle}.${ext}`,
+            dir: this.settings.defaultDir || undefined,
+          });
+          if (result?.filePath) {
+            this.markCompleted(item);
+            return;
           }
+        } catch (err: any) {
+          console.warn('[Engine] Electron proxy download failed, falling back:', err);
         }
       }
 
-      // Fallback: direct fetch (works in web mode or same-origin)
+      if (needsConversion && hasElectronBridge) {
+        // Different format — fetch via Electron main (no CORS), convert Canvas, save via IPC
+        try {
+          const imgData = await (window as any).electron.invoke('fetch-image-base64', { url: sourceUrl });
+          if (imgData?.base64) {
+            await this.convertAndSaveImageBase64(imgData.base64, imgData.mime || 'image/webp', ext, `${cleanTitle}.${ext}`);
+            this.markCompleted(item);
+            return;
+          }
+        } catch (err: any) {
+          console.warn('[Engine] Electron fetch+convert failed, falling back:', err);
+        }
+      }
+
+      // Fallback: proxy fetch + Canvas + browser download
       try {
         let blob: Blob;
         try {
-          const resp = await fetch(sourceUrl);
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          blob = await resp.blob();
-        } catch {
           const proxyFetchUrl = `/api/proxy-download?url=${encodeURIComponent(sourceUrl)}&filename=tmp`;
           const resp = await fetch(proxyFetchUrl);
           if (!resp.ok) throw new Error(`Proxy HTTP ${resp.status}`);
+          blob = await resp.blob();
+        } catch {
+          const resp = await fetch(sourceUrl);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           blob = await resp.blob();
         }
         await this.convertAndDownloadImageBlob(blob, ext, `${cleanTitle}.${ext}`);
         this.markCompleted(item);
       } catch (e: any) {
-        // Final fallback: browser download
-        const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(sourceUrl)}&filename=${encodeURIComponent(`${cleanTitle}.${ext}`)}`;
-        this.triggerFileSave(proxyUrl, `${cleanTitle}.${ext}`);
-        this.markCompleted(item);
+        this.markFailed(item, 'Falha ao baixar imagem');
       }
       return;
     }
@@ -624,6 +634,42 @@ class DownloadEngineClass {
   // ─────────────────────────────────────────────────────────────────────────
   // Image conversion (canvas-based, runs on user hardware)
   // ─────────────────────────────────────────────────────────────────────────
+  private async convertAndSaveImageBase64(base64: string, mime: string, targetExt: string, filename: string) {
+    const dataUrl = `data:${mime};base64,${base64}`;
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('No 2D context');
+    ctx.drawImage(img, 0, 0);
+
+    const outMimeMap: Record<string, string> = {
+      webp: 'image/webp', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png'
+    };
+    const outMime = outMimeMap[targetExt] || 'image/png';
+
+    const convertedBlob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((b) => resolve(b), outMime, 0.92);
+    });
+    if (!convertedBlob) throw new Error('Canvas conversion failed');
+
+    const arrayBuf = await convertedBlob.arrayBuffer();
+    const convertedBase64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
+    const result = await (window as any).electron.invoke('download-file-proxy', {
+      url: `data:${outMime};base64,${convertedBase64}`,
+      filename,
+      dir: this.settings.defaultDir || undefined,
+    });
+    if (!result?.filePath) throw new Error('Save failed');
+  }
+
   private async convertAndDownloadImageBlob(blob: Blob, targetExt: string, filename: string) {
     try {
       const objectUrl = URL.createObjectURL(blob);

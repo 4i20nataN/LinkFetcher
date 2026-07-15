@@ -124,6 +124,18 @@ ipcMain.handle('download-file', async (_event, { url, filename }) => {
   return { filePath };
 });
 
+// Fetch image as base64 via main process (bypasses CORS entirely)
+ipcMain.handle('fetch-image-base64', async (_event, { url }) => {
+  if (!url) throw new Error('No URL provided');
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const buffer = Buffer.from(await response.arrayBuffer());
+  const ext = url.split('?')[0].split('.').pop()?.toLowerCase() || 'png';
+  const mimeMap = { webp: 'image/webp', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', bmp: 'image/bmp' };
+  const mime = mimeMap[ext] || 'image/png';
+  return { base64: buffer.toString('base64'), mime };
+});
+
 // Image proxy download — saves directly to default downloads folder (no dialog)
 ipcMain.handle('download-file-proxy', async (_event, { url, filename, dir }) => {
   if (!url) throw new Error('No URL provided');
