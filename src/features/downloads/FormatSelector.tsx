@@ -525,7 +525,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
       <div className="rounded-xl bg-zinc-900/40 border border-white/5">
         <button
           onClick={() => toggleSection(id)}
-          className="w-full flex items-center justify-between p-3 text-left hover:bg-white/[0.02] transition-colors"
+          className="w-full flex items-center justify-between p-3 pb-4 text-left hover:bg-white/[0.02] transition-colors"
         >
           <div className="flex items-center gap-2">
             <BlockIcon blockId={blockId} />
