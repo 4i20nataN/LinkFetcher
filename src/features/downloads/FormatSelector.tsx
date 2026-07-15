@@ -674,11 +674,11 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   <span className="text-[10px] text-zinc-600">_</span>
                   <button
                     onClick={() => setUseUnderscore(!useUnderscore)}
-                    className={`relative w-7 h-4 rounded-full transition-colors shrink-0 ${useUnderscore ? 'bg-zinc-600' : 'bg-zinc-800'}`}
+                    className={`relative w-7 h-4 rounded-full transition-colors shrink-0 ${useUnderscore ? accentBg : 'bg-zinc-800'}`}
                   >
                     <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${useUnderscore ? 'left-[14px]' : 'left-0.5'}`} />
                   </button>
-                  <span className="text-[10px] text-zinc-600">espaco</span>
+                  <span className="text-[10px] text-zinc-600">Sem Espaco</span>
                 </div>
               </div>
               <div className="flex items-center justify-end gap-2.5 p-2.5 rounded-lg bg-zinc-900/30 border border-white/5">
