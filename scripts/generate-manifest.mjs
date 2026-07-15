@@ -93,13 +93,34 @@ if (keyPath) {
 }
 // Normalize: fix escaped newlines, strip BOM, trim whitespace
 privKeyPem = privKeyPem.replace(/\\n/g, '\n').replace(/^\uFEFF/, '').trim();
+
+// If key is base64-encoded (no PEM header), decode it
+if (!privKeyPem.includes('-----BEGIN')) {
+  console.log('Key is base64-encoded, decoding...');
+  privKeyPem = Buffer.from(privKeyPem, 'base64').toString('utf-8');
+}
+
 console.log('Key length after normalize:', privKeyPem.length);
 console.log('Key header:', privKeyPem.split('\n')[0]);
+console.log('Key footer:', privKeyPem.split('\n').pop());
+
+// Validate PEM structure
+if (!privKeyPem.includes('-----BEGIN PRIVATE KEY-----')) {
+  console.error('ERROR: PEM does not contain BEGIN PRIVATE KEY header');
+  console.error('First 100 chars:', privKeyPem.slice(0, 100));
+  process.exit(1);
+}
+if (!privKeyPem.includes('-----END PRIVATE KEY-----')) {
+  console.error('ERROR: PEM does not contain END PRIVATE KEY footer');
+  process.exit(1);
+}
+
 const keyObject = createPrivateKey(privKeyPem);
 const manifestBytes = readFileSync('manifest.json');
 const signature = sign(null, manifestBytes, keyObject);
-writeFileSync('manifest.json.sig', signature);
-console.log('manifest.json.sig written (' + signature.length + ' bytes)');
+// Write as base64 (verifyRelease.cjs expects base64-encoded signature)
+writeFileSync('manifest.json.sig', signature.toString('base64'));
+console.log('manifest.json.sig written (' + signature.length + ' bytes base64)');
 
 // Summary
 console.log('\nRelease ' + VERSION + ':');

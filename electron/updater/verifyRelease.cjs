@@ -30,7 +30,7 @@ const PINNED_ASSET_HOSTS = new Set(['github.com', 'objects.githubusercontent.com
 // Private key goes to GitHub Actions secret: UPDATE_SIGNING_PRIVATE_KEY
 const TRUSTED_PUBLIC_KEYS = {
   v1: `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEAoBRLoQlW/H4RPwJ6jIuR7tXUp8Tf0ez1nr7VK/B8guY=
+MCowBQYDK2VwAyEA/b86YtHcdb332WCuUkMzyQ12IdZA5ow760QVTt/DABo=
 -----END PUBLIC KEY-----`,
 };
 
