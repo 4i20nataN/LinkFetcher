@@ -77,13 +77,23 @@ writeFileSync('CHECKSUMS_SHA512.txt', checksums);
 console.log('CHECKSUMS_SHA512.txt written');
 
 // Sign manifest with Ed25519
-let privKeyPem = process.env.UPDATE_SIGNING_PRIVATE_KEY;
-if (!privKeyPem) {
-  console.error('UPDATE_SIGNING_PRIVATE_KEY not set');
-  process.exit(1);
+// Sign manifest with Ed25519
+let privKeyPem;
+const keyPath = process.env.SIGNING_KEY_PATH;
+if (keyPath) {
+  // Read from file (most reliable on GitHub Actions)
+  privKeyPem = readFileSync(keyPath, 'utf-8');
+  console.log('Read key from file:', keyPath);
+} else {
+  // Fallback: from env var
+  const envKey = process.env.UPDATE_SIGNING_PRIVATE_KEY;
+  if (!envKey) {
+    console.error('No signing key found (SIGNING_KEY_PATH or UPDATE_SIGNING_PRIVATE_KEY)');
+    process.exit(1);
+  }
+  privKeyPem = envKey.replace(/\\n/g, '\n');
+  console.log('Read key from env var');
 }
-// GitHub Secrets may pass literal \n instead of real newlines
-privKeyPem = privKeyPem.replace(/\\n/g, '\n');
 console.log('Key starts with:', privKeyPem.slice(0, 30));
 console.log('Key length:', privKeyPem.length);
 console.log('Has BEGIN:', privKeyPem.includes('BEGIN'));
