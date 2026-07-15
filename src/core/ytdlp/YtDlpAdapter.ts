@@ -23,8 +23,13 @@ export const YtDlpAdapter = {
       return (window as any).electron.invoke('yt-dlp-download', params);
     }
     // Fallback: open SSE stream via /api/download/start
-    const qs = new URLSearchParams(params).toString();
-    return fetch(`/api/download/start?${qs}`);
+    const qs = new URLSearchParams();
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        qs.set(key, String(value));
+      }
+    });
+    return fetch(`/api/download/start?${qs.toString()}`);
   },
 
   async cancel(id: string) {

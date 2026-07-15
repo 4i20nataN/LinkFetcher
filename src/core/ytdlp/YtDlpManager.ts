@@ -9,12 +9,53 @@ import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import type { ProbeOptions, SearchOptions, SearchResult, DownloadOptions } from '../../types';
 
 const execFileAsync = promisify(execFile);
 
+const LOG_FILE = path.join(os.homedir(), 'Downloads', 'linkfetcher-debug.log');
+function logDebug(...args: unknown[]) {
+  const line = `[${new Date().toISOString()}] ${args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ')}\n`;
+  try { fs.appendFileSync(LOG_FILE, line); } catch {}
+}
+
 const BINARY_NAME = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
 const FFMPEG_NAME = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+
+function resolveDownloadedFilePath(candidatePath: string, outputDir: string): string {
+  const normalizedCandidates = [candidatePath, outputDir]
+    .filter(Boolean)
+    .map(value => String(value).trim().replace(/^['"]|['"]$/g, ''))
+    .filter(Boolean);
+
+  for (const candidate of normalizedCandidates) {
+    if (!candidate) continue;
+    try {
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+        return candidate;
+      }
+    } catch {
+      // Ignore invalid or transient paths and continue fallback logic.
+    }
+  }
+
+  if (outputDir && fs.existsSync(outputDir)) {
+    try {
+      const files = fs.readdirSync(outputDir)
+        .map(name => path.join(outputDir, name))
+        .filter(filePath => fs.statSync(filePath).isFile())
+        .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+
+      const latestMatch = files.find(filePath => /\.(mp4|webm|mkv|mp3|m4a|wav|ogg|jpg|jpeg|png|gif|webp)$/i.test(filePath));
+      if (latestMatch) return latestMatch;
+    } catch {
+      // Fall back to the original candidate if scanning fails.
+    }
+  }
+
+  return normalizedCandidates[0] || '';
+}
 
 function getBundledBinaryPath(): string {
   const candidates = [
@@ -130,11 +171,14 @@ export function spawnDownload(params: {
   downloadSections?: string;
   sponsorblockRemove?: string;
   fpsMax?: number;
+  customFilename?: string;
   onProgress: (data: { percent: number; speed: string; eta: string; filename?: string }) => void;
   onComplete: (filePath: string) => void;
   onError: (err: string) => void;
 }): () => void {
   const ffmpegPath = getFfmpegPath();
+  const outputDir = params.outputDir || path.join(process.cwd(), 'downloads');
+  fs.mkdirSync(outputDir, { recursive: true });
   const cleanTitle = (params.url.match(/(?:v=|\/)([\w-]{11})/)?.[1]) || 'download';
 
   const args = [
@@ -143,6 +187,7 @@ export function spawnDownload(params: {
     '--newline',
     '--progress',
     '--no-mtime',
+    '--windows-filenames',
   ];
 
   // Build final format string by applying transformations
@@ -156,11 +201,13 @@ export function spawnDownload(params: {
       .replace(/\/b/g, '') || 'bv*';
   }
 
-  if (params.fpsMax && params.fpsMax > 0) {
-    finalFormat = finalFormat.replace(/\[ext=\w+\]/g, `[ext=mp4][fps<=${params.fpsMax}]`);
-  }
+  // fpsMax is handled via --format-sort after --format is pushed
 
   args.push('--format', finalFormat);
+
+  if (params.fpsMax && params.fpsMax > 0) {
+    args.push('--format-sort', `fps:${params.fpsMax}`);
+  }
 
   if (params.audioOnly) {
     args.push('--extract-audio');
@@ -204,25 +251,31 @@ export function spawnDownload(params: {
     args.push('--retries', String(params.retries));
   }
 
-  const outputTemplate = path.join(params.outputDir, '%(title)s.%(ext)s');
+  const outputTemplate = params.customFilename
+    ? path.join(outputDir, `${params.customFilename}.%(ext)s`)
+    : path.join(outputDir, '%(title)s.%(ext)s');
   args.push('-o', outputTemplate);
 
   if (ffmpegPath) args.push('--ffmpeg-location', ffmpegPath);
 
   args.push(params.url);
 
+  logDebug('[yt-dlp spawnDownload] FINAL ARGS:', JSON.stringify(args, null, 2));
+
   let proc: ReturnType<typeof spawn> | null = null;
   let killed = false;
 
   (async () => {
     try {
-      const binary = await ensureYtDlp(msg => console.log(msg));
+      const binary = await ensureYtDlp(msg => logDebug(msg));
       proc = spawn(binary, args);
 
       let lastFile = '';
 
       proc.stdout?.on('data', (chunk: Buffer) => {
-        const lines = chunk.toString().split('\n');
+        const raw = chunk.toString();
+        logDebug('[yt-dlp stdout]', raw);
+        const lines = raw.split('\n');
         for (const line of lines) {
           const progressMatch = line.match(/\[download\]\s+([\d.]+)%\s+of\s+[\d.]+\S+\s+at\s+([\d.]+\S+)\/s\s+ETA\s+(\S+)/);
           if (progressMatch) {
@@ -248,15 +301,21 @@ export function spawnDownload(params: {
 
       proc.stderr?.on('data', (chunk: Buffer) => {
         const text = chunk.toString();
+        logDebug('[yt-dlp stderr]', text);
         if (text.includes('ERROR') || text.includes('error')) {
-          console.warn('[yt-dlp stderr]', text.trim());
+          logDebug('[yt-dlp stderr] WARNING:', text.trim());
         }
       });
 
       proc.on('close', (code) => {
+        logDebug(`[yt-dlp close] exit code: ${code}, lastFile: "${lastFile}"`);
         if (killed) return;
         if (code === 0) {
-          params.onComplete(lastFile);
+          setTimeout(() => {
+            const resolvedPath = resolveDownloadedFilePath(lastFile, params.outputDir);
+            logDebug(`[yt-dlp close] resolvedPath: "${resolvedPath}", lastFile: "${lastFile}", outputDir: "${params.outputDir}"`);
+            params.onComplete(resolvedPath);
+          }, 250);
         } else {
           params.onError(`yt-dlp exited with code ${code}`);
         }
@@ -405,7 +464,7 @@ export function buildArgs(options: DownloadOptions): string[] {
   }
 
   if (options.fpsMax && options.fpsMax > 0) {
-    finalFormat = finalFormat.replace(/\[ext=\w+\]/g, `[ext=mp4][fps<=${options.fpsMax}]`);
+    args.push('--format-sort', `fps:${options.fpsMax}`);
   }
 
   args.push('--format', finalFormat);
@@ -445,6 +504,9 @@ export function buildArgs(options: DownloadOptions): string[] {
   if (options.restrictFilenames) args.push('--restrict-filenames');
   if (options.noOverwrites) args.push('--no-overwrites');
   if (options.keepVideo) args.push('--keep-video');
+
+  // Windows compatibility
+  if (process.platform === 'win32') args.push('--windows-filenames');
 
   // Download sections (trim/cut)
   if (options.downloadSections) {

@@ -32,8 +32,9 @@ class DownloadEngineClass {
   private settings: AppSettings = {
     themeMode: 'dark',
     accentColor: 'emerald',
+    iconStyle: 'lucide-mono',
     language: 'pt',
-    defaultDir: 'Downloads',
+    defaultDir: '',
     bandLimit: 0,
     maxConcurrent: 3,
     wifiOnly: false,
@@ -132,7 +133,7 @@ class DownloadEngineClass {
       writeThumbnail: formatOptions?.writeThumbnail,
       embedThumbnail: formatOptions?.embedThumbnail,
       embedMetadata: formatOptions?.embedMetadata,
-      mergeOutputFormat: formatOptions?.audioOnly ? formatOptions.audioFormat : undefined,
+      mergeOutputFormat: formatOptions?.videoFormat || undefined,
       concurrentFragments: formatOptions?.concurrentFragments,
       retries: formatOptions?.retries,
       restrictFilenames: formatOptions?.restrictFilenames,
@@ -142,6 +143,8 @@ class DownloadEngineClass {
       downloadSections: formatOptions?.downloadSections,
       sponsorblockRemove: formatOptions?.sponsorblockRemove,
       fpsMax: formatOptions?.fpsMax,
+      bandLimit: formatOptions?.bandLimit,
+      customFilename: formatOptions?.customFilename,
       sizeTotal,
       sizeDownloaded: 0,
       progress: 0,
@@ -341,6 +344,7 @@ class DownloadEngineClass {
         url: item.url,
         title: item.title,
         format: item.formatString || item.format.id,
+        outputDir: this.settings.defaultDir || undefined,
         audioOnly: isAudio,
         audioFormat: item.audioFormat || (isAudio ? 'mp3' : undefined),
         audioQuality: item.audioQuality,
@@ -356,13 +360,14 @@ class DownloadEngineClass {
         restrictFilenames: item.restrictFilenames,
         concurrentFragments: item.concurrentFragments,
         retries: item.retries,
-        bandLimit: this.settings.bandLimit || 0,
+        bandLimit: item.bandLimit || 0,
         noOverwrites: item.noOverwrites,
         keepVideo: item.keepVideo,
         videoOnly: item.videoOnly,
         downloadSections: item.downloadSections,
         sponsorblockRemove: item.sponsorblockRemove,
         fpsMax: item.fpsMax,
+        customFilename: item.customFilename,
       }).catch((err: any) => {
         const target = this.items.find(i => i.id === item.id);
         if (target) {
@@ -385,13 +390,31 @@ class DownloadEngineClass {
       id: item.id,
       url: encodeURIComponent(item.url),
       title: item.title,
-      bandLimit: String(this.settings.bandLimit || 0),
+      bandLimit: String(item.bandLimit || 0),
     });
     if (item.formatString) params.set('formatStr', item.formatString);
     if (isAudio) params.set('isAudio', '1');
     if (item.audioFormat) params.set('audioFormat', item.audioFormat);
+    if (item.audioQuality) params.set('audioQuality', item.audioQuality);
     if (item.writeSubs) params.set('writeSubs', '1');
+    if (item.writeAutoSubs) params.set('writeAutoSubs', '1');
     if (item.subLangs) params.set('subLangs', item.subLangs);
+    if (item.subFormat) params.set('subFormat', item.subFormat);
+    if (item.embedSubs) params.set('embedSubs', '1');
+    if (item.writeThumbnail) params.set('writeThumbnail', '1');
+    if (item.embedThumbnail) params.set('embedThumbnail', '1');
+    if (item.embedMetadata) params.set('embedMetadata', '1');
+    if (item.mergeOutputFormat) params.set('mergeOutputFormat', item.mergeOutputFormat);
+    if (item.restrictFilenames) params.set('restrictFilenames', '1');
+    if (item.noOverwrites) params.set('noOverwrites', '1');
+    if (item.keepVideo) params.set('keepVideo', '1');
+    if (item.videoOnly) params.set('videoOnly', '1');
+    if (item.downloadSections) params.set('downloadSections', item.downloadSections);
+    if (item.sponsorblockRemove) params.set('sponsorblockRemove', item.sponsorblockRemove);
+    if (item.fpsMax) params.set('fpsMax', String(item.fpsMax));
+    if (item.concurrentFragments) params.set('concurrentFragments', String(item.concurrentFragments));
+    if (item.retries) params.set('retries', String(item.retries));
+    if (item.customFilename) params.set('customFilename', item.customFilename);
 
     const es = new EventSource(`/api/download/start?${params.toString()}`);
     this.eventSources.set(item.id, es);
@@ -460,7 +483,7 @@ class DownloadEngineClass {
   private openFileLocation(filePath: string) {
     const hasElectronBridge = typeof window !== 'undefined' && !!(window as any).electron?.invoke;
     if (hasElectronBridge && filePath) {
-      (window as any).electron.invoke('shell:openPath', filePath).catch(() => {});
+      (window as any).electron.invoke('shell:openPath', filePath).catch((err) => console.warn('Failed to open file location:', err));
     }
   }
 
@@ -488,29 +511,61 @@ class DownloadEngineClass {
       return;
     }
 
-    // For images: fetch, convert via canvas, then save
+    // For images: try Electron IPC proxy first (bypasses CORS, saves to default folder)
+    // Only use proxy when formats match (no conversion needed) — otherwise skip to Canvas
     if (item.format.type === 'image') {
+      const originalExt = sourceUrl.split('.').pop()?.split('?')[0]?.toLowerCase() || '';
+      const needsConversion = ext.toLowerCase() !== originalExt && originalExt !== '';
+      const hasElectronBridge = typeof window !== 'undefined' && !!(window as any).electron?.invoke;
+
+      if (!needsConversion && hasElectronBridge) {
+        // Same format — direct save via IPC (fast path, no conversion)
+        try {
+          const result = await (window as any).electron.invoke('download-file-proxy', {
+            url: sourceUrl,
+            filename: `${cleanTitle}.${ext}`,
+            dir: this.settings.defaultDir || undefined,
+          });
+          if (result?.filePath) {
+            this.markCompleted(item);
+            return;
+          }
+        } catch (err: any) {
+          console.warn('[Engine] Electron proxy download failed, falling back:', err);
+        }
+      }
+
+      if (needsConversion && hasElectronBridge) {
+        // Different format — fetch via Electron main (no CORS), convert Canvas, save via IPC
+        try {
+          const imgData = await (window as any).electron.invoke('fetch-image-base64', { url: sourceUrl });
+          if (imgData?.base64) {
+            await this.convertAndSaveImageBase64(imgData.base64, imgData.mime || 'image/webp', ext, `${cleanTitle}.${ext}`);
+            this.markCompleted(item);
+            return;
+          }
+        } catch (err: any) {
+          console.warn('[Engine] Electron fetch+convert failed, falling back:', err);
+        }
+      }
+
+      // Fallback: proxy fetch + Canvas + browser download
       try {
         let blob: Blob;
         try {
-          // Try direct fetch first (works in Electron / same-origin)
-          const resp = await fetch(sourceUrl);
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          blob = await resp.blob();
-        } catch {
-          // CORS or network error — fetch through server proxy
           const proxyFetchUrl = `/api/proxy-download?url=${encodeURIComponent(sourceUrl)}&filename=tmp`;
           const resp = await fetch(proxyFetchUrl);
           if (!resp.ok) throw new Error(`Proxy HTTP ${resp.status}`);
+          blob = await resp.blob();
+        } catch {
+          const resp = await fetch(sourceUrl);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           blob = await resp.blob();
         }
         await this.convertAndDownloadImageBlob(blob, ext, `${cleanTitle}.${ext}`);
         this.markCompleted(item);
       } catch (e: any) {
-        // Final fallback: trigger browser download without conversion
-        const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(sourceUrl)}&filename=${encodeURIComponent(`${cleanTitle}.${ext}`)}`;
-        this.triggerFileSave(proxyUrl, `${cleanTitle}.${ext}`);
-        this.markCompleted(item);
+        this.markFailed(item, 'Falha ao baixar imagem');
       }
       return;
     }
@@ -579,10 +634,42 @@ class DownloadEngineClass {
   // ─────────────────────────────────────────────────────────────────────────
   // Image conversion (canvas-based, runs on user hardware)
   // ─────────────────────────────────────────────────────────────────────────
+  private async convertAndSaveImageBase64(base64: string, mime: string, targetExt: string, filename: string) {
+    const dataUrl = `data:${mime};base64,${base64}`;
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('No 2D context');
+    ctx.drawImage(img, 0, 0);
+
+    const outMimeMap: Record<string, string> = {
+      webp: 'image/webp', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png'
+    };
+    const outMime = outMimeMap[targetExt] || 'image/png';
+
+    const convertedDataUrl = canvas.toDataURL(outMime, 0.92);
+
+    const result = await (window as any).electron.invoke('save-image-dataurl', {
+      dataUrl: convertedDataUrl,
+      filename,
+      dir: this.settings.defaultDir || undefined,
+    });
+    if (!result?.filePath) throw new Error('Save failed');
+  }
+
   private async convertAndDownloadImageBlob(blob: Blob, targetExt: string, filename: string) {
     try {
       const objectUrl = URL.createObjectURL(blob);
       const img = new Image();
+      img.crossOrigin = 'anonymous';
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve();
         img.onerror = reject;
@@ -602,14 +689,33 @@ class DownloadEngineClass {
       };
       const mime = mimeMap[targetExt] || 'image/png';
 
-      await new Promise<void>((resolve, reject) => {
-        canvas.toBlob((convertedBlob) => {
-          if (!convertedBlob) return reject(new Error('Conversion failed'));
-          this.downloadBlob(convertedBlob, filename);
-          resolve();
-        }, mime, 0.92);
+      const convertedBlob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((b) => resolve(b), mime, 0.92);
       });
-    } catch {
+      if (!convertedBlob) throw new Error('Canvas conversion failed');
+
+      // Try Electron IPC proxy to save directly to Downloads folder
+      const hasElectronBridge = typeof window !== 'undefined' && !!(window as any).electron?.invoke;
+      if (hasElectronBridge) {
+        try {
+          const arrayBuf = await convertedBlob.arrayBuffer();
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
+          const dataUrl = `data:${mime};base64,${base64}`;
+          const result = await (window as any).electron.invoke('download-file-proxy', {
+            url: dataUrl,
+            filename,
+            dir: this.settings.defaultDir || undefined,
+          });
+          if (result?.filePath) return;
+        } catch (err) {
+          console.warn('[Engine] Electron IPC save failed, falling back to browser:', err);
+        }
+      }
+
+      // Fallback: browser download
+      this.downloadBlob(convertedBlob, filename);
+    } catch (err) {
+      console.warn('[Engine] Canvas conversion failed, downloading original:', err);
       this.downloadBlob(blob, filename);
     }
   }

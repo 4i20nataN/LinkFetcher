@@ -74,7 +74,7 @@ async function main() {
   // 3) Start Electron
   console.log('[electron-dev] Starting Electron...');
   const electronBin = require('electron');
-  const electron = spawn(electronBin, ['electron/main.cjs'], {
+  const electron = spawn(electronBin, ['--remote-debugging-port=9222', 'electron/main.cjs'], {
     cwd: projectRoot,
     stdio: 'inherit',
     env: {

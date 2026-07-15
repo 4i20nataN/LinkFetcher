@@ -54,6 +54,7 @@ export const LinkAnalyzer: React.FC = () => {
     videoOnly: false,
     sponsorblockRemove: '',
     fpsMax: 0,
+    bandLimit: 0,
   });
 
   // Auto-analyze URL from search / download later trigger
@@ -108,6 +109,7 @@ export const LinkAnalyzer: React.FC = () => {
       videoOnly: false,
       sponsorblockRemove: '',
       fpsMax: 0,
+      bandLimit: 0,
     });
     setSuccessMsg(null);
     setProbeError(null);
@@ -159,7 +161,6 @@ export const LinkAnalyzer: React.FC = () => {
       const text = await navigator.clipboard.readText();
       if (text) {
         setUrl(text);
-        handleSubmit();
       }
     } catch (e) {
       setError(settings.language === 'en' ? 'Clipboard permission was denied. Type or paste manually.' : 'A permissão de área de transferência foi negada. Digite ou cole o link manualmente.');
@@ -167,7 +168,10 @@ export const LinkAnalyzer: React.FC = () => {
   };
 
   const handleStartDownload = () => {
-    if (!mediaInfo || !selectedFormat) return;
+    if (!mediaInfo || !selectedFormat) {
+      setError(settings.language === 'en' ? 'No format selected. Please wait for analysis to complete.' : 'Nenhum formato selecionado. Aguarde a analise completar.');
+      return;
+    }
 
     DownloadEngine.addDownload(
       mediaInfo,
@@ -217,8 +221,14 @@ export const LinkAnalyzer: React.FC = () => {
       const filename = `thumbnail_${mediaInfo.id || 'media'}.jpg`;
       const hasElectronBridge = typeof window !== 'undefined' && !!(window as any).electron?.invoke;
       if (hasElectronBridge) {
-        // In Electron, open the thumbnail in the default browser (user can save)
-        await (window as any).electron.invoke('shell:openExternal', mediaInfo.thumbnailUrl);
+        const result = await (window as any).electron.invoke('download-file', {
+          url: mediaInfo.thumbnailUrl,
+          filename,
+        });
+        if (result?.canceled) {
+          setSuccessMsg(null);
+          return;
+        }
       } else {
         const proxiedUrl = `/api/proxy-download?url=${encodeURIComponent(mediaInfo.thumbnailUrl)}&filename=${encodeURIComponent(filename)}`;
         const a = document.createElement('a');
@@ -233,7 +243,7 @@ export const LinkAnalyzer: React.FC = () => {
       setSuccessMsg(settings.language === 'en' ? 'Thumbnail downloaded successfully!' : 'Capa baixada com sucesso!');
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err) {
-      console.warn('Error downloading thumbnail via server proxy:', err);
+      console.warn('Error downloading thumbnail:', err);
       setSuccessMsg(settings.language === 'en' ? 'Failed to download thumbnail' : 'Falha ao baixar capa');
       setTimeout(() => setSuccessMsg(null), 3000);
     }
@@ -274,7 +284,30 @@ export const LinkAnalyzer: React.FC = () => {
             />
             {url && (
               <button
-                onClick={() => setUrl('')}
+                onClick={() => {
+                  setUrl('');
+                  setMediaInfo(null);
+                  setSelectedFormat(null);
+                  setProbeError(null);
+                  setFormatOptions({
+                    format: 'bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b',
+                    audioOnly: false,
+                    audioFormat: 'mp3',
+                    audioQuality: '0',
+                    writeSubs: false,
+                    writeAutoSubs: false,
+                    subLangs: 'en',
+                    subFormat: 'srt',
+                    embedSubs: false,
+                    writeThumbnail: false,
+                    embedThumbnail: false,
+                    embedMetadata: true,
+                    videoOnly: false,
+                    sponsorblockRemove: '',
+                    fpsMax: 0,
+                    bandLimit: 0,
+                  });
+                }}
                 className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-white/5 text-zinc-400 hover:text-white transition-colors"
               >
                 <Trash2 size={16} />
@@ -500,6 +533,7 @@ export const LinkAnalyzer: React.FC = () => {
                 mediaInfo={mediaInfo}
                 onFormatSelect={setFormatOptions}
                 onFormatChange={setSelectedFormat}
+                formatOptions={formatOptions}
               />
             </div>
 

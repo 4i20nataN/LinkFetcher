@@ -1,14 +1,25 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MediaInfo, MediaFormat } from '../../types';
-import { getAccentBgClass, getAccentTextClass, getAccentBorderClass } from '../../components/ThemeWrapper';
+import { getAccentBgClass, getAccentTextClass, getAccentBorderClass, getAccentTextOnBgClass } from '../../components/ThemeWrapper';
+import { BlockIcon, BlockTitle, BlockId } from '../../components/BlockIcon';
 import { motion, AnimatePresence } from 'motion/react';
-import { FileVideo, SlidersHorizontal, ChevronDown, ChevronUp, Info, Scissors, Shield, Gauge } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info } from 'lucide-react';
+
+const isWebMode = typeof window !== 'undefined' && !window.electron;
+
+const DesktopOnlyTag: React.FC = () => (
+  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-zinc-800 text-zinc-500 border border-zinc-700">
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+    Desktop
+  </span>
+);
 
 interface FormatSelectorProps {
   mediaInfo: MediaInfo;
   onFormatSelect: (options: FormatOptions) => void;
   onFormatChange?: (format: MediaFormat) => void;
+  formatOptions?: FormatOptions;
 }
 
 export interface FormatOptions {
@@ -33,6 +44,10 @@ export interface FormatOptions {
   downloadSections?: string;
   sponsorblockRemove?: string;
   fpsMax?: number;
+  bandLimit?: number; // KB/s, 0 = unlimited
+  videoCodec?: string; // '', 'h264', 'h265', 'vp9', 'av01'
+  videoFormat?: string; // 'mp4', 'mkv', 'webm', 'avi', 'flv', 'mov', 'ts'
+  customFilename?: string;
 }
 
 const VIDEO_PRESETS = [
@@ -45,7 +60,14 @@ const VIDEO_PRESETS = [
   { id: '360p', label: '360p', height: 360, format: 'bv*[height<=360][ext=mp4]+ba[ext=m4a]/b[height<=360]' },
 ] as const;
 
-const VIDEO_FORMATS = ['mp4', 'mkv', 'webm'] as const;
+const VIDEO_FORMATS = ['mp4', 'mkv', 'webm', 'avi', 'flv', 'mov', 'ts'] as const;
+const VIDEO_CODECS = [
+  { id: '', label: 'Auto' },
+  { id: 'h264', label: 'H.264' },
+  { id: 'h265', label: 'H.265' },
+  { id: 'vp9', label: 'VP9' },
+  { id: 'av01', label: 'AV1' },
+] as const;
 const AUDIO_FORMATS = [
   { id: 'mp3', label: 'MP3' },
   { id: 'aac', label: 'AAC' },
@@ -119,11 +141,12 @@ function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, accentBg, 
   const effectiveEnd = endSeconds || durationSeconds;
 
   const startPct = (startSeconds / maxVal) * 100;
-  const endPct = ((endSeconds || durationSeconds) / maxVal) * 100;
+  const endPct = (effectiveEnd / maxVal) * 100;
 
   const [inputStart, setInputStart] = useState(formatTime(startSeconds));
   const [inputEnd, setInputEnd] = useState(endSeconds > 0 ? formatTime(endSeconds) : '');
   const [inputFocused, setInputFocused] = useState<'start' | 'end' | null>(null);
+  const [dragging, setDragging] = useState<'start' | 'end' | null>(null);
 
   useEffect(() => {
     if (inputFocused !== 'start') setInputStart(formatTime(startSeconds));
@@ -147,20 +170,49 @@ function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, accentBg, 
     setInputFocused(null);
   };
 
+  const updateFromClientX = useCallback((which: 'start' | 'end', clientX: number) => {
+    const track = document.querySelector('[data-time-range-track]') as HTMLElement;
+    if (!track) return;
+    const rect = track.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const val = Math.round(pct * maxVal);
+    if (which === 'start') {
+      const maxAllowed = effectiveEnd > 0 ? effectiveEnd - 1 : maxVal;
+      if (val <= maxAllowed) onChange(val, endSeconds);
+    } else {
+      const minAllowed = startSeconds + 1;
+      if (val >= minAllowed) onChange(startSeconds, val >= durationSeconds ? 0 : val);
+    }
+  }, [maxVal, effectiveEnd, durationSeconds, endSeconds, startSeconds, onChange]);
+
+  useEffect(() => {
+    if (!dragging) return;
+    const mouseMove = (e: MouseEvent) => { e.preventDefault(); updateFromClientX(dragging, e.clientX); };
+    const mouseUp = () => setDragging(null);
+    const touchMove = (e: TouchEvent) => { e.preventDefault(); updateFromClientX(dragging, e.touches[0].clientX); };
+    const touchEnd = () => setDragging(null);
+    window.addEventListener('mousemove', mouseMove);
+    window.addEventListener('mouseup', mouseUp);
+    window.addEventListener('touchmove', touchMove, { passive: false });
+    window.addEventListener('touchend', touchEnd);
+    return () => {
+      window.removeEventListener('mousemove', mouseMove);
+      window.removeEventListener('mouseup', mouseUp);
+      window.removeEventListener('touchmove', touchMove);
+      window.removeEventListener('touchend', touchEnd);
+    };
+  }, [dragging, updateFromClientX]);
+
   const cutDuration = effectiveEnd > startSeconds ? effectiveEnd - startSeconds : 0;
 
   return (
     <div className="space-y-3">
-      {/* Slider track */}
-      <div className="relative h-6 flex items-center select-none">
-        {/* Background track */}
+      <div className="relative h-6 flex items-center select-none" data-time-range-track>
         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 rounded-full bg-zinc-800" />
-        {/* Selected region */}
         <div
           className={`absolute top-1/2 -translate-y-1/2 h-1 rounded-full ${accentBg}`}
-          style={{ left: `${startPct}%`, width: `${endPct - startPct}%` }}
+          style={{ left: `${startPct}%`, width: `${Math.max(0, endPct - startPct)}%` }}
         />
-        {/* Start handle */}
         <input
           type="range"
           min={0}
@@ -169,30 +221,63 @@ function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, accentBg, 
           value={startSeconds}
           onChange={e => {
             const val = parseInt(e.target.value);
-            if (val < (endSeconds || durationSeconds)) onChange(val, endSeconds);
+            const maxAllowed = effectiveEnd > 0 ? effectiveEnd - 1 : maxVal;
+            if (val <= maxAllowed) onChange(val, endSeconds);
           }}
-          className="range-slider absolute inset-0"
-          style={{ zIndex: 3 }}
+          className="absolute inset-0 opacity-0 pointer-events-none"
+          tabIndex={-1}
+          aria-label="Início do recorte"
         />
-        {/* End handle */}
         <input
           type="range"
           min={0}
           max={maxVal}
           step={1}
-          value={endSeconds || durationSeconds}
+          value={effectiveEnd}
           onChange={e => {
             const val = parseInt(e.target.value);
-            if (val > startSeconds) onChange(startSeconds, val >= durationSeconds ? 0 : val);
+            const minAllowed = startSeconds + 1;
+            if (val >= minAllowed) onChange(startSeconds, val >= durationSeconds ? 0 : val);
           }}
-          className="range-slider absolute inset-0"
-          style={{ zIndex: 4 }}
+          className="absolute inset-0 opacity-0 pointer-events-none"
+          tabIndex={-1}
+          aria-label="Fim do recorte"
+        />
+        <button
+          type="button"
+          onMouseDown={e => { e.preventDefault(); setDragging('start'); }}
+          onTouchStart={e => { setDragging('start'); }}
+          onKeyDown={e => {
+            if (e.key === 'ArrowLeft') { e.preventDefault(); onChange(Math.max(0, startSeconds - 1), endSeconds); }
+            if (e.key === 'ArrowRight') { e.preventDefault(); const maxAllowed = effectiveEnd > 0 ? effectiveEnd - 1 : maxVal; if (startSeconds + 1 <= maxAllowed) onChange(startSeconds + 1, endSeconds); }
+          }}
+          className="absolute top-1/2 w-4 h-4 rounded-full bg-white border-2 border-zinc-300 shadow-lg transition-transform hover:scale-125 active:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-zinc-900"
+          style={{ left: `${startPct}%`, transform: 'translate(-50%, -50%)', zIndex: 4 }}
+          aria-label="Início do recorte"
+          aria-valuemin={0}
+          aria-valuemax={maxVal}
+          aria-valuenow={startSeconds}
+          tabIndex={0}
+        />
+        <button
+          type="button"
+          onMouseDown={e => { e.preventDefault(); setDragging('end'); }}
+          onTouchStart={e => { setDragging('end'); }}
+          onKeyDown={e => {
+            if (e.key === 'ArrowLeft') { e.preventDefault(); const minAllowed = startSeconds + 1; if (effectiveEnd - 1 >= minAllowed) onChange(startSeconds, effectiveEnd - 1); }
+            if (e.key === 'ArrowRight') { e.preventDefault(); if (effectiveEnd < maxVal) onChange(startSeconds, effectiveEnd + 1 >= durationSeconds ? 0 : effectiveEnd + 1); }
+          }}
+          className="absolute top-1/2 w-4 h-4 rounded-full bg-white border-2 border-zinc-300 shadow-lg transition-transform hover:scale-125 active:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-zinc-900"
+          style={{ left: `${endPct}%`, transform: 'translate(-50%, -50%)', zIndex: 4 }}
+          aria-label="Fim do recorte"
+          aria-valuemin={0}
+          aria-valuemax={maxVal}
+          aria-valuenow={effectiveEnd}
+          tabIndex={0}
         />
       </div>
 
-      {/* Timestamps + inputs row */}
       <div className="flex items-center gap-2">
-        {/* Start input */}
         <input
           type="text"
           value={inputStart}
@@ -204,7 +289,6 @@ function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, accentBg, 
           placeholder="00:00"
         />
         <span className="text-zinc-600 text-xs">-</span>
-        {/* End input */}
         <input
           type="text"
           value={inputEnd}
@@ -215,7 +299,6 @@ function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, accentBg, 
           className="w-16 px-2 py-1.5 rounded-lg bg-zinc-900 border border-white/5 text-[11px] font-mono text-white text-center placeholder-zinc-600 focus:outline-none focus:border-white/15"
           placeholder="fim"
         />
-        {/* Cut duration */}
         {cutDuration > 0 && (
           <span className="ml-auto text-[10px] text-zinc-500 font-mono">
             {formatTime(cutDuration)}
@@ -226,7 +309,7 @@ function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, accentBg, 
   );
 }
 
-export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: FormatSelectorProps) {
+export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, formatOptions }: FormatSelectorProps) {
   const { settings, updateSettings } = useApp();
   const [activeTab, setActiveTab] = useState<TabId>('media');
   const [showSubs, setShowSubs] = useState(false);
@@ -234,7 +317,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
 
   const maxRes = useMemo(() => getMaxVideoHeight(mediaInfo.formats), [mediaInfo.formats]);
 
-  const [options, setOptions] = useState<FormatOptions>({
+  const [options, setOptions] = useState<FormatOptions>(() => ({
     format: VIDEO_PRESETS[0].format,
     audioOnly: false,
     audioFormat: 'mp3',
@@ -255,32 +338,31 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
     videoOnly: false,
     sponsorblockRemove: '',
     fpsMax: 0,
-  });
+    bandLimit: 0,
+    videoCodec: '',
+    customFilename: '',
+    ...formatOptions,
+  }));
 
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
 
-  // Find the best matching MediaFormat from probe results based on current options
   const findMatchingFormat = useCallback((): MediaFormat | null => {
     const formats = mediaInfo.formats;
     if (!formats.length) return null;
 
     if (options.audioOnly) {
-      // For audio-only, find best audio format
       const audioFormats = formats.filter(f => f.type === 'audio');
       if (audioFormats.length) {
-        // Prefer the format matching audioFormat if specified
         const preferred = audioFormats.find(f => f.ext === options.audioFormat);
         return preferred || audioFormats.reduce((best, f) => (f.sizeBytes > best.sizeBytes ? f : best), audioFormats[0]);
       }
       return formats[0];
     }
 
-    // For video, find format matching the resolution preset
     const targetHeight = VIDEO_PRESETS.find(p => p.format === options.format)?.height;
     if (targetHeight && targetHeight !== Infinity) {
       const videoFormats = formats.filter(f => f.type === 'video');
-      // Find format with height <= targetHeight, preferring highest
       const matching = videoFormats
         .filter(f => {
           const m = f.quality.match(/(\d+)/);
@@ -292,17 +374,14 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
           return parseInt(hb, 10) - parseInt(ha, 10);
         });
       if (matching.length) return matching[0];
-      // Fallback to highest available
       if (videoFormats.length) return videoFormats.sort((a, b) => b.sizeBytes - a.sizeBytes)[0];
     }
 
-    // 'best' preset or fallback - return highest quality video+audio combination
     const videoFormats = formats.filter(f => f.type === 'video');
     if (videoFormats.length) return videoFormats.sort((a, b) => b.sizeBytes - a.sizeBytes)[0];
     return formats[0];
   }, [mediaInfo.formats, options.format, options.audioOnly, options.audioFormat]);
 
-  // Notify parent when matching format changes
   useEffect(() => {
     if (onFormatChange) {
       const fmt = findMatchingFormat();
@@ -331,29 +410,40 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
   const accentBg = getAccentBgClass(settings).split(' ')[0];
   const accentText = getAccentTextClass(settings);
   const accentBorder = getAccentBorderClass(settings).split(' ')[0];
+  const accentTextOnBg = getAccentTextOnBgClass(settings);
 
   const isImage = mediaInfo.type === 'image';
 
-  // ── Image-only simplified picker ──
   if (isImage) {
     const imageFormats = mediaInfo.formats.filter(f => f.type === 'image');
+    const origExt = mediaInfo.originalUrl?.split('.').pop()?.split('?')[0]?.toLowerCase() || '';
     return (
       <div className="space-y-3">
-        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-zinc-900/40 border border-white/5">
-          <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/5 bg-zinc-950 shrink-0">
-            <img src={mediaInfo.thumbnailUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+        {/* Preview card */}
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-zinc-900/40 border border-white/5">
+          <div className="w-16 h-16 rounded-lg overflow-hidden border border-white/10 bg-zinc-950 shrink-0">
+            <img src={mediaInfo.thumbnailUrl || mediaInfo.originalUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" crossOrigin="anonymous" />
           </div>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 space-y-1">
             <p className="text-[11px] font-semibold text-white truncate">{mediaInfo.title}</p>
-            <p className="text-[10px] text-zinc-500 font-mono">{mediaInfo.resolution || 'Imagem'}{mediaInfo.sizeEst !== 'N/A' ? ` • ${mediaInfo.sizeEst}` : ''}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] text-zinc-400 font-mono">{mediaInfo.resolution || 'Imagem'}</span>
+              {origExt && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-zinc-800 text-zinc-400 uppercase">{origExt}</span>
+              )}
+              {mediaInfo.sizeEst !== 'N/A' && (
+                <span className="text-[10px] text-zinc-500">{mediaInfo.sizeEst}</span>
+              )}
+            </div>
           </div>
         </div>
 
         {imageFormats.length > 0 && (
-          <div className="space-y-2">
-            <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">
-              {settings.language === 'en' ? 'Format' : 'Formato'}
-            </label>
+          <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
+            <div className="flex items-center gap-2">
+              <BlockIcon blockId="resolution" />
+              <BlockTitle>{settings.language === 'en' ? 'Convert to' : 'Converter para'}</BlockTitle>
+            </div>
             <div className="grid grid-cols-3 gap-1.5">
               {imageFormats.map(fmt => (
                 <button
@@ -372,22 +462,24 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
                 </button>
               ))}
             </div>
+            <p className="text-[9px] text-zinc-600 italic">A conversão é feita localmente via Canvas API</p>
           </div>
         )}
       </div>
     );
   }
 
-  // ── Video/Audio full picker ──
-
   const selectedPreset = VIDEO_PRESETS.find(p => p.format === options.format && !options.audioOnly);
   const isOverMaxRes = selectedPreset && selectedPreset.height !== Infinity && maxRes > 0 && selectedPreset.height > maxRes;
 
-  const Toggle: React.FC<{ value: boolean; onChange: () => void; label: string; desc?: string }> = ({ value, onChange, label, desc }) => (
+  const Toggle: React.FC<{ value: boolean; onChange: () => void; label: string; desc?: string; icon?: React.ReactNode }> = ({ value, onChange, label, desc, icon }) => (
     <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-900/40 border border-white/5">
-      <div>
-        <p className="text-xs font-semibold text-white">{label}</p>
-        {desc && <p className="text-[10px] text-zinc-500 mt-0.5">{desc}</p>}
+      <div className="flex items-center gap-2">
+        {icon && <span className="text-zinc-400">{icon}</span>}
+        <div>
+          <p className="text-xs font-semibold text-white">{label}</p>
+          {desc && <p className="text-[10px] text-zinc-500 mt-0.5">{desc}</p>}
+        </div>
       </div>
       <button onClick={onChange} className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${value ? accentBg : 'bg-zinc-700'}`}>
         <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform shadow-md ${value ? 'left-[26px]' : 'left-1'}`} />
@@ -423,18 +515,17 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
     <div className="space-y-3">
       <div className="flex gap-1 p-1 rounded-xl bg-zinc-900/60 border border-white/5">
         {([
-          { id: 'media' as TabId, icon: FileVideo, label: 'Mídia' },
-          { id: 'advanced' as TabId, icon: SlidersHorizontal, label: 'Avançado' },
+          { id: 'media' as TabId, blockId: 'video-format' as BlockId, label: 'Mídia' },
+          { id: 'advanced' as TabId, blockId: 'behavior' as BlockId, label: 'Avançado' },
         ]).map(tab => {
-          const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${isActive ? `${accentBg} text-white shadow-lg` : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}`}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-semibold transition-all ${isActive ? `${accentBg} ${accentTextOnBg} shadow-lg` : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}`}
             >
-              <Icon size={14} />
+              <BlockIcon blockId={tab.blockId} size={14} />
               {tab.label}
             </button>
           );
@@ -453,11 +544,35 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
 
       <AnimatePresence mode="wait">
         {activeTab === 'media' && (
-          <motion.div key="media" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="space-y-4">
+          <motion.div key="media" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="space-y-3">
 
-            {/* Resolução */}
-            <div className="space-y-2">
-              <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">Resolucao</label>
+            {/* ── Nome do Arquivo + Nome Limpo ── */}
+            <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
+              <div className="flex items-center gap-2">
+                <BlockIcon blockId="behavior" />
+                <BlockTitle>Nome do Arquivo</BlockTitle>
+              </div>
+              <input
+                type="text"
+                value={options.customFilename || ''}
+                onChange={e => update({ customFilename: e.target.value })}
+                placeholder="Se vazio, usa o titulo original do video"
+                className="w-full px-3 py-2 rounded-lg bg-zinc-800/60 border border-white/5 text-[13px] text-white placeholder-zinc-500 focus:outline-none focus:border-white/15 transition-colors"
+              />
+              <div className="flex items-center justify-end gap-2.5 p-2.5 rounded-lg bg-zinc-900/30 border border-white/5">
+                <label className="text-[11px] text-zinc-400">Nome limpo (sem caracteres especiais)</label>
+                <button onClick={() => update({ restrictFilenames: !options.restrictFilenames })} className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${options.restrictFilenames ? accentBg : 'bg-zinc-800'}`}>
+                  <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${options.restrictFilenames ? 'left-[18px]' : 'left-0.5'}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* ── Resolução ── */}
+            <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
+              <div className="flex items-center gap-2">
+                <BlockIcon blockId="resolution" />
+                <BlockTitle>Resolucao</BlockTitle>
+              </div>
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
                 {VIDEO_PRESETS.map(preset => {
                   const unavailable = preset.height !== Infinity && maxRes > 0 && preset.height > maxRes;
@@ -486,41 +601,132 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
               )}
             </div>
 
-            {/* Formato do Vídeo */}
-            <div className="space-y-2">
-              <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">Formato do Video</label>
-              <div className="flex gap-1.5">
-                {VIDEO_FORMATS.map(fmt => (
-                  <Btn
-                    key={fmt}
-                    active={!options.audioOnly && (options.format || '').includes(`[ext=${fmt}]`)}
-                    onClick={() => {
-                      if (options.audioOnly) return;
-                      const current = VIDEO_PRESETS.find(p => p.format === options.format);
-                      const base = current ? current.format : VIDEO_PRESETS[0].format;
-                      update({ format: base.replace(/\[ext=\w+\]/g, `[ext=${fmt}]`).replace(/ba\[ext=\w+\]/g, `ba[ext=${fmt}]`) });
-                    }}
-                    className="py-2.5 flex-1"
-                  >
-                    {fmt.toUpperCase()}
-                  </Btn>
-                ))}
+            {/* ── Formato Video + Codecs | Legendas + Audio (2 colunas) ── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {/* Coluna esquerda: Formato do Video + Codecs */}
+              <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <BlockIcon blockId="video-format" />
+                  <BlockTitle>Formato do Video</BlockTitle>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {VIDEO_FORMATS.map(fmt => (
+                    <Btn
+                      key={fmt}
+                      active={!options.audioOnly && options.videoFormat === fmt}
+                      onClick={() => {
+                        if (options.audioOnly) return;
+                        update({ videoFormat: fmt });
+                      }}
+                      className="py-2"
+                    >
+                      {fmt.toUpperCase()}
+                    </Btn>
+                  ))}
+                </div>
+                <div className="border-t border-white/5 pt-2 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <BlockIcon blockId="custom-format" />
+                    <BlockTitle>Codec de Video</BlockTitle>
+                  </div>
+                  <div className="flex gap-1.5">
+                    {VIDEO_CODECS.map(codec => (
+                      <Btn
+                        key={codec.id}
+                        active={options.videoCodec === codec.id}
+                        onClick={() => {
+                          const codecVal = codec.id;
+                          update({ videoCodec: codecVal });
+                          if (!options.audioOnly && options.format) {
+                            let fmt = options.format;
+                            fmt = fmt.replace(/\[vcodec~?[^]]*\]/g, '');
+                            if (codecVal) {
+                              fmt = fmt.replace(/bv\*\[/g, `bv*[vcodec~=${codecVal}][`);
+                            }
+                            update({ format: fmt });
+                          }
+                        }}
+                        className="py-2 flex-1"
+                      >
+                        {codec.label}
+                      </Btn>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Coluna direita: Legendas + Extrair apenas audio */}
+              <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <BlockIcon blockId="subtitles" />
+                  <BlockTitle>Legendas</BlockTitle>
+                </div>
+                <Toggle
+                  value={showSubs}
+                  onChange={() => {
+                    const next = !showSubs;
+                    setShowSubs(next);
+                    if (next) update({ writeSubs: true });
+                    else update({ writeSubs: false, writeAutoSubs: false, embedSubs: false });
+                  }}
+                  label="Baixar legendas"
+                  desc="Baixar e opcionalmente embutir"
+                />
+                {showSubs && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden space-y-3 pl-2 border-l-2 border-zinc-800">
+                    <SmallToggle value={options.writeAutoSubs} onChange={() => update({ writeAutoSubs: !options.writeAutoSubs })} label="Legendas automaticas" />
+                    <div className="space-y-1.5">
+                      <BlockTitle>Idioma</BlockTitle>
+                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                        {SUB_LANGS.map(lang => (
+                          <Btn key={lang.id} active={options.subLangs === lang.id} onClick={() => update({ subLangs: lang.id })} className="py-2">
+                            {lang.label}
+                          </Btn>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <BlockTitle>Formato</BlockTitle>
+                      <div className="flex gap-1.5">
+                        {SUB_FORMATS.map(fmt => (
+                          <Btn key={fmt} active={options.subFormat === fmt} onClick={() => update({ subFormat: fmt })} className="py-2 flex-1">
+                            {fmt.toUpperCase()}
+                          </Btn>
+                        ))}
+                      </div>
+                    </div>
+                    <div className={`${isWebMode ? 'opacity-40 pointer-events-none' : ''}`}>
+                      <SmallToggle value={options.embedSubs} onChange={() => update({ embedSubs: !options.embedSubs })} label="Embutir no video" />
+                      {isWebMode && <div className="mt-1"><DesktopOnlyTag /></div>}
+                    </div>
+                  </motion.div>
+                )}
+                <div className="border-t border-white/5 pt-2">
+                  <Toggle
+                    value={options.audioOnly}
+                    onChange={() => update({ audioOnly: !options.audioOnly })}
+                    label="Extrair apenas audio"
+                    desc="Baixar somente a faixa de audio"
+                    icon={<BlockIcon blockId="audio-extract" />}
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Toggle Audio-Only */}
-            <Toggle
-              value={options.audioOnly}
-              onChange={() => update({ audioOnly: !options.audioOnly })}
-              label="Extrair apenas audio"
-              desc="Baixar somente a faixa de audio do video"
-            />
-
-            {/* Audio Format — always visible */}
-            <div className={`space-y-3 ${options.audioOnly ? '' : 'opacity-60'}`}>
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">Formato do Audio</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+            {/* ── Formato + Qualidade do Áudio (2 colunas) ── */}
+            {!options.audioOnly && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                <span className="text-yellow-500 text-xs">⚠</span>
+                <span className="text-yellow-500/80 text-[10px]">Funciona apenas com <strong>"Extrair apenas audio"</strong> ativado</span>
+              </div>
+            )}
+            <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 ${options.audioOnly ? '' : 'opacity-30 pointer-events-none'}`}>
+              <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <BlockIcon blockId="audio-format" />
+                  <BlockTitle>Formato do Audio</BlockTitle>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
                   {AUDIO_FORMATS.map(fmt => (
                     <Btn key={fmt.id} active={options.audioFormat === fmt.id} onClick={() => update({ audioFormat: fmt.id })} className="py-2">
                       {fmt.label}
@@ -528,62 +734,23 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
                   ))}
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">Qualidade do Audio</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+              <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <BlockIcon blockId="audio-quality" />
+                  <BlockTitle>Qualidade do Audio</BlockTitle>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
                   {AUDIO_QUALITY_PRESETS.map(q => (
                     <Btn key={q.value} active={options.audioQuality === q.value} onClick={() => update({ audioQuality: q.value })} className="py-2">
                       {q.label}
                     </Btn>
                   ))}
                 </div>
-                {!options.audioOnly && (
-                  <p className="text-[9px] text-zinc-600 italic">* Aplicavel apenas quando "Extrair apenas audio" esta ligado</p>
-                )}
               </div>
             </div>
 
-            {/* Legendas */}
-            <Toggle
-              value={showSubs}
-              onChange={() => {
-                const next = !showSubs;
-                setShowSubs(next);
-                if (next) update({ writeSubs: true });
-                else update({ writeSubs: false, writeAutoSubs: false, embedSubs: false });
-              }}
-              label="Legendas"
-              desc="Baixar e opcionalmente embutir legendas"
-            />
-            {showSubs && (
-              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden space-y-3 pl-2 border-l-2 border-zinc-800">
-                <SmallToggle value={options.writeAutoSubs} onChange={() => update({ writeAutoSubs: !options.writeAutoSubs })} label="Legendas automaticas" />
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">Idioma</label>
-                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
-                    {SUB_LANGS.map(lang => (
-                      <Btn key={lang.id} active={options.subLangs === lang.id} onClick={() => update({ subLangs: lang.id })} className="py-2">
-                        {lang.label}
-                      </Btn>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">Formato</label>
-                  <div className="flex gap-1.5">
-                    {SUB_FORMATS.map(fmt => (
-                      <Btn key={fmt} active={options.subFormat === fmt} onClick={() => update({ subFormat: fmt })} className="py-2 flex-1">
-                        {fmt.toUpperCase()}
-                      </Btn>
-                    ))}
-                  </div>
-                </div>
-                <SmallToggle value={options.embedSubs} onChange={() => update({ embedSubs: !options.embedSubs })} label="Embutir no video" />
-              </motion.div>
-            )}
-
-            {/* Formato customizado */}
-            <div className="space-y-2">
+            {/* ── Formato customizado ── */}
+            <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
               <button onClick={() => setShowCustomFormat(!showCustomFormat)} className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">
                 {showCustomFormat ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                 Formato customizado (yt-dlp)
@@ -602,13 +769,13 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
         )}
 
         {activeTab === 'advanced' && (
-          <motion.div key="advanced" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="space-y-4">
+          <motion.div key="advanced" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="space-y-3">
 
             {/* ── Recorte de tempo ── */}
             <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
               <div className="flex items-center gap-2">
-                <Scissors size={13} className="text-zinc-400" />
-                <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">Recortar video</label>
+                <BlockIcon blockId="trim" />
+                <BlockTitle>Recortar video</BlockTitle>
               </div>
               {mediaInfo.durationSeconds > 0 ? (
                 <TimeRangeSlider
@@ -652,41 +819,46 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
               )}
             </div>
 
-            {/* ── Modo de saida ── */}
-            <div className="space-y-2">
-              <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">Modo de saida</label>
-              <div className="grid grid-cols-3 gap-1.5">
-                <Btn active={!options.videoOnly && !options.audioOnly} onClick={() => update({ videoOnly: false, audioOnly: false })} className="py-2.5">
-                  Video + Audio
-                </Btn>
-                <Btn active={!!options.videoOnly} onClick={() => update({ videoOnly: !options.videoOnly, audioOnly: false })} className="py-2.5">
-                  So Video
-                </Btn>
-                <Btn active={!!options.audioOnly} onClick={() => update({ audioOnly: !options.audioOnly, videoOnly: false })} className="py-2.5">
-                  So Audio
-                </Btn>
-              </div>
-            </div>
-
-            {/* ── FPS ── */}
-            <div className="space-y-2">
-              <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">FPS Maximo</label>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
-                {[0, 24, 30, 60, 120].map(fps => (
-                  <Btn key={fps} active={options.fpsMax === fps} onClick={() => update({ fpsMax: fps })} className="py-2 flex-1">
-                    {fps === 0 ? 'Auto' : `${fps}`}
+            {/* ── Modo de Saída + FPS (2 colunas) ── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <BlockIcon blockId="output-mode" />
+                  <BlockTitle>Modo de saida</BlockTitle>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <Btn active={!options.videoOnly && !options.audioOnly} onClick={() => update({ videoOnly: false, audioOnly: false })} className="py-2.5">
+                    Video + Audio
                   </Btn>
-                ))}
+                  <Btn active={!!options.videoOnly} onClick={() => update({ videoOnly: !options.videoOnly, audioOnly: false })} className="py-2.5">
+                    So Video
+                  </Btn>
+                  <Btn active={!!options.audioOnly} onClick={() => update({ audioOnly: !options.audioOnly, videoOnly: false })} className="py-2.5">
+                    So Audio
+                  </Btn>
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <BlockIcon blockId="fps" />
+                  <BlockTitle>FPS Maximo</BlockTitle>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[0, 24, 30, 60, 120].map(fps => (
+                    <Btn key={fps} active={options.fpsMax === fps} onClick={() => update({ fpsMax: fps })} className="py-2 flex-1">
+                      {fps === 0 ? 'Auto' : `${fps}`}
+                    </Btn>
+                  ))}
+                </div>
               </div>
             </div>
-
-
 
             {/* ── SponsorBlock ── */}
-            <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
+            <div className={`p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2 ${isWebMode ? 'opacity-40 pointer-events-none' : ''}`}>
               <div className="flex items-center gap-2">
-                <Shield size={13} className="text-zinc-400" />
-                <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">SponsorBlock</label>
+                <BlockIcon blockId="sponsorblock" />
+                <BlockTitle>SponsorBlock</BlockTitle>
+                {isWebMode && <DesktopOnlyTag />}
               </div>
               <p className="text-[10px] text-zinc-600">Remover automaticamente partes indesejadas do video</p>
               <div className="grid grid-cols-2 gap-1.5">
@@ -703,63 +875,49 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
               </div>
             </div>
 
-            {/* ── Metadados ── */}
-            <Toggle value={options.embedMetadata} onChange={() => update({ embedMetadata: !options.embedMetadata })} label="Metadados" desc="Incorporar titulo, autor e outros dados" />
-
-            {/* ── Thumbnail ── */}
-            <Toggle value={!!options.writeThumbnail} onChange={() => update({ writeThumbnail: !options.writeThumbnail })} label="Thumbnail" desc="Salvar imagem da miniatura" />
-            {options.writeThumbnail && (
-              <SmallToggle value={!!options.embedThumbnail} onChange={() => update({ embedThumbnail: !options.embedThumbnail })} label="Incorporar thumbnail" />
-            )}
-
-            {/* ── Comportamento ── */}
-            <div className="space-y-2">
-              <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">Comportamento</label>
-              <div className="space-y-1.5">
-                <SmallToggle value={!!options.restrictFilenames} onChange={() => update({ restrictFilenames: !options.restrictFilenames })} label="Nome limpo (sem caracteres especiais)" />
-                <SmallToggle value={!!options.noOverwrites} onChange={() => update({ noOverwrites: !options.noOverwrites })} label="Nao sobrescrever arquivos existentes" />
-                <SmallToggle value={!!options.keepVideo} onChange={() => update({ keepVideo: !options.keepVideo })} label="Manter video apos extrair audio" />
+            {/* ── Metadados + Thumbnail (2 colunas) ── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Toggle value={options.embedMetadata} onChange={() => update({ embedMetadata: !options.embedMetadata })} label="Metadados" desc="Incorporar titulo, autor e outros dados" icon={<BlockIcon blockId="metadata" />} />
+              <div>
+                <Toggle value={!!options.writeThumbnail} onChange={() => update({ writeThumbnail: !options.writeThumbnail })} label="Thumbnail" desc="Salvar imagem da miniatura" icon={<BlockIcon blockId="thumbnail" />} />
+                {options.writeThumbnail && (
+                  <div className={`mt-2 ${isWebMode ? 'opacity-40 pointer-events-none' : ''}`}>
+                    <SmallToggle value={!!options.embedThumbnail} onChange={() => update({ embedThumbnail: !options.embedThumbnail })} label="Incorporar thumbnail" />
+                    {isWebMode && <div className="mt-1"><DesktopOnlyTag /></div>}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* ── Fragmentos ── */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">Downloads simultaneos (fragmentos)</label>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
-                {[1, 2, 4, 8, 16].map(n => (
-                  <Btn key={n} active={options.concurrentFragments === n} onClick={() => update({ concurrentFragments: n })} className="py-2 flex-1">
-                    {n}
-                  </Btn>
-                ))}
-              </div>
-            </div>
-
-            {/* ── Tentativas ── */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">Tentativas</label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                {[1, 3, 5, 10].map(n => (
-                  <Btn key={n} active={options.retries === n} onClick={() => update({ retries: n })} className="py-2 flex-1">
-                    {n}
-                  </Btn>
-                ))}
-              </div>
-            </div>
-
-            {/* ── Limite de Velocidade ── */}
-            <div className="space-y-2">
-              <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide">Limite de Velocidade</label>
-              <div className="flex flex-wrap gap-1.5">
-                {[0, 512, 1024, 5120, 10240, 25600, 51200].map(kbps => (
-                  <Btn
-                    key={kbps}
-                    active={settings.bandLimit === kbps}
-                    onClick={() => updateSettings({ bandLimit: kbps })}
-                    className="py-2 flex-1 text-[10px] min-w-[80px]"
-                  >
+            {/* ── Comportamento + Limite de Velocidade (2 colunas) ── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <BlockIcon blockId="speed-limit" />
+                  <BlockTitle>Limite de Velocidade</BlockTitle>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {[0, 512, 1024, 5120, 10240, 25600, 51200].map(kbps => (
+                    <Btn
+                      key={kbps}
+                      active={options.bandLimit === kbps}
+                      onClick={() => update({ bandLimit: kbps })}
+                      className="py-2 flex-1 text-[10px] min-w-[80px]"
+                    >
                     {kbps === 0 ? 'Sem limite' : kbps >= 1024 ? `${kbps / 1024}MB/s` : `${kbps}KB/s`}
                   </Btn>
                 ))}
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <BlockIcon blockId="behavior" />
+                  <BlockTitle>Comportamento</BlockTitle>
+                </div>
+                <div className="space-y-1.5">
+                  <SmallToggle value={!!options.noOverwrites} onChange={() => update({ noOverwrites: !options.noOverwrites })} label="Nao sobrescrever arquivos existentes" />
+                  <SmallToggle value={!!options.keepVideo} onChange={() => update({ keepVideo: !options.keepVideo })} label="Manter video apos extrair audio" />
+                </div>
               </div>
             </div>
           </motion.div>

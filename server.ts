@@ -109,8 +109,8 @@ async function startServer() {
 
   // ─── REAL DOWNLOAD VIA YT-DLP (SSE streaming progress) ─────────────────
   /**
-   * POST /api/download/start
-   * Body: { id, url, format, qualityLabel, isAudio, title }
+   * GET /api/download/start
+   * Query: all download parameters
    * Returns SSE stream: { type: 'progress'|'complete'|'error', ...data }
    */
   app.get("/api/download/start", async (req, res) => {
@@ -121,7 +121,30 @@ async function startServer() {
       isAudio,
       title,
       bandLimit,
-      formatStr: clientFormatStr
+      formatStr: clientFormatStr,
+      format: clientFormat,
+      downloadSections,
+      // All missing parameters for parity with Electron
+      audioFormat,
+      audioQuality,
+      writeSubs,
+      writeAutoSubs,
+      subLangs,
+      subFormat,
+      embedSubs,
+      writeThumbnail,
+      embedThumbnail,
+      embedMetadata,
+      mergeOutputFormat,
+      restrictFilenames,
+      noOverwrites,
+      keepVideo,
+      videoOnly,
+      sponsorblockRemove,
+      fpsMax,
+      concurrentFragments,
+      retries,
+      customFilename
     } = req.query as Record<string, string>;
 
     if (!id || !url) {
@@ -140,8 +163,8 @@ async function startServer() {
 
     // Build yt-dlp format string — prefer client-provided format string from FormatSelector
     let formatStr: string;
-    if (clientFormatStr) {
-      formatStr = clientFormatStr;
+    if (clientFormatStr || clientFormat) {
+      formatStr = clientFormatStr || clientFormat || '';
     } else if (isAudio === 'true') {
       // Best audio, convert to mp3
       formatStr = 'bestaudio[ext=m4a]/bestaudio';
@@ -170,6 +193,29 @@ async function startServer() {
       format: formatStr,
       outputDir: TEMP_DOWNLOAD_DIR,
       bandLimit: bandLimit ? parseInt(bandLimit, 10) : 0,
+      downloadSections: downloadSections || undefined,
+      // Parity: pass all parameters to spawnDownload
+      audioOnly: isAudio === 'true',
+      audioFormat: audioFormat || undefined,
+      audioQuality: audioQuality || undefined,
+      writeSubs: writeSubs === 'true',
+      writeAutoSubs: writeAutoSubs === 'true',
+      subLangs: subLangs || undefined,
+      subFormat: subFormat || undefined,
+      embedSubs: embedSubs === 'true',
+      writeThumbnail: writeThumbnail === 'true',
+      embedThumbnail: embedThumbnail === 'true',
+      embedMetadata: embedMetadata === 'true',
+      mergeOutputFormat: mergeOutputFormat || undefined,
+      restrictFilenames: restrictFilenames === 'true',
+      noOverwrites: noOverwrites === 'true',
+      keepVideo: keepVideo === 'true',
+      videoOnly: videoOnly === 'true',
+      sponsorblockRemove: sponsorblockRemove || undefined,
+      fpsMax: fpsMax ? parseInt(fpsMax, 10) : undefined,
+      concurrentFragments: concurrentFragments ? parseInt(concurrentFragments, 10) : undefined,
+      retries: retries ? parseInt(retries, 10) : undefined,
+      customFilename: customFilename || undefined,
       onProgress: ({ percent, speed, eta }) => {
         send({ type: 'progress', percent, speed, eta });
       },
