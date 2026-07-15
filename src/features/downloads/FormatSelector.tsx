@@ -652,21 +652,20 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
               />
               <div className="flex flex-wrap gap-1.5">
                 {[
-                  { tpl: '%(title)s', label: 'Titulo' },
-                  { tpl: '%(uploader)s', label: 'Canal' },
-                  { tpl: '%(upload_date)s', label: 'Data' },
-                  { tpl: '%(resolution)s', label: 'Resolucao' },
-                  { tpl: '%(duration)s', label: 'Duracao' },
-                ].map(t => (
+                  { resolved: mediaInfo.title || 'video', label: 'Titulo' },
+                  { resolved: mediaInfo.channel || 'canal', label: 'Canal' },
+                  { resolved: mediaInfo.publishDate || '', label: 'Data' },
+                  { resolved: mediaInfo.duration || '', label: 'Duracao' },
+                ].filter(t => t.resolved).map(t => (
                   <button
-                    key={t.tpl}
+                    key={t.label}
                     onClick={() => {
                       const cur = options.customFilename || '';
-                      update({ customFilename: cur ? `${cur} ${t.tpl}` : t.tpl });
+                      update({ customFilename: cur ? `${cur} ${t.resolved}` : t.resolved });
                     }}
-                    className="px-2 py-1 rounded-md bg-zinc-800/60 border border-white/5 text-[10px] text-zinc-400 hover:text-white hover:border-white/10 transition-colors font-mono"
+                    className="px-2 py-1 rounded-md bg-zinc-800/60 border border-white/5 text-[10px] text-zinc-400 hover:text-white hover:border-white/10 transition-colors"
                   >
-                    {t.tpl}
+                    {t.label}
                   </button>
                 ))}
               </div>
