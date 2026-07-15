@@ -765,7 +765,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                     </Btn>
                   ))}
                 </div>
-                <div className="border-t border-white/5 pt-2 space-y-2">
+                <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <BlockIcon blockId="custom-format" />
                     <BlockTitle>Codec de Video</BlockTitle>
