@@ -531,7 +531,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
           </div>
           <motion.div
             animate={{ rotate: isOpen ? 180 : 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
           >
             <ChevronDown size={14} className="text-zinc-500" />
           </motion.div>
@@ -542,7 +542,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
+              transition={{ height: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }, opacity: { duration: 0.25, ease: 'easeOut' } }}
               className="overflow-hidden"
             >
               {children}
@@ -853,6 +853,11 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                 </div>
               </div>
             </AccordionSection>
+          </motion.div>
+        )}
+
+        {activeTab === 'advanced' && (
+          <motion.div key="advanced" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="space-y-4">
 
             {/* ── Formato customizado ── */}
             <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
@@ -870,11 +875,6 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                 />
               )}
             </div>
-          </motion.div>
-        )}
-
-        {activeTab === 'advanced' && (
-          <motion.div key="advanced" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="space-y-4">
 
             {/* ── Recorte de tempo ── */}
             <AccordionSection id="trim" title="Recortar vídeo" blockId="trim">

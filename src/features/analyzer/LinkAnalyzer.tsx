@@ -602,9 +602,6 @@ export const LinkAnalyzer: React.FC = () => {
                 onFormatChange={setSelectedFormat}
                 formatOptions={formatOptions}
               />
-
-              {/* ── Summary Panel ── */}
-              <SummaryPanel formatOptions={formatOptions} selectedFormat={selectedFormat} mediaInfo={mediaInfo} />
             </div>
 
             {/* Execute Download trigger */}
@@ -626,6 +623,9 @@ export const LinkAnalyzer: React.FC = () => {
                 {t('btnDownloadSelected')}
               </button>
             </div>
+
+            {/* ── Summary Panel ── */}
+            <SummaryPanel formatOptions={formatOptions} selectedFormat={selectedFormat} mediaInfo={mediaInfo} />
           </motion.div>
         )}
       </AnimatePresence>
