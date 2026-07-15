@@ -4,7 +4,7 @@ import { MediaInfo, MediaFormat } from '../../types';
 import { getAccentBgClass, getAccentTextClass, getAccentBorderClass, getAccentTextOnBgClass } from '../../components/ThemeWrapper';
 import { BlockIcon, BlockTitle, BlockId } from '../../components/BlockIcon';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronDown, ChevronUp, Info, User, Eye, Calendar, ArrowDownToLine, AlertTriangle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info, User, Eye, Calendar, ArrowDownToLine, AlertTriangle, FileText, Download } from 'lucide-react';
 import { AUDIO_QUALITY_PRESETS } from './constants';
 
 const isWebMode = typeof window !== 'undefined' && !window.electron;
@@ -314,6 +314,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
   };
   const [useUnderscore, setUseUnderscore] = useState(true);
   const [uiScale, setUiScale] = useState(50);
+  const [descExpanded, setDescExpanded] = useState(false);
 
   const maxRes = useMemo(() => getMaxVideoHeight(mediaInfo.formats), [mediaInfo.formats]);
 
@@ -392,6 +393,45 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
   const update = useCallback((partial: Partial<FormatOptions>) => {
     setOptions(prev => ({ ...prev, ...partial }));
   }, []);
+
+  const handleDownloadDescription = useCallback(async (format: 'txt' | 'md') => {
+    const desc = mediaInfo.description;
+    if (!desc) return;
+    const title = mediaInfo.title || 'video';
+    const safeTitle = title.replace(/[<>:"/\\|?*]/g, '_').substring(0, 80);
+    let content = '';
+    let filename = '';
+    if (format === 'md') {
+      content = `# ${title}\n\n`;
+      if (mediaInfo.channel) content += `**Canal:** ${mediaInfo.channel}\n`;
+      if (mediaInfo.publishDate) content += `**Data:** ${fmtDate(mediaInfo.publishDate)}\n`;
+      if (mediaInfo.views) content += `**Views:** ${mediaInfo.views}\n`;
+      if (mediaInfo.duration) content += `**Duração:** ${mediaInfo.duration}\n`;
+      content += `\n---\n\n${desc}`;
+      filename = `${safeTitle}.md`;
+    } else {
+      content = `${title}\n${'='.repeat(title.length)}\n\n`;
+      if (mediaInfo.channel) content += `Canal: ${mediaInfo.channel}\n`;
+      if (mediaInfo.publishDate) content += `Data: ${fmtDate(mediaInfo.publishDate)}\n`;
+      if (mediaInfo.views) content += `Views: ${mediaInfo.views}\n`;
+      if (mediaInfo.duration) content += `Duração: ${mediaInfo.duration}\n`;
+      content += `\n${desc}`;
+      filename = `${safeTitle}.txt`;
+    }
+    if (window.electron) {
+      const result = await window.electron.invoke('save-description', { filename, content }) as { success?: boolean; dir?: string };
+      if (result?.success) {
+        window.electron.invoke('shell:openPath', result.dir);
+      }
+    } else {
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+  }, [mediaInfo]);
 
   useEffect(() => {
     onFormatSelect(options);
@@ -602,7 +642,9 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             </button>
           );
         })}
-        <div className="flex items-center gap-0.5 ml-1 pl-1 border-l border-white/5">
+      </div>
+      <div className="flex justify-end -mt-2 mb-1">
+        <div className="flex items-center gap-0.5">
           <span className="fs-sm text-zinc-600 mr-0.5">🔍</span>
           <button onClick={() => setUiScale(s => Math.max(0, s - 5))} className="w-5 h-5 rounded flex items-center justify-center fs-sm text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">A-</button>
           <span className="fs-xs text-zinc-500 w-7 text-center font-mono">{uiScale}%</span>
@@ -792,6 +834,42 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                 </div>
               </div>
             </AccordionSection>
+
+            {/* ── Descrição ── */}
+            {mediaInfo.description && (
+              <AccordionSection id="description" title="Descrição" blockId="metadata">
+                <div className="px-3 pb-3 pt-0 space-y-2">
+                  <div className={`relative fs-sm text-zinc-400 leading-relaxed whitespace-pre-line ${descExpanded ? '' : 'line-clamp-5'}`}>
+                    {mediaInfo.description}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setDescExpanded(!descExpanded)}
+                      className="fs-xs text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1"
+                    >
+                      {descExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      {descExpanded ? 'Recolher' : 'Ver completa'}
+                    </button>
+                    <div className="flex items-center gap-1 ml-auto">
+                      <button
+                        onClick={() => handleDownloadDescription('txt')}
+                        className="fs-xs px-2 py-1 rounded-md bg-zinc-800/60 border border-white/5 text-zinc-400 hover:text-white hover:border-white/10 transition-colors flex items-center gap-1"
+                      >
+                        <FileText size={10} />
+                        .txt
+                      </button>
+                      <button
+                        onClick={() => handleDownloadDescription('md')}
+                        className="fs-xs px-2 py-1 rounded-md bg-zinc-800/60 border border-white/5 text-zinc-400 hover:text-white hover:border-white/10 transition-colors flex items-center gap-1"
+                      >
+                        <Download size={10} />
+                        .md
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </AccordionSection>
+            )}
 
             {/* ── Legendas + Extrair Apenas Audio ── */}
             <AccordionSection id="subtitles" title="Legendas" blockId="subtitles">

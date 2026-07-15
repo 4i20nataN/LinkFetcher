@@ -195,6 +195,28 @@ ipcMain.handle('download-file-proxy', async (_event, { url, filename, dir }) => 
   }
 });
 
+ipcMain.handle('save-description', async (_event, { filename, content }) => {
+  const downloadsDir = app.getPath('downloads');
+  const safeName = (filename || 'description.txt').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+  let filePath = path.join(downloadsDir, safeName);
+  if (fs.existsSync(filePath)) {
+    const ext = path.extname(safeName);
+    const base = path.basename(safeName, ext);
+    let counter = 1;
+    while (fs.existsSync(filePath)) {
+      filePath = path.join(downloadsDir, `${base}_${counter}${ext}`);
+      counter++;
+    }
+  }
+  try {
+    fs.writeFileSync(filePath, content, 'utf-8');
+    return { success: true, filePath, dir: downloadsDir };
+  } catch (err) {
+    logDebug('[save-description] ERROR:', String(err));
+    throw err;
+  }
+});
+
 ipcMain.handle('shell:selectFolder', async (_event, defaultPath) => {
   const resolvedDefault = defaultPath && path.isAbsolute(defaultPath)
     ? defaultPath

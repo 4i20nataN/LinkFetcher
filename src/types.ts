@@ -50,6 +50,7 @@ export interface MediaInfo {
   platform: PlatformId;
   originalUrl: string;
   thumbnailUrl: string;
+  description?: string;
   status: 'idle' | 'analyzing' | 'success' | 'failed';
   error?: string;
 }

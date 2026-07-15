@@ -64,6 +64,7 @@ function buildMediaInfoFromProbe(metadata: Record<string, unknown>, url: string,
     platform,
     originalUrl: url,
     thumbnailUrl: (metadata.thumbnail as string) || '',
+    description: (metadata.description as string) || undefined,
     status: 'success'
   };
 }
