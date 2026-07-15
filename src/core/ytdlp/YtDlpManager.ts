@@ -463,7 +463,7 @@ export function buildArgs(options: DownloadOptions): string[] {
       .replace(/\/b/g, '') || 'bv*';
   }
 
-  if (options.fpsMax && options.fpsMax > 0) {
+  if (options.fpsMax && options.fpsMax > 0 && !options.audioOnly) {
     args.push('--format-sort', `fps:${options.fpsMax}`);
   }
 
@@ -476,8 +476,8 @@ export function buildArgs(options: DownloadOptions): string[] {
     if (options.audioQuality) args.push('--audio-quality', options.audioQuality);
   }
 
-  // Merge output format
-  if (options.mergeOutputFormat) {
+  // Merge output format (video only - audio uses --audio-format)
+  if (options.mergeOutputFormat && !options.audioOnly) {
     args.push('--merge-output-format', options.mergeOutputFormat);
   }
 

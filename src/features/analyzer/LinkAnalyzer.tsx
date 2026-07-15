@@ -49,7 +49,7 @@ const SummaryPanel: React.FC<{ formatOptions: FormatOptions; selectedFormat: Med
     items.push({ icon: '⚡', label: `SponsorBlock: ${sb}` });
   }
   if (formatOptions.downloadSections) items.push({ icon: '✂', label: `Corte: ${formatOptions.downloadSections.replace(/\*/g, '')}` });
-  if (formatOptions.fpsMax && formatOptions.fpsMax > 0) items.push({ icon: '🎞', label: `${formatOptions.fpsMax} FPS` });
+  if (!formatOptions.audioOnly && formatOptions.fpsMax && formatOptions.fpsMax > 0) items.push({ icon: '🎞', label: `${formatOptions.fpsMax} FPS` });
   if (formatOptions.writeSubs || formatOptions.writeAutoSubs) {
     const lang = formatOptions.subLangs || 'en';
     items.push({ icon: '📋', label: lang.toUpperCase() });
