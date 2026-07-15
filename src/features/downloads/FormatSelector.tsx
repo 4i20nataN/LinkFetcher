@@ -314,6 +314,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
   const [activeTab, setActiveTab] = useState<TabId>('media');
   const [showSubs, setShowSubs] = useState(false);
   const [showCustomFormat, setShowCustomFormat] = useState(false);
+  const [useUnderscore, setUseUnderscore] = useState(true);
 
   const maxRes = useMemo(() => getMaxVideoHeight(mediaInfo.formats), [mediaInfo.formats]);
 
@@ -650,7 +651,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                 placeholder="Se vazio, usa o titulo original do video"
                 className="w-full px-3 py-2 rounded-lg bg-zinc-800/60 border border-white/5 text-[13px] text-white placeholder-zinc-500 focus:outline-none focus:border-white/15 transition-colors font-mono"
               />
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 {[
                   { resolved: mediaInfo.title || 'video', label: 'Titulo' },
                   { resolved: mediaInfo.channel || 'canal', label: 'Canal' },
@@ -661,13 +662,24 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                     key={t.label}
                     onClick={() => {
                       const cur = options.customFilename || '';
-                      update({ customFilename: cur ? `${cur} ${t.resolved}` : t.resolved });
+                      const sep = useUnderscore ? '_' : ' ';
+                      update({ customFilename: cur ? `${cur}${sep}${t.resolved}` : t.resolved });
                     }}
                     className="px-2 py-1 rounded-md bg-zinc-800/60 border border-white/5 text-[10px] text-zinc-400 hover:text-white hover:border-white/10 transition-colors"
                   >
                     {t.label}
                   </button>
                 ))}
+                <div className="flex items-center gap-1 ml-1 pl-2 border-l border-white/5">
+                  <span className="text-[10px] text-zinc-600">_</span>
+                  <button
+                    onClick={() => setUseUnderscore(!useUnderscore)}
+                    className={`relative w-7 h-4 rounded-full transition-colors shrink-0 ${useUnderscore ? 'bg-zinc-600' : 'bg-zinc-800'}`}
+                  >
+                    <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${useUnderscore ? 'left-[14px]' : 'left-0.5'}`} />
+                  </button>
+                  <span className="text-[10px] text-zinc-600">espaco</span>
+                </div>
               </div>
               <div className="flex items-center justify-end gap-2.5 p-2.5 rounded-lg bg-zinc-900/30 border border-white/5">
                 <label className="text-[11px] text-zinc-400">Nome limpo (sem caracteres especiais)</label>
