@@ -51,7 +51,7 @@ export interface FormatOptions {
 }
 
 const VIDEO_PRESETS = [
-  { id: 'best', label: '★★★★ Melhor', height: Infinity, format: 'bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b' },
+  { id: 'best', label: '★ Melhor', height: Infinity, format: 'bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b', starYellow: true },
   { id: '2160p', label: '4K Ultra', height: 2160, format: 'bv*[height<=2160][ext=mp4]+ba[ext=m4a]/b[height<=2160]' },
   { id: '1440p', label: '1440 QHD', height: 1440, format: 'bv*[height<=1440][ext=mp4]+ba[ext=m4a]/b[height<=1440]' },
   { id: '1080p', label: '1080 Full HD', height: 1080, format: 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080]' },
@@ -666,8 +666,9 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                     key={t.label}
                     onClick={() => {
                       const cur = options.customFilename || '';
+                      const val = useUnderscore ? t.resolved.replace(/ /g, '_') : t.resolved;
                       const sep = useUnderscore ? '_' : ' ';
-                      update({ customFilename: cur ? `${cur}${sep}${t.resolved}` : t.resolved });
+                      update({ customFilename: cur ? `${cur}${sep}${val}` : val });
                     }}
                     className="px-2 py-1 rounded-md bg-zinc-800/60 border border-white/5 text-[10px] text-zinc-400 hover:text-white hover:border-white/10 transition-colors"
                   >
@@ -677,7 +678,13 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                 <div className="flex items-center gap-1 ml-1 pl-2 border-l border-white/5">
                   <span className="text-[10px] text-zinc-600">_</span>
                   <button
-                    onClick={() => setUseUnderscore(!useUnderscore)}
+                    onClick={() => {
+                      const next = !useUnderscore;
+                      setUseUnderscore(next);
+                      if (next && options.customFilename) {
+                        update({ customFilename: options.customFilename.replace(/ /g, '_') });
+                      }
+                    }}
                     className={`relative w-7 h-4 rounded-full transition-colors shrink-0 ${useUnderscore ? accentBg : 'bg-zinc-800'}`}
                   >
                     <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${useUnderscore ? 'left-[14px]' : 'left-0.5'}`} />
@@ -707,7 +714,9 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                         disabled={unavailable}
                         className="py-2.5"
                       >
-                        {preset.label}
+                        {'starYellow' in preset && preset.starYellow ? (
+                          <><span className="text-yellow-400">★</span> Melhor</>
+                        ) : preset.label}
                       </Btn>
                     );
                   })}
