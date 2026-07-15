@@ -46,6 +46,7 @@ export interface FormatOptions {
   fpsMax?: number;
   bandLimit?: number; // KB/s, 0 = unlimited
   videoCodec?: string; // '', 'h264', 'h265', 'vp9', 'av01'
+  videoFormat?: string; // 'mp4', 'mkv', 'webm', 'avi', 'flv', 'mov', 'ts'
   customFilename?: string;
 }
 
@@ -308,7 +309,7 @@ function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, accentBg, 
   );
 }
 
-export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: FormatSelectorProps) {
+export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, formatOptions }: FormatSelectorProps) {
   const { settings, updateSettings } = useApp();
   const [activeTab, setActiveTab] = useState<TabId>('media');
   const [showSubs, setShowSubs] = useState(false);
@@ -316,7 +317,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
 
   const maxRes = useMemo(() => getMaxVideoHeight(mediaInfo.formats), [mediaInfo.formats]);
 
-  const [options, setOptions] = useState<FormatOptions>({
+  const [options, setOptions] = useState<FormatOptions>(() => ({
     format: VIDEO_PRESETS[0].format,
     audioOnly: false,
     audioFormat: 'mp3',
@@ -340,7 +341,8 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
     bandLimit: 0,
     videoCodec: '',
     customFilename: '',
-  });
+    ...formatOptions,
+  }));
 
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
@@ -600,12 +602,10 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange }: Fo
                   {VIDEO_FORMATS.map(fmt => (
                     <Btn
                       key={fmt}
-                      active={!options.audioOnly && (options.format || '').includes(`[ext=${fmt}]`)}
+                      active={!options.audioOnly && options.videoFormat === fmt}
                       onClick={() => {
                         if (options.audioOnly) return;
-                        const current = VIDEO_PRESETS.find(p => p.format === options.format);
-                        const base = current ? current.format : VIDEO_PRESETS[0].format;
-                        update({ format: base.replace(/\[ext=\w+\]/g, `[ext=${fmt}]`).replace(/ba\[ext=\w+\]/g, `ba[ext=${fmt}]`) });
+                        update({ videoFormat: fmt });
                       }}
                       className="py-2"
                     >

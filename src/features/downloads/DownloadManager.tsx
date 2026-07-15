@@ -111,8 +111,14 @@ export const DownloadManager: React.FC = () => {
     }
   };
 
-  const handleOpenFolder = (item: DownloadItem) => {
-    showToast(settings.language === 'en' ? `Folder opened virtually: ${settings.defaultDir}` : `Diretório aberto virtualmente: ${settings.defaultDir}`);
+  const handleOpenFolder = async (_item: DownloadItem) => {
+    if (!window.electron?.invoke) return;
+    const dir = settings.defaultDir || await window.electron.invoke('shell:getDownloadsPath');
+    if (dir) {
+      window.electron.invoke('shell:openPath', dir).catch(() => {
+        showToast(settings.language === 'en' ? 'Failed to open folder' : 'Falha ao abrir pasta');
+      });
+    }
   };
 
   // Calculate global summary states

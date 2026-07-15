@@ -133,7 +133,7 @@ class DownloadEngineClass {
       writeThumbnail: formatOptions?.writeThumbnail,
       embedThumbnail: formatOptions?.embedThumbnail,
       embedMetadata: formatOptions?.embedMetadata,
-      mergeOutputFormat: formatOptions?.audioOnly ? formatOptions.audioFormat : undefined,
+      mergeOutputFormat: formatOptions?.videoFormat || undefined,
       concurrentFragments: formatOptions?.concurrentFragments,
       retries: formatOptions?.retries,
       restrictFilenames: formatOptions?.restrictFilenames,
