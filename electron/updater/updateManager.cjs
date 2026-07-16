@@ -49,15 +49,26 @@ function setLogger(logDebug, logSecurity) {
 // ── Download Installer to Staging (.part → atomic rename after hash verify) ──
 
 async function downloadInstallerToStaging(url, expectedSha512, maxBytes, onProgress) {
-  const host = new URL(url).hostname;
-  if (!PINNED_ASSET_HOSTS.has(host)) throw new SecurityError('update.asset_host_not_allowed');
+  // Follow redirects manually, verifying each hop against pinned hosts.
+  let currentUrl = url;
+  let res;
+  for (let hop = 0; hop < 5; hop++) {
+    const host = new URL(currentUrl).hostname;
+    if (!PINNED_ASSET_HOSTS.has(host)) throw new SecurityError('update.asset_host_not_allowed');
+    res = await fetch(currentUrl, { redirect: 'manual', signal: AbortSignal.timeout(120_000) });
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location');
+      if (!location) throw new SecurityError('update.download_failed');
+      currentUrl = location.startsWith('http') ? location : new URL(location, currentUrl).href;
+      continue;
+    }
+    break;
+  }
+  if (!res.ok || !res.body) throw new SecurityError('update.download_failed');
 
   const stagingDir = path.join(app.getPath('temp'), 'linkfetcher-update-staging');
   await fs.mkdir(stagingDir, { recursive: true, mode: 0o700 });
   const tmpPath = path.join(stagingDir, `installer-${Date.now()}.part`);
-
-  const res = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(120_000) });
-  if (!res.ok || !res.body) throw new SecurityError('update.download_failed');
 
   let received = 0;
   const contentLength = Number(res.headers.get('content-length') || '0');
@@ -207,9 +218,21 @@ async function launchInstaller(installerPath) {
 // ── Internal: Download to Buffer ─────────────────────────────────────────────
 
 async function downloadToBufferForManifest(url) {
-  const host = new URL(url).hostname;
-  if (!PINNED_ASSET_HOSTS.has(host)) throw new SecurityError('update.asset_host_not_allowed');
-  const res = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(15_000) });
+  // Follow redirects manually, verifying each hop against pinned hosts.
+  let currentUrl = url;
+  let res;
+  for (let hop = 0; hop < 5; hop++) {
+    const host = new URL(currentUrl).hostname;
+    if (!PINNED_ASSET_HOSTS.has(host)) throw new SecurityError('update.asset_host_not_allowed');
+    res = await fetch(currentUrl, { redirect: 'manual', signal: AbortSignal.timeout(15_000) });
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location');
+      if (!location) throw new SecurityError('update.download_failed');
+      currentUrl = location.startsWith('http') ? location : new URL(location, currentUrl).href;
+      continue;
+    }
+    break;
+  }
   if (!res.ok || !res.body) throw new SecurityError('update.download_failed');
   const chunks = [];
   let total = 0;

@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Download, X, CheckCircle, AlertCircle, Loader2, ExternalLink } from 'lucide-react';
+import { Download, X, CheckCircle, AlertCircle, Loader2, Shield, Sparkles, ArrowRight, RotateCcw } from 'lucide-react';
 
 type UpdateStage = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error' | 'dismissed';
 
@@ -11,15 +11,26 @@ interface UpdateInfo {
 interface ProgressData {
   stage: string;
   percent?: number;
+  received?: number;
+  total?: number;
   error?: string;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
 export default function UpdateBanner() {
   const [stage, setStage] = useState<UpdateStage>('idle');
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [progress, setProgress] = useState(0);
+  const [receivedBytes, setReceivedBytes] = useState(0);
+  const [totalBytes, setTotalBytes] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
   const [installerPath, setInstallerPath] = useState('');
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Listen for auto-detected updates from main process (5s after launch)
   useEffect(() => {
@@ -37,8 +48,10 @@ export default function UpdateBanner() {
   useEffect(() => {
     if (!window.electron?.onUpdateProgress) return;
     const unsub = window.electron.onUpdateProgress((data: ProgressData) => {
-      if (data.stage === 'downloading' && typeof data.percent === 'number') {
-        setProgress(data.percent);
+      if (data.stage === 'downloading') {
+        if (typeof data.percent === 'number') setProgress(data.percent);
+        if (typeof data.received === 'number') setReceivedBytes(data.received);
+        if (typeof data.total === 'number') setTotalBytes(data.total);
       } else if (data.stage === 'ready') {
         setStage('ready');
         setProgress(100);
@@ -74,6 +87,8 @@ export default function UpdateBanner() {
     if (!window.electron?.applyUpdate || !updateInfo) return;
     setStage('downloading');
     setProgress(0);
+    setReceivedBytes(0);
+    setTotalBytes(0);
     try {
       const result = await window.electron.applyUpdate({ version: updateInfo.version });
       if (result.ok && result.installerPath) {
@@ -99,7 +114,10 @@ export default function UpdateBanner() {
     }
   }, [installerPath]);
 
-  const dismiss = useCallback(() => setStage('dismissed'), []);
+  const dismiss = useCallback(() => {
+    setStage('dismissed');
+    if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+  }, []);
 
   const currentVersion = window.electron?.checkForUpdate ? __APP_VERSION__ : '?';
 
@@ -107,117 +125,194 @@ export default function UpdateBanner() {
     <AnimatePresence>
       {stage !== 'idle' && stage !== 'dismissed' && (
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="mb-4"
+          initial={{ opacity: 0, y: -12, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -12, scale: 0.98 }}
+          transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+          className="mb-4 relative z-20"
         >
           {/* Checking */}
           {stage === 'checking' && (
-            <div className="flex items-center gap-2 px-4 py-2.5 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-zinc-400">
-              <Loader2 size={14} className="animate-spin" />
-              <span>Verificando atualizações...</span>
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-zinc-900/60 border border-white/5 backdrop-blur-md">
+              <div className="relative">
+                <Loader2 size={16} className="animate-spin text-zinc-400" />
+              </div>
+              <span className="text-sm text-zinc-400">Verificando atualizações...</span>
             </div>
           )}
 
-          {/* Update Available */}
+          {/* Update Available — Premium */}
           {stage === 'available' && updateInfo && (
-            <div className="flex items-center justify-between gap-3 px-4 py-3 bg-blue-950/40 border border-blue-800/40 rounded-lg">
-              <div className="flex items-center gap-3 min-w-0">
-                <Download size={16} className="text-blue-400 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-blue-200">
-                    Nova versão disponível: <span className="font-mono">v{updateInfo.version}</span>
-                  </p>
-                  <p className="text-xs text-blue-400/70 mt-0.5">
-                    Sua versão: {currentVersion}
-                  </p>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="relative overflow-hidden rounded-xl border border-indigo-500/20 bg-gradient-to-r from-indigo-500/[0.08] via-indigo-500/[0.04] to-transparent backdrop-blur-md"
+            >
+              {/* Shimmer accent line */}
+              <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-400/40 to-transparent" />
+
+              <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="relative shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center">
+                      <Sparkles size={15} className="text-indigo-400" />
+                    </div>
+                    {/* Pulse ring */}
+                    <div className="absolute inset-0 rounded-lg bg-indigo-500/10 animate-ping" style={{ animationDuration: '2s' }} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+                      Atualização disponível
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/20">
+                        v{updateInfo.version}
+                      </span>
+                    </p>
+                    <p className="text-[11px] text-zinc-500 mt-0.5 flex items-center gap-1.5">
+                      <Shield size={10} className="text-zinc-600" />
+                      Verificada &bull; v{currentVersion} → v{updateInfo.version}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
+                    onClick={downloadUpdate}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition-colors shadow-lg shadow-indigo-500/20"
+                  >
+                    <Download size={13} />
+                    Baixar
+                  </motion.button>
+                  <button
+                    onClick={dismiss}
+                    className="p-1.5 text-zinc-600 hover:text-zinc-400 transition-colors rounded-md hover:bg-white/5"
+                    aria-label="Dispensar"
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={downloadUpdate}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-md transition-colors"
-                >
-                  Atualizar
-                </button>
-                <button
-                  onClick={dismiss}
-                  className="p-1.5 text-zinc-500 hover:text-zinc-300 transition-colors"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            </div>
+            </motion.div>
           )}
 
-          {/* Downloading */}
+          {/* Downloading — Premium Progress */}
           {stage === 'downloading' && (
-            <div className="px-4 py-3 bg-zinc-800/60 border border-zinc-700/50 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Loader2 size={14} className="animate-spin text-blue-400" />
-                  <span className="text-sm text-zinc-300">Baixando atualização...</span>
+            <div className="relative overflow-hidden rounded-xl border border-white/5 bg-zinc-900/60 backdrop-blur-md">
+              <div className="px-4 py-3.5">
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <Loader2 size={14} className="animate-spin text-indigo-400" />
+                    <span className="text-sm font-medium text-zinc-200">Baixando atualização...</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px]">
+                    {totalBytes > 0 && (
+                      <span className="text-zinc-600 font-mono">
+                        {formatBytes(receivedBytes)} / {formatBytes(totalBytes)}
+                      </span>
+                    )}
+                    <span className="font-mono font-bold text-indigo-400">{progress}%</span>
+                  </div>
                 </div>
-                <span className="text-xs font-mono text-zinc-500">{progress}%</span>
-              </div>
-              <div className="w-full bg-zinc-700/50 rounded-full h-1.5">
-                <motion.div
-                  className="bg-blue-500 h-1.5 rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ duration: 0.3 }}
-                />
+
+                {/* Progress bar */}
+                <div className="relative w-full bg-zinc-800/80 rounded-full h-[5px] overflow-hidden">
+                  <motion.div
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-indigo-500 to-indigo-400 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progress}%` }}
+                    transition={{ duration: 0.3, ease: 'easeOut' }}
+                  />
+                  {/* Shimmer effect on progress bar */}
+                  {progress > 0 && progress < 100 && (
+                    <motion.div
+                      className="absolute inset-y-0 w-20 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+                      animate={{ left: ['-10%', '110%'] }}
+                      transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+                    />
+                  )}
+                </div>
+
+                {/* Security badge */}
+                <div className="flex items-center gap-1.5 mt-2">
+                  <Shield size={10} className="text-zinc-600" />
+                  <span className="text-[10px] text-zinc-600">SHA-512 verificado após download</span>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Ready to Install */}
+          {/* Ready to Install — Premium */}
           {stage === 'ready' && (
-            <div className="flex items-center justify-between gap-3 px-4 py-3 bg-emerald-950/40 border border-emerald-800/40 rounded-lg">
-              <div className="flex items-center gap-3">
-                <CheckCircle size={16} className="text-emerald-400" />
-                <div>
-                  <p className="text-sm font-medium text-emerald-200">
-                    Download completo — {updateInfo?.version && `v${updateInfo.version}`}
-                  </p>
-                  <p className="text-xs text-emerald-400/70 mt-0.5">
-                    O app será fechado e o instalador será iniciado
-                  </p>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="relative overflow-hidden rounded-xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/[0.08] via-emerald-500/[0.04] to-transparent backdrop-blur-md"
+            >
+              {/* Success accent line */}
+              <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-400/40 to-transparent" />
+
+              <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
+                    <CheckCircle size={15} className="text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+                      Pronto para instalar
+                      {updateInfo?.version && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/20">
+                          v{updateInfo.version}
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-[11px] text-zinc-500 mt-0.5">
+                      O app será fechado e o instalador será iniciado automaticamente
+                    </p>
+                  </div>
                 </div>
+                <motion.button
+                  whileTap={{ scale: 0.96 }}
+                  onClick={installUpdate}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition-colors shadow-lg shadow-emerald-500/20 shrink-0"
+                >
+                  Instalar
+                  <ArrowRight size={13} />
+                </motion.button>
               </div>
-              <button
-                onClick={installUpdate}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-md transition-colors"
-              >
-                Instalar e Reiniciar
-              </button>
-            </div>
+            </motion.div>
           )}
 
-          {/* Error */}
+          {/* Error — Premium */}
           {stage === 'error' && (
-            <div className="flex items-center justify-between gap-3 px-4 py-3 bg-red-950/40 border border-red-800/40 rounded-lg">
-              <div className="flex items-center gap-3">
-                <AlertCircle size={16} className="text-red-400" />
-                <div>
-                  <p className="text-sm font-medium text-red-200">Falha na atualização</p>
-                  <p className="text-xs text-red-400/70 mt-0.5">{errorMsg}</p>
+            <div className="relative overflow-hidden rounded-xl border border-rose-500/20 bg-gradient-to-r from-rose-500/[0.06] via-rose-500/[0.03] to-transparent backdrop-blur-md">
+              <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-rose-400/30 to-transparent" />
+
+              <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center shrink-0">
+                    <AlertCircle size={15} className="text-rose-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-zinc-200">Falha na atualização</p>
+                    <p className="text-[11px] text-zinc-500 mt-0.5 truncate">{errorMsg}</p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={checkForUpdates}
-                  className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-xs font-medium rounded-md transition-colors"
-                >
-                  Tentar Novamente
-                </button>
-                <button
-                  onClick={() => setStage('idle')}
-                  className="p-1.5 text-zinc-500 hover:text-zinc-300 transition-colors"
-                >
-                  <X size={14} />
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
+                    onClick={checkForUpdates}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium rounded-lg transition-colors border border-white/5"
+                  >
+                    <RotateCcw size={12} />
+                    Tentar
+                  </motion.button>
+                  <button
+                    onClick={dismiss}
+                    className="p-1.5 text-zinc-600 hover:text-zinc-400 transition-colors rounded-md hover:bg-white/5"
+                    aria-label="Fechar"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
               </div>
             </div>
           )}

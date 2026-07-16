@@ -23,7 +23,7 @@ const { createHash, createPublicKey, verify: cryptoVerify } = require('node:cryp
 
 const PINNED_OWNER_REPO = '4i20nataN/LinkFetcher';
 const PINNED_API_HOST = 'api.github.com';
-const PINNED_ASSET_HOSTS = new Set(['github.com', 'objects.githubusercontent.com']);
+const PINNED_ASSET_HOSTS = new Set(['github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com']);
 
 // Ed25519 public keys for manifest signature verification.
 // Generate with: node -e "const{generateKeyPairSync}=require('crypto');const{publicKey,privateKey}=generateKeyPairSync('ed25519');console.log(publicKey.export({type:'spki',format:'pem'}));"
@@ -120,10 +120,21 @@ function pickManifestAssets(release) {
 // ── Download to Buffer with Size Limit ───────────────────────────────────────
 
 async function downloadToBuffer(url, maxBytes) {
-  const host = new URL(url).hostname;
-  if (!PINNED_ASSET_HOSTS.has(host)) throw new SecurityError('update.asset_host_not_allowed');
-
-  const res = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(15_000) });
+  // Follow redirects manually, verifying each hop against pinned hosts.
+  let currentUrl = url;
+  let res;
+  for (let hop = 0; hop < 5; hop++) {
+    const host = new URL(currentUrl).hostname;
+    if (!PINNED_ASSET_HOSTS.has(host)) throw new SecurityError('update.asset_host_not_allowed');
+    res = await fetch(currentUrl, { redirect: 'manual', signal: AbortSignal.timeout(15_000) });
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location');
+      if (!location) throw new SecurityError('update.download_failed');
+      currentUrl = location.startsWith('http') ? location : new URL(location, currentUrl).href;
+      continue;
+    }
+    break;
+  }
   if (!res.ok || !res.body) throw new SecurityError('update.download_failed');
 
   const chunks = [];
