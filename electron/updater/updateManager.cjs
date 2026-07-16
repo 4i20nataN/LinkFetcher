@@ -145,7 +145,7 @@ async function checkForUpdate() {
   const sigBytes = await downloadToBufferForManifest(sigAsset.browser_download_url);
   const manifest = parseVerifiedManifest(manifestBytes, sigBytes.toString('utf-8').trim());
 
-  const currentVersion = app.getVersion();
+  const currentVersion = app.isPackaged ? app.getVersion() : require('../../package.json').version;
   const localState = await loadLocalState();
   assertNotRollback(manifest.version, localState ? localState.lastInstalledVersion : null);
 

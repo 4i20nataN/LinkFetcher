@@ -27,7 +27,7 @@ function registerUpdateHandlers(mainWindow) {
       return {
         updateAvailable: result.updateAvailable,
         version: result.manifest ? result.manifest.version : undefined,
-        currentVersion: require('electron').app.getVersion(),
+        currentVersion: require('electron').app.isPackaged ? require('electron').app.getVersion() : require('../../package.json').version,
       };
     } catch (err) {
       // Security errors abort silently — user just sees "up to date"
