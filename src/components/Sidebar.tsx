@@ -58,12 +58,13 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = ({
       {/* Navigation Drawer */}
       <nav 
         className={`
-          fixed top-16 bottom-0 left-0 z-40 w-64 glass-sidebar p-4 overflow-y-auto
+          fixed top-16 bottom-0 left-0 z-40 w-64 glass-sidebar p-4
           lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:glass-sidebar lg:p-6
           transition-transform duration-300 transform
           ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
       >
+      <div className="h-full overflow-y-auto">
         {/* Title branding on desktop */}
         <div className="hidden lg:flex items-center gap-3 mb-10">
           <div className={`p-2.5 rounded-2xl ${getAccentBgClass(settings)} text-white shadow-xl shadow-indigo-500/10`}>
@@ -143,6 +144,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = ({
               </button>
             );
           })}
+        </div>
         </div>
 
         {/* User profile / watermark footer */}

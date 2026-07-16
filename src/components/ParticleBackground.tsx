@@ -4,7 +4,7 @@ export function ParticleBackground() {
   const [particles, setParticles] = useState<{ id: number, sizeClass: string, left: string, riseDuration: number, colorDuration: number, riseDelay: number, colorDelay: number }[]>([]);
 
   useEffect(() => {
-    const numParticles = 65;
+    const numParticles = 35;
     const sizes = ['p-tiny', 'p-small', 'p-medium', 'p-large', 'p-xlarge'];
     const newParticles = [];
 

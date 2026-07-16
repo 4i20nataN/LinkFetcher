@@ -69,3 +69,4 @@ CHECKSUMS*.txt
 # Unrelated artifacts
 LinkFatcher_Background.html
 .update-signing-key.txt
+RELEASE-GUIDE.md
