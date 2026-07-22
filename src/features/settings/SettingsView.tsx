@@ -4,7 +4,7 @@ import { StorageService } from '../../core/storage/Storage';
 import { 
   Settings, Globe, Sliders, HardDrive, AlertCircle, 
   Trash2, ShieldCheck, Download, Upload, RefreshCw,
-  FolderOpen, FolderPlus, Smile, Palette, Clipboard
+  FolderOpen, FolderPlus, Smile, Palette, Clipboard, Eye
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from '../../core/i18n';
@@ -299,6 +299,37 @@ export const SettingsView: React.FC = () => {
                   layout
                   className="absolute top-[2px] left-[2px] w-[16px] h-[16px] rounded-full bg-white shadow-sm"
                   animate={{ x: settings.clipboardEnabled ? 16 : 0 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-xl lf-surface-40 lf-border">
+              <div className="space-y-1">
+                <span className="text-xs text-white font-medium flex items-center gap-1.5">
+                  <Eye size={14} className="lf-text-secondary" />
+                  {settings.language === 'en' ? 'Clipboard Link Detection' : 'Detecção de Links na Área de Transferência'}
+                </span>
+                <p className="text-[10px] lf-text-muted">
+                  {settings.language === 'en'
+                    ? 'Show download popup when a link is copied to clipboard'
+                    : 'Mostrar popup de download quando um link for copiado para a área de transferência'}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  const newVal = !settings.clipboardMonitoringEnabled;
+                  updateSettings({
+                    clipboardMonitoringEnabled: newVal,
+                    clipboardFirstRunDone: true,
+                  });
+                }}
+                className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.clipboardMonitoringEnabled ? getAccentBgClass(settings) : 'lf-surface-raised'}`}
+              >
+                <motion.div
+                  layout
+                  className="absolute top-[2px] left-[2px] w-[16px] h-[16px] rounded-full bg-white shadow-sm"
+                  animate={{ x: settings.clipboardMonitoringEnabled ? 16 : 0 }}
                   transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                 />
               </button>

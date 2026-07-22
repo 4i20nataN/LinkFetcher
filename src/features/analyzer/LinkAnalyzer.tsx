@@ -165,6 +165,19 @@ export const LinkAnalyzer: React.FC = () => {
     }
   }, [selectedUrl]);
 
+  // Listen for clipboard-detected URL from popup
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const url = (e as CustomEvent).detail?.url;
+      if (url) {
+        setUrl(url);
+        handleSubmit();
+      }
+    };
+    window.addEventListener('clipboard:analyze', handler);
+    return () => window.removeEventListener('clipboard:analyze', handler);
+  }, []);
+
   // Persist analyzer state to localStorage
   useEffect(() => {
     const saved = localStorage.getItem('universal_downloader_analyzer_state');

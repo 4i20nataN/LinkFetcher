@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, Tray, Menu, clipboard, nativeImage } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -7,6 +7,9 @@ const fs = require('fs');
 const { setLogger: setUpdaterLogger } = require('./updater/updateManager.cjs');
 const { registerUpdateHandlers } = require('./updater/handlers.cjs');
 
+// ── Native Messaging (browser extension) + clipboard fallback ────────────────
+const nativeMsg = require('./nativeMessaging.cjs');
+
 const LOG_FILE = path.join(app.getPath('downloads'), 'linkfetcher-debug.log');
 function logDebug(...args) {
   const line = `[${new Date().toISOString()}] ${args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ')}\n`;
@@ -14,7 +17,69 @@ function logDebug(...args) {
 }
 
 let mainWindow;
+let tray = null;
 const cancelMap = new Map();
+
+function createTrayIcon() {
+  // 16x16 blue-tinted tray icon as data URL
+  const size = 16;
+  const canvas = Buffer.alloc(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const cx = x - size / 2 + 0.5;
+      const cy = y - size / 2 + 0.5;
+      const dist = Math.sqrt(cx * cx + cy * cy);
+      if (dist < size / 2 - 1) {
+        canvas[i] = 99;     // R
+        canvas[i + 1] = 102; // G
+        canvas[i + 2] = 241; // B (indigo)
+        canvas[i + 3] = 255; // A
+      } else {
+        canvas[i + 3] = 0;
+      }
+    }
+  }
+  const img = nativeImage.createFromBuffer(canvas, { width: size, height: size });
+  return img.isEmpty ? nativeImage.createEmpty() : img;
+}
+
+function buildTrayContextMenu() {
+  return Menu.buildFromTemplate([
+    {
+      label: 'LinkFetcher',
+      enabled: false,
+      icon: tray?.getImage() || nativeImage.createEmpty()
+    },
+    { type: 'separator' },
+    {
+      label: 'Restaurar',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'SAIR',
+      click: () => {
+        nativeMsg.cleanup();
+        app.quit();
+      }
+    }
+  ]);
+}
+
+// ── Clipboard monitoring ──────────────────────────────────────────────────────
+// Managed by nativeMessaging.cjs. Kept for backward compat with renderer.
+function startClipboardMonitoring() {
+  nativeMsg.startMonitoring();
+}
+function stopClipboardMonitoring() {
+  nativeMsg.stopMonitoring();
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -49,6 +114,26 @@ function createWindow() {
     const htmlPath = path.join(app.getAppPath(), 'dist-web', 'index.html');
     mainWindow.loadFile(htmlPath);
   }
+
+  // ── Tray: minimize to tray on X click ──────────────────────────────────────
+  mainWindow.on('close', (e) => {
+    if (!app.isQuitting) {
+      e.preventDefault();
+      mainWindow.hide();
+      if (!tray) {
+        tray = new Tray(createTrayIcon());
+        tray.setToolTip('LinkFetcher');
+        tray.setContextMenu(buildTrayContextMenu());
+        tray.on('double-click', () => {
+          mainWindow.show();
+          mainWindow.focus();
+        });
+      }
+    }
+  });
+
+  // ── Start native messaging pipe server ─────────────────────────────────────
+  nativeMsg.init(mainWindow);
 }
 
 function resolveYtDlpPath() {
@@ -362,14 +447,23 @@ ipcMain.handle('yt-dlp-cancel', async (_event, id) => {
   }
 });
 
+// ── Clipboard monitoring IPC (delegated to nativeMessaging.cjs) ───────────────
+nativeMsg.registerIpcHandlers();
+
 app.whenReady().then(() => {
   createWindow();
 
-  // ── Wire up updater logging + IPC handlers ────────────────────────────────
-  setUpdaterLogger(logDebug, logDebug);
-  registerUpdateHandlers(mainWindow);
+  // ── Portable detection ────────────────────────────────────────────────
+  // electron-builder sets PORTABLE_EXECUTABLE_DIR for portable builds.
+  // Also allow explicit --portable flag for manual testing.
+  const isPortable = !!process.env.PORTABLE_EXECUTABLE_DIR || 
+    process.argv.some(arg => arg === '--portable');
 
-  // ── Auto-Update: startup check + periodic polling (skip in dev mode) ─────
+  // ── Wire up updater logging + IPC handlers ────────────────────────────
+  setUpdaterLogger(logDebug, logDebug);
+  registerUpdateHandlers(mainWindow, isPortable);
+
+  // ── Auto-Update: startup check + periodic polling (ALL packaged builds: desktop + portable) ─────
   if (app.isPackaged) {
     const POLL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
     let autoCheckEnabled = true; // default ON
@@ -392,23 +486,37 @@ app.whenReady().then(() => {
         if (result.updateAvailable && mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('update:available', {
             version: result.manifest.version,
+            portable: isPortable,
           });
-          logDebug('[updater] background poll: update found →', result.manifest.version);
+          logDebug('[updater] background poll: update found →', result.manifest.version, 'portable:', isPortable);
         }
       } catch (err) {
         logDebug('[updater] poll failed:', err.code || err.message);
       }
     }
 
-    // First check: 5 seconds after launch
+    // First check: 5 seconds after launch (catches offline→online users)
     setTimeout(pollForUpdates, 5000);
     // Then every 30 minutes while the app is running
     setInterval(pollForUpdates, POLL_INTERVAL_MS);
+    
+    logDebug('[updater] Auto-update enabled (packaged build, portable:', isPortable, ')');
+  } else {
+    logDebug('[updater] Dev mode — auto-update disabled.');
   }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on('before-quit', () => {
+  app.isQuitting = true;
+  nativeMsg.cleanup();
+  if (tray) {
+    tray.destroy();
+    tray = null;
+  }
 });
 
 app.on('window-all-closed', () => {

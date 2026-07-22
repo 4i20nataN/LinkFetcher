@@ -134,6 +134,8 @@ export interface AppSettings {
   updates: boolean;
   colorfulIcons: boolean;
   clipboardEnabled: boolean;
+  clipboardMonitoringEnabled: boolean;
+  clipboardFirstRunDone: boolean;
   customApiUrl?: string;
 }
 

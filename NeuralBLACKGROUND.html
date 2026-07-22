@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=none">
+    <title>Neural Background - Obsidian Theme</title>
+    <style>
+        :root {
+            --primary: #0076ff;
+            --primary-glow: rgba(0, 118, 255, 0.3);
+            --primary-rgb: 0, 118, 255;
+            --bg-obsidian: #030406; 
+            --text-main: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            margin: 0;
+            padding: 0;
+        }
+        
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-obsidian);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* 1. GRADIENTE FLUIDO ULTRA SUAVE DA PALETA ORIGINAL */
+        .bg-glow-container {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .bg-glow-container::before {
+            content: "";
+            position: absolute;
+            inset: -10%;
+            background: 
+                radial-gradient(circle at 15% 25%, rgba(var(--primary-rgb), 0.05) 0%, rgba(var(--primary-rgb), 0.008) 40%, transparent 70%),
+                radial-gradient(circle at 85% 75%, rgba(var(--primary-rgb), 0.06) 0%, rgba(var(--primary-rgb), 0.008) 45%, transparent 75%);
+            animation: bgmove 28s ease-in-out infinite alternate;
+        }
+
+        @keyframes bgmove {
+            0% { transform: scale(1) rotate(0deg); }
+            100% { transform: scale(1.08) rotate(2deg); }
+        }
+
+        /* Container principal para o Canvas */
+        .viewport-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            z-index: 2;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Fundo Gradiente Fluido Original -->
+    <div class="bg-glow-container"></div>
+
+    <div class="viewport-container">
+        <!-- Canvas de Animação Otimizada -->
+        <canvas id="neuralCanvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('neuralCanvas');
+        const ctx = canvas.getContext('2d', { alpha: true });
+
+        let w, h;
+        let animationFrameId;
+
+        // Paleta de Cores Original (Vermelho, Verde e Azul Apple)
+        const nodeColors = [
+            { rgb: "255, 59, 48", r: 255, g: 59, b: 48 },   // Vermelho
+            { rgb: "48, 209, 88", r: 48, g: 209, b: 88 },   // Verde
+            { rgb: "0, 118, 255", r: 0, g: 118, b: 255 }    // Azul
+        ];
+
+        const CONFIG = {
+            nodeCount: 80,
+            connectionDist: 135,
+            mouseRadius: 150
+        };
+
+        const mouse = { x: null, y: null, active: false };
+        let nodes = [];
+
+        let resizeTimeout;
+        function resize() {
+            w = canvas.width = window.innerWidth;
+            h = canvas.height = window.innerHeight;
+            initNodes();
+        }
+        
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(resize, 200);
+        });
+
+        class Node {
+            constructor() {
+                this.init();
+            }
+
+            init() {
+                this.x = Math.random() * w;
+                this.y = Math.random() * h;
+                this.vx = (Math.random() - 0.5) * 0.4;
+                this.vy = (Math.random() - 0.5) * 0.4;
+                this.baseRadius = Math.random() * 2 + 2;
+                this.radius = this.baseRadius;
+                this.color = nodeColors[Math.floor(Math.random() * nodeColors.length)];
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+
+                if (this.x < 0 || this.x > w) this.vx *= -1;
+                if (this.y < 0 || this.y > h) this.vy *= -1;
+
+                if (mouse.active && mouse.x !== null) {
+                    const dx = mouse.x - this.x;
+                    const dy = mouse.y - this.y;
+                    const distSq = dx * dx + dy * dy;
+                    const radSq = CONFIG.mouseRadius * CONFIG.mouseRadius;
+
+                    if (distSq < radSq) {
+                        const dist = Math.sqrt(distSq);
+                        const force = (CONFIG.mouseRadius - dist) / CONFIG.mouseRadius;
+                        this.x += (dx / dist) * force * 0.25;
+                        this.y += (dy / dist) * force * 0.25;
+                    }
+                }
+            }
+
+            draw(context) {
+                const cx = this.x;
+                const cy = this.y;
+                const r = this.radius;
+
+                // 1. Brilho radial (Glow) usando a cor própria do nó
+                const gradient = context.createRadialGradient(cx, cy, 0, cx, cy, r * 4);
+                gradient.addColorStop(0, `rgba(${this.color.rgb}, 0.35)`);
+                gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                
+                context.fillStyle = gradient;
+                context.beginPath();
+                context.arc(cx, cy, r * 4, 0, 6.28318);
+                context.fill();
+
+                // 2. Halo Sutil
+                context.fillStyle = `rgba(${this.color.rgb}, 0.6)`;
+                context.beginPath();
+                context.arc(cx, cy, r + 1, 0, 6.28318);
+                context.fill();
+
+                // 3. Núcleo Brilhante
+                context.fillStyle = `rgb(${this.color.rgb})`;
+                context.beginPath();
+                context.arc(cx, cy, r, 0, 6.28318);
+                context.fill();
+            }
+        }
+
+        function initNodes() {
+            nodes = [];
+            for (let i = 0; i < CONFIG.nodeCount; i++) {
+                nodes.push(new Node());
+            }
+        }
+
+        function setMouse(e) {
+            if(e.touches) {
+                mouse.x = e.touches[0].clientX;
+                mouse.y = e.touches[0].clientY;
+            } else {
+                mouse.x = e.clientX;
+                mouse.y = e.clientY;
+            }
+            mouse.active = true;
+        }
+
+        function clearMouse() {
+            mouse.active = false;
+            mouse.x = null;
+            mouse.y = null;
+        }
+
+        window.addEventListener('mousemove', setMouse);
+        window.addEventListener('touchstart', setMouse, {passive: true});
+        window.addEventListener('touchmove', setMouse, {passive: true});
+        window.addEventListener('touchend', clearMouse);
+        window.addEventListener('mouseleave', clearMouse);
+
+        function animate() {
+            ctx.clearRect(0, 0, w, h);
+
+            const nodeLen = nodes.length;
+
+            for (let i = 0; i < nodeLen; i++) {
+                nodes[i].update();
+            }
+
+            // Conexões com mistura de cores (RGB Mix) da paleta original
+            context = ctx;
+            context.lineWidth = 1.1;
+            
+            for (let i = 0; i < nodeLen; i++) {
+                const a = nodes[i];
+                for (let j = i + 1; j < nodeLen; j++) {
+                    const b = nodes[j];
+                    const dx = a.x - b.x;
+                    const dy = a.y - b.y;
+                    
+                    const distSq = dx * dx + dy * dy;
+                    const minDistSq = CONFIG.connectionDist * CONFIG.connectionDist;
+
+                    if (distSq < minDistSq) {
+                        const dist = Math.sqrt(distSq);
+                        const factor = (1 - dist / CONFIG.connectionDist);
+                        
+                        // Interpolação perfeita entre as duas cores dos nós
+                        const mixR = Math.round((a.color.r + b.color.r) / 2);
+                        const mixG = Math.round((a.color.g + b.color.g) / 2);
+                        const mixB = Math.round((a.color.b + b.color.b) / 2);
+                        const alpha = factor * 0.65;
+
+                        context.strokeStyle = `rgba(${mixR}, ${mixG}, ${mixB}, ${alpha})`;
+                        context.beginPath();
+                        context.moveTo(a.x, a.y);
+                        context.lineTo(b.x, b.y);
+                        context.stroke();
+                    }
+                }
+            }
+
+            for (let i = 0; i < nodeLen; i++) {
+                nodes[i].draw(ctx);
+            }
+
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        resize();
+        animate();
+    </script>
+</body>
+</html>

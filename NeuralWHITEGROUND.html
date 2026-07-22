@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=none">
+    <title>Neural Constellation - Optimized Mobile Background</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            /* Fundo simplificado para alta performance, mantendo a estética clara */
+            background: #e8ebf0;
+            background: radial-gradient(circle at 50% 50%, #ffffff 0%, #dbe1e9 100%);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Container principal com otimização de GPU */
+        .viewport-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            transform: translateZ(0); /* Força aceleração de hardware */
+            -webkit-transform: translateZ(0);
+        }
+
+        /* Canvas único - mix-blend-mode removido pois pesa muito em mobile */
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 2;
+            pointer-events: none; /* Deixa toques passarem para o app abaixo */
+        }
+
+        /* 
+           TEXTO ESTÉTICO (Ajustado para mobile)
+        */
+        .elegant-branding {
+            position: absolute;
+            bottom: 10%; /* Movido para baixo para não atrapalhar header do app */
+            left: 0;
+            width: 100%;
+            text-align: center;
+            z-index: 4;
+            pointer-events: none;
+            font-family: "Didot", "Playfair Display", "Georgia", serif;
+            color: rgba(60, 68, 81, 0.65);
+            text-shadow: 0 1px 5px rgba(255, 255, 255, 0.8);
+            animation: fadeIn 2.5s ease-out;
+            padding: 0 20px;
+        }
+
+        .elegant-branding h1 {
+            font-size: 18px; /* Menor em mobile */
+            font-weight: 300;
+            letter-spacing: 0.2em;
+            margin: 0;
+            text-transform: uppercase;
+        }
+
+        .elegant-branding p {
+            font-size: 12px;
+            font-style: italic;
+            font-weight: 300;
+            letter-spacing: 0.1em;
+            margin: 4px 0 0 0;
+            color: rgba(90, 100, 115, 0.5);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="viewport-container">
+        <!-- Marcação elegante ajustada -->
+        <div class="elegant-branding">
+            <h1>Neural Constellation</h1>
+            <p>a white architecture</p>
+        </div>
+
+        <!-- Canvas Único e Otimizado -->
+        <canvas id="neuralCanvas"></canvas>
+    </div>
+
+    <script>
+        // Otimização: Uso de const e let adequadamente, cache de seletores
+        const canvas = document.getElementById('neuralCanvas');
+        const ctx = canvas.getContext('2d', { alpha: true }); // Alpha true necessário para bg
+
+        let w, h;
+        let animationFrameId;
+
+        // Otimização: Configurações reduzidas para Mobile
+        const CONFIG = {
+            nodeCount: 60,            // Reduzido de 95 (Melhora O(N^2) drasticamente)
+            connectionDist: 120,      // Reduzido de 155
+            // Cores ajustadas para canvas único sem blend modes pesados
+            coreColor: 'rgba(60, 68, 81, 0.8)',       
+            haloColor: 'rgba(255, 255, 255, 0.9)',    
+            lineColor: 'rgba(105, 118, 138, 0.15)',   // Mais sutil
+            glowColor: 'rgba(255, 246, 230, 0.3)',    
+            interactiveGlow: 'rgba(255, 253, 245, 0.4)',
+            mouseRadius: 150          // Reduzido para telas menores
+        };
+
+        const mouse = { x: null, y: null, active: false };
+        let nodes = [];
+
+        // Otimização: Debounce no resize
+        let resizeTimeout;
+        function resize() {
+            w = canvas.width = window.innerWidth;
+            h = canvas.height = window.innerHeight;
+            initNodes();
+        }
+        
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(resize, 200);
+        });
+
+        class Node {
+            constructor() {
+                this.init();
+            }
+
+            init() {
+                this.x = Math.random() * w;
+                this.y = Math.random() * h;
+                // Velocidade reduzida para ser mais calmante em background
+                this.vx = (Math.random() - 0.5) * 0.3;
+                this.vy = (Math.random() - 0.5) * 0.3;
+                this.baseRadius = Math.random() * 2 + 1; // Ligeiramente menor
+                this.radius = this.baseRadius;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Bounce nas bordas
+                if (this.x < 0 || this.x > w) this.vx *= -1;
+                if (this.y < 0 || this.y > h) this.vy *= -1;
+
+                // Interação com mouse/toque sutil
+                if (mouse.active && mouse.x !== null) {
+                    const dx = mouse.x - this.x;
+                    const dy = mouse.y - this.y;
+                    // Math.hypot é lento, usando aproximação ou x*x+y*y para checagem rápida
+                    const distSq = dx * dx + dy * dy;
+                    const radSq = CONFIG.mouseRadius * CONFIG.mouseRadius;
+
+                    if (distSq < radSq) {
+                        const dist = Math.sqrt(distSq);
+                        const force = (CONFIG.mouseRadius - dist) / CONFIG.mouseRadius;
+                        // Movimento mais suave
+                        this.x += (dx / dist) * force * 0.2;
+                        this.y += (dy / dist) * force * 0.2;
+                    }
+                }
+            }
+
+            // Otimização: Desenho consolidado em uma função
+            draw(context) {
+                const cx = this.x;
+                const cy = this.y;
+                const r = this.radius;
+
+                // 1. Brilho Simulado (Substitui shadowBlur que é lento)
+                const gradient = context.createRadialGradient(cx, cy, 0, cx, cy, r * 4);
+                gradient.addColorStop(0, CONFIG.glowColor);
+                gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                
+                context.fillStyle = gradient;
+                context.beginPath();
+                context.arc(cx, cy, r * 4, 0, 6.28318); // 6.28318 é aprox 2*Math.PI
+                context.fill();
+
+                // 2. Halo Externo
+                context.fillStyle = CONFIG.haloColor;
+                context.beginPath();
+                context.arc(cx, cy, r + 1.2, 0, 6.28318);
+                context.fill();
+
+                // 3. Núcleo
+                context.fillStyle = CONFIG.coreColor;
+                context.beginPath();
+                context.arc(cx, cy, r, 0, 6.28318);
+                context.fill();
+            }
+        }
+
+        function initNodes() {
+            nodes = [];
+            for (let i = 0; i < CONFIG.nodeCount; i++) {
+                nodes.push(new Node());
+            }
+        }
+
+        // Otimização: Unificação de eventos de mouse e touch
+        function setMouse(e) {
+            if(e.touches) {
+                mouse.x = e.touches[0].clientX;
+                mouse.y = e.touches[0].clientY;
+            } else {
+                mouse.x = e.clientX;
+                mouse.y = e.clientY;
+            }
+            mouse.active = true;
+        }
+
+        function clearMouse() {
+            mouse.active = false;
+            mouse.x = null;
+            mouse.y = null;
+        }
+
+        window.addEventListener('mousemove', setMouse);
+        window.addEventListener('touchstart', setMouse, {passive: true});
+        window.addEventListener('touchmove', setMouse, {passive: true});
+        window.addEventListener('touchend', clearMouse);
+        window.addEventListener('mouseleave', clearMouse);
+
+        function animate() {
+            // Otimização: clearRect é geralmente mais rápido que fillRect com opacidade em mobile
+            ctx.clearRect(0, 0, w, h);
+
+            const nodeLen = nodes.length;
+
+            // Passagem Única: Atualiza lógica
+            for (let i = 0; i < nodeLen; i++) {
+                nodes[i].update();
+            }
+
+            // Passagem Única: Desenha conexões (O(N^2) - parte crítica)
+            context = ctx;
+            context.lineWidth = 1;
+            
+            for (let i = 0; i < nodeLen; i++) {
+                const a = nodes[i];
+                
+                // Otimização: Começa j em i+1 para não duplicar linhas
+                for (let j = i + 1; j < nodeLen; j++) {
+                    const b = nodes[j];
+                    const dx = a.x - b.x;
+                    const dy = a.y - b.y;
+                    
+                    // Checagem rápida de distância quadrada antes do hypot/sqrt
+                    const distSq = dx * dx + dy * dy;
+                    const minDistSq = CONFIG.connectionDist * CONFIG.connectionDist;
+
+                    if (distSq < minDistSq) {
+                        const dist = Math.sqrt(distSq);
+                        const factor = (1 - dist / CONFIG.connectionDist);
+                        
+                        // Desenha linha estrutural sutil
+                        context.strokeStyle = CONFIG.lineColor;
+                        context.globalAlpha = factor; // Opacidade baseada na distância
+                        context.beginPath();
+                        context.moveTo(a.x, a.y);
+                        context.lineTo(b.x, b.y);
+                        context.stroke();
+                        context.globalAlpha = 1; // Reseta alpha
+                    }
+                }
+            }
+
+            // Passagem Única: Desenha os nós
+            for (let i = 0; i < nodeLen; i++) {
+                nodes[i].draw(ctx);
+            }
+
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        // Inicialização
+        resize();
+        animate();
+    </script>
+</body>
+</html>

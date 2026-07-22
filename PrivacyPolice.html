@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Política de Privacidade · LinkFatcher</title>
+    <style>
+        /* ==========================================
+           IMPORTAÇÃO DE FONTE & VARIÁVEIS DE TEMA
+           ========================================== */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        :root {
+            --primary: #0076ff;
+            --primary-glow: rgba(0, 118, 255, 0.3);
+            --primary-rgb: 0, 118, 255;
+            --bg-obsidian: linear-gradient(rgba(0, 118, 255, 0.02), rgba(0, 118, 255, 0.02)), #030406;
+            --text-main: #ffffff;
+            --text-muted: #94a3b8;
+            --card-shadow: rgba(0, 0, 0, 0.75);
+            --glass-bg: rgba(10, 14, 23, 0.18);
+            --glass-border: rgba(255, 255, 255, 0.12);
+        }
+
+        /* Tema dinâmico (herdado do dashboard) */
+        body.theme-red { --primary: #ff3b30; --primary-glow: rgba(255, 59, 48, 0.3); --primary-rgb: 255, 59, 48; --bg-obsidian: linear-gradient(rgba(255, 59, 48, 0.025), rgba(255, 59, 48, 0.025)), #030406; }
+        body.theme-green { --primary: #30d158; --primary-glow: rgba(48, 209, 88, 0.3); --primary-rgb: 48, 209, 88; --bg-obsidian: linear-gradient(rgba(48, 209, 88, 0.025), rgba(48, 209, 88, 0.025)), #030406; }
+        body.theme-blue { --primary: #0076ff; --primary-glow: rgba(0, 118, 255, 0.3); --primary-rgb: 0, 118, 255; --bg-obsidian: linear-gradient(rgba(0, 118, 255, 0.025), rgba(0, 118, 255, 0.025)), #030406; }
+        body.theme-purple { --primary: #bf5af2; --primary-glow: rgba(191, 90, 242, 0.3); --primary-rgb: 191, 90, 242; --bg-obsidian: linear-gradient(rgba(191, 90, 242, 0.025), rgba(191, 90, 242, 0.025)), #030406; }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+
+        body {
+            background: var(--bg-obsidian);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--text-main);
+            padding: 40px 20px;
+            position: relative;
+            transition: background 0.5s ease;
+        }
+
+        /* Fundo com rede neural + bokeh (mesmo estilo do dashboard) */
+        #network-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            pointer-events: none;
+            filter: blur(8px);
+            opacity: 0.65;
+            transform: scale(1.05);
+        }
+
+        .bg-glow-container {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        .bg-glow-container::before {
+            content: "";
+            position: absolute;
+            inset: -20%;
+            background: radial-gradient(circle at 15% 25%, rgba(255, 59, 48, 0.08) 0%, transparent 50%),
+                        radial-gradient(circle at 85% 25%, rgba(48, 209, 88, 0.06) 0%, transparent 50%),
+                        radial-gradient(circle at 50% 85%, rgba(0, 118, 255, 0.10) 0%, transparent 60%);
+            filter: blur(120px);
+            animation: bgmove 35s ease-in-out infinite alternate;
+        }
+        @keyframes bgmove {
+            0% { transform: scale(1) translate(0px, 0px) rotate(0deg); }
+            50% { transform: scale(1.1) translate(30px, -40px) rotate(3deg); }
+            100% { transform: scale(0.95) translate(-20px, 20px) rotate(-3deg); }
+        }
+
+        /* Seletor de tema flutuante (glassmorphism) */
+        .theme-selector {
+            display: flex;
+            gap: 16px;
+            background: rgba(10, 14, 23, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 10px 20px;
+            border-radius: 30px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(30px) saturate(140%);
+            z-index: 10;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        .theme-btn {
+            width: 16px; height: 16px; border-radius: 50%; border: 2px solid transparent; cursor: pointer;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .theme-btn:hover { transform: scale(1.2); }
+        .theme-btn.active { border-color: #ffffff; box-shadow: 0 0 8px currentColor; }
+        .btn-red { background-color: #ff3b30; color: #ff3b30; }
+        .btn-green { background-color: #30d158; color: #30d158; }
+        .btn-blue { background-color: #0076ff; color: #0076ff; }
+        .btn-purple { background-color: #bf5af2; color: #bf5af2; }
+
+        /* Container principal – glassmorphism refinado */
+        .privacy-container {
+            max-width: 1000px;
+            width: 100%;
+            background: rgba(10, 14, 23, 0.28);
+            backdrop-filter: blur(40px) saturate(160%);
+            -webkit-backdrop-filter: blur(40px) saturate(160%);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 28px;
+            padding: 40px 45px;
+            box-shadow: 0 40px 90px rgba(0, 0, 0, 0.95), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+            z-index: 10;
+            position: relative;
+        }
+
+        /* Cabeçalho com logo e navegação */
+        .privacy-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 24px;
+            margin-bottom: 28px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .logo-icon {
+            width: 48px; height: 48px;
+            border-radius: 16px;
+            border: 1px solid rgba(var(--primary-rgb), 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            box-shadow: 0 0 12px var(--primary-glow);
+            background: rgba(255,255,255,0.01);
+            flex-shrink: 0;
+        }
+        .logo-icon svg { width: 22px; height: 22px; }
+        .logo-text h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+        .logo-text h1 span { color: var(--primary); }
+        .logo-text p { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.04);
+            background: rgba(255,255,255,0.02);
+            transition: all 0.2s;
+        }
+        .back-link:hover {
+            background: rgba(var(--primary-rgb), 0.08);
+            border-color: rgba(var(--primary-rgb), 0.3);
+            color: var(--primary);
+        }
+
+        /* Conteúdo da política */
+        .privacy-content {
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+        }
+        .privacy-content h2 {
+            font-size: 26px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+            background: linear-gradient(135deg, #fff 30%, var(--text-muted));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 6px;
+        }
+        .privacy-content .last-updated {
+            font-size: 12px;
+            color: var(--text-muted);
+            border-left: 2px solid var(--primary);
+            padding-left: 14px;
+            margin-top: -6px;
+            margin-bottom: 10px;
+        }
+        .privacy-content p {
+            color: rgba(255,255,255,0.8);
+            line-height: 1.7;
+            font-size: 14px;
+            font-weight: 300;
+        }
+        .privacy-content p strong {
+            color: #fff;
+            font-weight: 600;
+        }
+        .privacy-content .highlight {
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        .policy-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 20px;
+            padding: 24px 28px;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        .policy-card:hover {
+            border-color: rgba(var(--primary-rgb), 0.2);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+        .policy-card h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .policy-card h3 svg {
+            width: 18px; height: 18px;
+            stroke: var(--primary);
+            stroke-width: 2;
+        }
+        .policy-card ul {
+            list-style: none;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .policy-card ul li {
+            font-size: 13px;
+            color: rgba(255,255,255,0.7);
+            padding-left: 20px;
+            position: relative;
+            line-height: 1.5;
+        }
+        .policy-card ul li::before {
+            content: "▹";
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-weight: 300;
+        }
+
+        .grid-2col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+        }
+        @media (max-width: 650px) {
+            .grid-2col { grid-template-columns: 1fr; }
+            .privacy-container { padding: 25px 18px; }
+            .privacy-header { flex-direction: column; align-items: flex-start; }
+        }
+
+        .footer-note {
+            margin-top: 30px;
+            padding-top: 22px;
+            border-top: 1px solid rgba(255,255,255,0.04);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 14px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .footer-note .badge {
+            background: rgba(var(--primary-rgb), 0.1);
+            padding: 4px 14px;
+            border-radius: 30px;
+            border: 1px solid rgba(var(--primary-rgb), 0.1);
+            color: var(--primary);
+            font-weight: 500;
+            font-size: 11px;
+        }
+        .footer-note a {
+            color: var(--text-muted);
+            text-decoration: none;
+            border-bottom: 1px dotted rgba(255,255,255,0.1);
+        }
+        .footer-note a:hover { color: #fff; border-color: var(--primary); }
+
+        /* Scroll adaptado */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 10px; }
+    </style>
+</head>
+<body class="theme-blue">
+
+    <!-- Canvas de fundo (rede neural) -->
+    <canvas id="network-canvas"></canvas>
+    <div class="bg-glow-container"></div>
+
+    <!-- Seletor de Tema -->
+    <div class="theme-selector">
+        <button class="theme-btn btn-red" onclick="changeTheme('red', this)" title="Vermelho"></button>
+        <button class="theme-btn btn-green" onclick="changeTheme('green', this)" title="Verde"></button>
+        <button class="theme-btn btn-blue active" onclick="changeTheme('blue', this)" title="Azul"></button>
+        <button class="theme-btn btn-purple" onclick="changeTheme('purple', this)" title="Roxo"></button>
+    </div>
+
+    <!-- Container da Política -->
+    <div class="privacy-container">
+        <!-- Cabeçalho -->
+        <div class="privacy-header">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <h1>Link<span>Fatcher</span></h1>
+                    <p>Política de Privacidade</p>
+                </div>
+            </div>
+            <a href="#" class="back-link" onclick="alert('Voltar para o dashboard (demo)')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                Voltar
+            </a>
+        </div>
+
+        <!-- Conteúdo principal -->
+        <div class="privacy-content">
+            <div>
+                <h2>Compromisso com sua privacidade</h2>
+                <div class="last-updated">Última atualização: 15 de julho de 2026</div>
+                <p style="font-size: 15px;">
+                    Na <strong>LinkFatcher</strong>, a transparência e a segurança dos seus dados são prioridades. 
+                    Esta política descreve como coletamos, usamos e protegemos as informações quando você utiliza 
+                    nossa plataforma de download e gerenciamento de links.
+                </p>
+            </div>
+
+            <!-- Grid de cards -->
+            <div class="grid-2col">
+                <div class="policy-card">
+                    <h3>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
+                        Coleta de Dados
+                    </h3>
+                    <ul>
+                        <li>Links e URLs enviados para análise e download.</li>
+                        <li>Endereço de IP anonimizado para estatísticas de uso.</li>
+                        <li>Nenhum dado pessoal (nome, e-mail, etc.) é armazenado, a menos que você forneça voluntariamente.</li>
+                    </ul>
+                </div>
+                <div class="policy-card">
+                    <h3>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/><path d="M15 9v6"/></svg>
+                        Uso das Informações
+                    </h3>
+                    <ul>
+                        <li>Processar downloads e extrair metadados de mídia.</li>
+                        <li>Melhorar a experiência do usuário e otimizar o motor de decodificação.</li>
+                        <li>Nunca compartilhamos seus links ou dados com terceiros.</li>
+                    </ul>
+                </div>
+                <div class="policy-card">
+                    <h3>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+                        Segurança
+                    </h3>
+                    <ul>
+                        <li>Criptografia TLS em todas as conexões (HTTPS).</li>
+                        <li>Os arquivos baixados são temporários e removidos após o envio.</li>
+                        <li>Não armazenamos histórico de downloads em servidores.</li>
+                    </ul>
+                </div>
+                <div class="policy-card">
+                    <h3>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                        Cookies & Rastreamento
+                    </h3>
+                    <ul>
+                        <li>Usamos cookies de sessão para manter sua preferência de tema.</li>
+                        <li>Nenhum cookie de rastreamento ou publicidade é utilizado.</li>
+                        <li>Você pode desativar cookies a qualquer momento nas configurações do navegador.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Seção de direitos do usuário -->
+            <div class="policy-card" style="margin-top: 6px;">
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M12 12l-4-4"/><path d="M12 12l4-4"/><path d="M12 12v8"/></svg>
+                    Seus Direitos
+                </h3>
+                <ul>
+                    <li><strong>Acesso e Correção:</strong> Você pode solicitar a correção ou exclusão de qualquer dado pessoal que tenha fornecido.</li>
+                    <li><strong>Portabilidade:</strong> Não armazenamos dados pessoais, portanto não há o que exportar.</li>
+                    <li><strong>Revogação:</strong> Você pode revogar o consentimento para coleta de dados de uso a qualquer momento.</li>
+                </ul>
+            </div>
+
+            <p style="margin-top: 10px; font-size: 13px; color: var(--text-muted); border-left: 2px solid var(--primary); padding-left: 18px;">
+                <span class="highlight">🔒 Compromisso</span> — A LinkFatcher é construída com foco em privacidade desde a origem. 
+                Seus links e dados são tratados com o mais alto nível de confidencialidade.
+            </p>
+        </div>
+
+        <!-- Rodapé -->
+        <div class="footer-note">
+            <div>
+                <span class="badge">🔐 Privacidade em primeiro lugar</span>
+                <span style="margin-left: 14px;">natan.vanim@gmail.com · ADMIN</span>
+            </div>
+            <div>
+                <a href="#">Termos de Uso</a> · 
+                <a href="#">Suporte</a> · 
+                <span style="color: var(--text-muted);">v2.4.0 (Pro)</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =============================================
+        // 1. BACKGROUND NEURAL NETWORK (mesmo código do dashboard)
+        // =============================================
+        const canvas = document.getElementById('network-canvas');
+        const ctx = canvas.getContext('2d');
+        let w, h;
+
+        function resize() {
+            w = canvas.width = window.innerWidth;
+            h = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const colors = [
+            { rgb: "255, 59, 48", r: 255, g: 59, b: 48 },
+            { rgb: "48, 209, 88", r: 48, g: 209, b: 88 },
+            { rgb: "0, 118, 255", r: 0, g: 118, b: 255 }
+        ];
+
+        const nodes = [...Array(140)].map(() => {
+            const c = colors[Math.floor(Math.random() * colors.length)];
+            return {
+                x: Math.random() * w,
+                y: Math.random() * h,
+                vx: (Math.random() - .5) * 0.95,
+                vy: (Math.random() - .5) * 0.95,
+                color: c,
+                size: Math.random() * 2 + 2.5
+            };
+        });
+
+        function animateNetwork() {
+            ctx.fillStyle = 'rgba(3, 4, 6, 1)';
+            ctx.fillRect(0, 0, w, h);
+
+            for (const n of nodes) {
+                n.x += n.vx;
+                n.y += n.vy;
+                if (n.x < 0 || n.x > w) n.vx *= -1;
+                if (n.y < 0 || n.y > h) n.vy *= -1;
+            }
+
+            for (let i = 0; i < nodes.length; i++) {
+                for (let j = i + 1; j < nodes.length; j++) {
+                    const a = nodes[i], b = nodes[j];
+                    const dx = a.x - b.x, dy = a.y - b.y;
+                    const d = Math.hypot(dx, dy);
+                    if (d < 125) {
+                        const mixR = Math.round((a.color.r + b.color.r) / 2);
+                        const mixG = Math.round((a.color.g + b.color.g) / 2);
+                        const mixB = Math.round((a.color.b + b.color.b) / 2);
+                        const alpha = (1 - d / 125) * 0.75;
+                        ctx.strokeStyle = `rgba(${mixR}, ${mixG}, ${mixB}, ${alpha})`;
+                        ctx.lineWidth = 1.2;
+                        ctx.beginPath();
+                        ctx.moveTo(a.x, a.y);
+                        ctx.lineTo(b.x, b.y);
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            for (const n of nodes) {
+                ctx.fillStyle = `rgb(${n.color.rgb})`;
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, n.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowColor = `rgb(${n.color.rgb})`;
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, n.size * 0.7, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+            requestAnimationFrame(animateNetwork);
+        }
+        animateNetwork();
+
+        // =============================================
+        // 2. TEMA DINÂMICO (mesmo mecanismo)
+        // =============================================
+        function changeTheme(themeName, element) {
+            document.body.className = '';
+            document.body.classList.add('theme-' + themeName);
+            document.querySelectorAll('.theme-btn').forEach(btn => btn.classList.remove('active'));
+            element.classList.add('active');
+        }
+
+        // Aplica o tema ativo ao carregar (blue ativo)
+        document.addEventListener('DOMContentLoaded', function() {
+            // Garante que o botão azul fique ativo
+            document.querySelector('.btn-blue')?.classList.add('active');
+        });
+    </script>
+</body>
+</html>

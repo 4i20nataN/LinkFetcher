@@ -74,3 +74,4 @@ CHECKSUMS*.txt
 LinkFatcher_Background.html
 .update-signing-key.txt
 RELEASE-GUIDE.md
+signing-keys/private-key.pem

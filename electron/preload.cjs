@@ -25,4 +25,22 @@ contextBridge.exposeInMainWorld('electron', {
   },
   setAutoCheck: (enabled) => ipcRenderer.send('update:setAutoCheck', enabled),
   getAutoCheck: () => ipcRenderer.invoke('update:getAutoCheck'),
+
+  // ── Clipboard monitoring API ─────────────────────────────────────────────
+  clipboardStartMonitoring: () => ipcRenderer.send('clipboard:startMonitoring'),
+  clipboardStopMonitoring: () => ipcRenderer.send('clipboard:stopMonitoring'),
+  clipboardGetText: () => ipcRenderer.invoke('clipboard:getText'),
+  onClipboardUrlDetected: (cb) => {
+    const listener = (_event, url) => cb(url);
+    ipcRenderer.on('clipboard:url-detected', listener);
+    return () => ipcRenderer.removeListener('clipboard:url-detected', listener);
+  },
+
+  // ── Browser extension status ─────────────────────────────────────────────
+  isExtensionConnected: () => ipcRenderer.invoke('extension:isConnected'),
+  onExtensionStatus: (cb) => {
+    const listener = (_event, connected) => cb(connected);
+    ipcRenderer.on('extension:status', listener);
+    return () => ipcRenderer.removeListener('extension:status', listener);
+  },
 });

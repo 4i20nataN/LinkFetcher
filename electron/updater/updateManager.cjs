@@ -17,6 +17,7 @@
 const { app } = require('electron');
 const { createWriteStream, promises: fsp } = require('fs');
 const path = require('path');
+const { extract } = require('extract-zip');
 const {
   fetchLatestRelease,
   pickManifestAssets,
@@ -149,4 +150,74 @@ async function downloadAndVerifyUpdate(manifest, release, onProgress) {
   return installerPath;
 }
 
-module.exports = { setLogger, checkForUpdate, downloadAndVerifyUpdate };
+/**
+ * Portable: download ZIP artifact, verify SHA-512, extract over app folder.
+ * @returns {Promise<string>} path to extracted app folder
+ */
+async function downloadAndExtractPortable(manifest, release, onProgress) {
+  const artifact = manifest.artifacts.find(
+    (a) => a.platform === currentPlatformId() && a.fileName.endsWith('-portable.zip')
+  );
+  if (!artifact) throw new SecurityError('update.no_portable_artifact');
+
+  const asset = release.assets.find((a) => a.name === artifact.fileName);
+  if (!asset) throw new SecurityError('update.asset_missing');
+  const host = new URL(asset.browser_download_url).hostname;
+  if (!PINNED_ASSET_HOSTS.has(host)) throw new SecurityError('update.asset_host_not_allowed');
+
+  const stagingDir = path.join(app.getPath('temp'), 'linkfetcher-update-staging');
+  await fsp.mkdir(stagingDir, { recursive: true, mode: 0o700 });
+  const zipPath = path.join(stagingDir, `portable-${Date.now()}.zip.part`);
+
+  const res = await fetch(asset.browser_download_url, { redirect: 'manual', signal: AbortSignal.timeout(60_000) });
+  if (!res.ok || !res.body) throw new SecurityError('update.download_failed');
+
+  let received = 0;
+  const contentLength = Number(res.headers.get('content-length') ?? '0');
+  await new Promise((resolve, reject) => {
+    const out = createWriteStream(zipPath, { mode: 0o600 });
+    (async () => {
+      try {
+        for await (const chunk of res.body) {
+          received += chunk.length;
+          if (received > Math.min(artifact.sizeBytes * 2, MAX_INSTALLER_BYTES)) {
+            throw new SecurityError('update.payload_too_large');
+          }
+          out.write(chunk);
+          onProgress?.(received, contentLength);
+        }
+        out.end(resolve);
+      } catch (err) {
+        out.destroy();
+        reject(err);
+      }
+    })();
+  });
+
+  const actualSha512 = await sha512Of(zipPath);
+  if (actualSha512 !== artifact.sha512) {
+    await fsp.unlink(zipPath).catch(() => {});
+    errorLog('update.hash_mismatch: portable zip does not match manifest');
+    throw new SecurityError('update.hash_mismatch');
+  }
+
+  const finalZipPath = zipPath.replace(/\.part$/, '');
+  await fsp.rename(zipPath, finalZipPath);
+
+  const appRoot = app.getAppPath();
+  const portableRoot = path.dirname(appRoot);
+
+  infoLog('Extracting portable update to:', portableRoot);
+  await extract(finalZipPath, { dir: portableRoot, overwrite: true });
+
+  try {
+    saveLocalState({ lastInstalledVersion: manifest.version, updatedAt: new Date().toISOString() });
+  } catch (err) {
+    errorLog('failed to persist anti-rollback state:', err.message);
+  }
+
+  infoLog('Portable update extracted, version:', manifest.version);
+  return portableRoot;
+}
+
+module.exports = { setLogger, checkForUpdate, downloadAndVerifyUpdate, downloadAndExtractPortable };

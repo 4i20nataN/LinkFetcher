@@ -109,6 +109,20 @@ class YtDlpPlugin : Plugin() {
                 updateReady.complete(Unit)
             }
         }
+
+        // ── Auto-Update check on app startup (Android) ─────────────────────────
+        // Runs in background, emits 'update:available' event if new version found.
+        // Mirrors Electron's 5s startup check + 30min polling.
+        scope.launch {
+            // Wait a bit for app to be fully ready and network available
+            kotlinx.coroutines.delay(5_000L)
+            checkAndNotifyUpdate()
+            // Then poll every 30 minutes while app is in foreground/background
+            while (true) {
+                kotlinx.coroutines.delay(30 * 60 * 1000L)
+                checkAndNotifyUpdate()
+            }
+        }
     }
 
     /**
@@ -723,6 +737,66 @@ class YtDlpPlugin : Plugin() {
                 call.reject("Falha ao checar atualização: ${e.message}", e)
             }
         }
+    }
+
+    /**
+     * Internal: checks for update and emits 'update:available' event if newer version found.
+     * Used by auto-check on startup and periodic polling.
+     */
+    private fun checkAndNotifyUpdate() {
+        scope.launch {
+            try {
+                val url = java.net.URL("https://api.github.com/repos/$UPDATE_OWNER_REPO/releases/latest")
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.setRequestProperty("Accept", "application/vnd.github+json")
+                conn.connectTimeout = 10_000
+                conn.readTimeout = 10_000
+                val body = conn.inputStream.bufferedReader().use { it.readText() }
+                conn.disconnect()
+                val json = JSONObject(body)
+                val tagName = json.getString("tag_name").removePrefix("v")
+                val assets = json.getJSONArray("assets")
+                var apkUrl: String? = null
+                var checksumsUrl: String? = null
+                for (i in 0 until assets.length()) {
+                    val asset = assets.getJSONObject(i)
+                    val name = asset.getString("name")
+                    if (apkUrl == null && name.endsWith(".apk")) {
+                        apkUrl = asset.getString("browser_download_url")
+                    }
+                    if (checksumsUrl == null && Regex("""(?i)^checksums[_-]?sha512\.txt$|^(checksums?|sha512sums)(\.txt)?$""").matches(name)) {
+                        checksumsUrl = asset.getString("browser_download_url")
+                    }
+                }
+                // Compare versions
+                val currentVersion = BuildConfig.APP_VERSION_NAME
+                if (apkUrl != null && compareVersions(tagName, currentVersion) > 0) {
+                    val payload = JSObject()
+                    payload.put("version", tagName)
+                    payload.put("apkUrl", apkUrl)
+                    payload.put("checksumsUrl", checksumsUrl ?: "")
+                    notifyListeners("update:available", payload)
+                    Log.i(TAG, "Auto-update check: new version available → ${tagName}")
+                } else {
+                    Log.i(TAG, "Auto-update check: up to date (current=$currentVersion, latest=$tagName)")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Auto-update check failed: ${e.message}")
+            }
+        }
+    }
+
+    /** Simple semver comparison: returns 1 if a>b, -1 if a<b, 0 if equal. */
+    private fun compareVersions(a: String, b: String): Int {
+        val pa = a.split(".").map { it.toIntOrNull() ?: 0 }
+        val pb = b.split(".").map { it.toIntOrNull() ?: 0 }
+        for (i in 0..2) {
+            val na = pa.getOrElse(i) { 0 }
+            val nb = pb.getOrElse(i) { 0 }
+            if (na > nb) return 1
+            if (na < nb) return -1
+        }
+        return 0
     }
 
     @PluginMethod

@@ -106,6 +106,8 @@ export class StorageService {
       updates: false,
       colorfulIcons: false,
       clipboardEnabled: true,
+      clipboardMonitoringEnabled: false,
+      clipboardFirstRunDone: false,
     };
   }
 

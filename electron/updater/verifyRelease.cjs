@@ -32,11 +32,15 @@ const PINNED_API_HOST = 'api.github.com';
 const PINNED_ASSET_HOSTS = new Set(['github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com']);
 
 // Ed25519 public keys for manifest signature verification.
-// Generate with: node -e "const{generateKeyPairSync}=require('crypto');const{publicKey,privateKey}=generateKeyPairSync('ed25519');console.log(publicKey.export({type:'spki',format:'pem'}));"
+// Generate with: node scripts/generate-signing-key.cjs
 // Private key goes to GitHub Actions secret: UPDATE_SIGNING_PRIVATE_KEY
+// Key rotation: add v2, keep v1 for 1 release (dual-sign), then remove v1
 const TRUSTED_PUBLIC_KEYS = {
   v1: `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEA/b86YtHcdb332WCuUkMzyQ12IdZA5ow760QVTt/DABo=
+-----END PUBLIC KEY-----`,
+  v2: `-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEAZ2LtjAQNuBPS/H78C9iaZRhjQHjCl9gq7PzS/hPOIqg=
 -----END PUBLIC KEY-----`,
 };
 
@@ -155,25 +159,36 @@ async function downloadToBuffer(url, maxBytes) {
 
 // ── Ed25519 Signature Verification ───────────────────────────────────────────
 
-function verifyManifestSignature(manifestBytes, signatureBase64, keyId = 'v1') {
-  const pem = TRUSTED_PUBLIC_KEYS[keyId];
-  if (!pem) return false;
-
-  try {
-    const publicKey = createPublicKey({ key: pem, format: 'pem' });
-    const signature = Buffer.from(signatureBase64, 'base64');
-    // Ed25519: algorithm=null — signature operates on the raw message
-    return cryptoVerify(null, manifestBytes, publicKey, signature);
-  } catch {
-    return false;
+/**
+ * Verifies manifest signature against trusted keys.
+ * Supports key rotation: tries v1 first, then v2 (if present).
+ * During rotation period, manifest is dual-signed with both keys.
+ * @returns {string|null} keyId that verified successfully, or null if all fail
+ */
+function verifyManifestSignature(manifestBytes, signatureBase64) {
+  const signature = Buffer.from(signatureBase64, 'base64');
+  
+  for (const [keyId, pem] of Object.entries(TRUSTED_PUBLIC_KEYS)) {
+    try {
+      const publicKey = createPublicKey({ key: pem, format: 'pem' });
+      // Ed25519: algorithm=null — signature operates on the raw message
+      if (cryptoVerify(null, manifestBytes, publicKey, signature)) {
+        return keyId;
+      }
+    } catch {
+      // Invalid key format, try next
+      continue;
+    }
   }
+  return null;
 }
 
 // ── Parse & Validate Manifest (signature first, then schema) ─────────────────
 
 function parseVerifiedManifest(manifestBytes, signatureBase64) {
   // Step 1: Verify Ed25519 signature BEFORE reading any field
-  if (!verifyManifestSignature(manifestBytes, signatureBase64)) {
+  const verifiedKeyId = verifyManifestSignature(manifestBytes, signatureBase64);
+  if (!verifiedKeyId) {
     throw new SecurityError('update.signature_invalid');
   }
 

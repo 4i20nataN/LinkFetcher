@@ -36,6 +36,16 @@ declare global {
       onUpdateAvailable: (cb: (data: { version: string }) => void) => () => void;
       setAutoCheck: (enabled: boolean) => void;
       getAutoCheck: () => Promise<boolean>;
+
+      // ── Clipboard monitoring API ─────────────────────────────────────────
+      clipboardStartMonitoring: () => void;
+      clipboardStopMonitoring: () => void;
+      clipboardGetText: () => Promise<string>;
+      onClipboardUrlDetected: (cb: (url: string) => void) => () => void;
+
+      // ── Browser extension status ─────────────────────────────────────────
+      isExtensionConnected: () => Promise<boolean>;
+      onExtensionStatus: (cb: (connected: boolean) => void) => () => void;
     };
   }
 }

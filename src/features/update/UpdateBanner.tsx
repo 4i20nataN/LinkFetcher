@@ -58,24 +58,21 @@ export default function UpdateBanner() {
     return unsub;
   }, []);
 
-  // Android: checagem automática de versão ao iniciar (assíncrona, sem travar a UI)
+  // Android: listen for native 'update:available' event from Capacitor plugin (auto-check on startup + polling)
   useEffect(() => {
     if (!isAndroid) return;
-    let cancelled = false;
-    getCapacitorYtDlp().then((plugin) => plugin.checkUpdate())
-      .then((result) => {
-        if (cancelled || !result.available) return;
-        if (result.version && result.version !== __APP_VERSION__) {
-          androidApkUrlRef.current = result.apkUrl;
-          androidChecksumsUrlRef.current = result.checksumsUrl || '';
-          setUpdateInfo({ version: result.version });
+    let handle: Promise<{ remove: () => void }> | null = null;
+    getCapacitorYtDlp().then((plugin) => {
+      handle = plugin.addListener('update:available', (data) => {
+        if (data?.version) {
+          setUpdateInfo({ version: data.version });
+          if (data.apkUrl) androidApkUrlRef.current = data.apkUrl;
+          if (data.checksumsUrl) androidChecksumsUrlRef.current = data.checksumsUrl;
           setStage('available');
         }
-      })
-      .catch(() => {
-        // Silencioso no boot — checagem manual continua disponível via checkForUpdates()
       });
-    return () => { cancelled = true; };
+    });
+    return () => { handle?.then((h) => h.remove()); };
   }, []);
 
   // Listen for download progress — Electron only (Android usa listener nativo separado abaixo).

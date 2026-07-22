@@ -44,6 +44,8 @@ class DownloadEngineClass {
     updates: false,
     colorfulIcons: false,
     clipboardEnabled: true,
+    clipboardMonitoringEnabled: false,
+    clipboardFirstRunDone: false,
   };
 
   constructor() {

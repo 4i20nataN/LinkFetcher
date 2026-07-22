@@ -3,12 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, useCallback, Suspense } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { AppProvider, useApp } from './context/AppContext';
 import { ThemeWrapper } from './components/ThemeWrapper';
 import { Sidebar } from './components/Sidebar';
+import { ClipboardPopup } from './components/ClipboardPopup';
+import { FirstRunClipboardPrompt } from './components/FirstRunClipboardPrompt';
 const LinkAnalyzer = React.lazy(() => import('./features/analyzer/LinkAnalyzer').then(m => ({ default: m.LinkAnalyzer })));
 const YouTubeSearch = React.lazy(() => import('./features/youtube/YouTubeSearch').then(m => ({ default: m.YouTubeSearch })));
 const DownloadManager = React.lazy(() => import('./features/downloads/DownloadManager').then(m => ({ default: m.DownloadManager })));
@@ -22,11 +24,15 @@ import { motion, AnimatePresence } from 'motion/react';
 function DashboardContent() {
   const { activeTab, setActiveTab, settings } = useApp();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [clipboardPopupUrl, setClipboardPopupUrl] = useState('');
+  const [showClipboardPopup, setShowClipboardPopup] = useState(false);
+  const [showFirstRunPrompt, setShowFirstRunPrompt] = useState(!settings.clipboardFirstRunDone);
 
-  // Gap #12: Android hardware/gesture back button. Without this listener the
-  // OS closes the app instead of navigating between tabs.
+  const isElectron = typeof window !== 'undefined' && !!window.electron;
+  const isCapacitor = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
+
+  // Gap #12: Android hardware/gesture back button
   useEffect(() => {
-    const isCapacitor = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
     if (!isCapacitor) return;
 
     const listenerPromise = CapacitorApp.addListener('backButton', () => {
@@ -44,16 +50,85 @@ function DashboardContent() {
     return () => {
       listenerPromise.then((listener) => listener.remove());
     };
-  }, [activeTab, sidebarOpen, setActiveTab]);
+  }, [activeTab, sidebarOpen, setActiveTab, isCapacitor]);
 
-  // Gap #13: without this the header can render behind the status bar / notch.
+  // Gap #13: status bar / notch alignment
   useEffect(() => {
-    const isCapacitor = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
     if (!isCapacitor) return;
 
     StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
     StatusBar.setStyle({ style: settings.themeMode === 'light' ? Style.Light : Style.Dark }).catch(() => {});
-  }, [settings.themeMode]);
+  }, [settings.themeMode, isCapacitor]);
+
+  // ── Clipboard monitoring lifecycle ────────────────────────────────────────
+  useEffect(() => {
+    if (!settings.clipboardMonitoringEnabled) return;
+
+    if (isElectron) {
+      window.electron!.clipboardStartMonitoring();
+      const unsub = window.electron!.onClipboardUrlDetected((url: string) => {
+        setClipboardPopupUrl(url);
+        setShowClipboardPopup(true);
+      });
+      return () => {
+        window.electron!.clipboardStopMonitoring();
+        unsub();
+      };
+    }
+
+    if (isCapacitor) {
+      let listener: any = null;
+      (async () => {
+        try {
+          const ClipboardMonitorMod = await import('./native/ClipboardMonitor');
+          const ClipboardMonitor = ClipboardMonitorMod.default;
+          await ClipboardMonitor.startMonitoring();
+          listener = await ClipboardMonitor.addListener('urlDetected', (data: { url: string }) => {
+            setClipboardPopupUrl(data.url);
+            setShowClipboardPopup(true);
+          });
+        } catch {
+          // Plugin not available — silent fail
+        }
+      })();
+      return () => {
+        listener?.remove();
+        (async () => {
+          try {
+            const ClipboardMonitorMod = await import('./native/ClipboardMonitor');
+            await ClipboardMonitorMod.default.stopMonitoring();
+          } catch {}
+        })();
+      };
+    }
+  }, [settings.clipboardMonitoringEnabled, isElectron, isCapacitor]);
+
+  // ── Mobile: appStateChange — pause/resume clipboard monitoring ─────────────
+  useEffect(() => {
+    if (!isCapacitor || !settings.clipboardMonitoringEnabled) return;
+
+    let listener: any = null;
+    (async () => {
+      const ClipboardMonitorMod = await import('./native/ClipboardMonitor');
+      const ClipboardMonitor = ClipboardMonitorMod.default;
+
+      listener = await CapacitorApp.addListener('appStateChange', async ({ isActive }: { isActive: boolean }) => {
+        if (isActive) {
+          try { await ClipboardMonitor.startMonitoring(); } catch {}
+        } else {
+          try { await ClipboardMonitor.stopMonitoring(); } catch {}
+        }
+      });
+    })();
+
+    return () => { listener?.remove(); };
+  }, [isCapacitor, settings.clipboardMonitoringEnabled]);
+
+  const handleAnalyzeClipboardUrl = useCallback((url: string) => {
+    setActiveTab('analyze');
+    // Dispatch custom event so LinkAnalyzer picks up the URL
+    window.dispatchEvent(new CustomEvent('clipboard:analyze', { detail: { url } }));
+  }, [setActiveTab]);
 
   const renderActiveView = () => {
     const views = { analyze: LinkAnalyzer, search: YouTubeSearch, manager: DownloadManager, favorites: FavoritesView, later: DownloadLaterView, settings: SettingsView, privacy: PrivacyPolicy } as const;
@@ -91,6 +166,17 @@ function DashboardContent() {
           </AnimatePresence>
         </div>
       </main>
+
+      {/* Clipboard link detection popup */}
+      <ClipboardPopup
+        onDismiss={() => setShowClipboardPopup(false)}
+        onAnalyze={handleAnalyzeClipboardUrl}
+      />
+
+      {/* First-run clipboard prompt */}
+      {showFirstRunPrompt && (
+        <FirstRunClipboardPrompt onDismiss={() => setShowFirstRunPrompt(false)} />
+      )}
     </div>
   );
 }

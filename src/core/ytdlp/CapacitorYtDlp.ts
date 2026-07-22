@@ -125,6 +125,10 @@ export interface YtDlpPlugin {
     eventName: 'update-progress',
     listener: (event: UpdateProgressEvent) => void
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
+  addListener(
+    eventName: 'update:available',
+    listener: (event: { version: string; apkUrl: string; checksumsUrl: string }) => void
+  ): Promise<PluginListenerHandle> & PluginListenerHandle;
 }
 
 const _rawPlugin = registerPlugin<YtDlpPlugin>('YtDlp');
