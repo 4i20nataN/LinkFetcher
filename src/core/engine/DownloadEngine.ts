@@ -934,8 +934,8 @@ class DownloadEngineClass {
   // ─────────────────────────────────────────────────────────────────────────
   private parseSpeedString(s: string): number {
     if (!s) return 0;
-    // e.g. "3.20MiB" or "512.00KiB"
-    const m = s.match(/([\d.]+)\s*(GiB|MiB|KiB|B)/i);
+    // e.g. "3.20MiB/s" (from Android/Kotlin regex) or "3.20MiB" (Electron/SSE)
+    const m = s.match(/([\d.]+)\s*(GiB|MiB|KiB|B)(?:\/s)?/i);
     if (!m) return 0;
     const val = parseFloat(m[1]);
     const unit = m[2].toLowerCase();

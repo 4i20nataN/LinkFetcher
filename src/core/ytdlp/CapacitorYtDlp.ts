@@ -77,6 +77,7 @@ export interface YtDlpProgressEvent {
   id: string;
   type: 'progress' | 'complete' | 'error';
   percent?: number;
+  speed?: string;
   eta?: string;
   filePath?: string;
   message?: string;

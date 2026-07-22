@@ -7,15 +7,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ChevronDown, ChevronUp, Info, User, Eye, Calendar, ArrowDownToLine, AlertTriangle, FileText, Download } from 'lucide-react';
 import { AUDIO_QUALITY_PRESETS } from './constants';
 
-const isWebMode = typeof window !== 'undefined' && !window.electron;
-
-const DesktopOnlyTag: React.FC = () => (
-  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-zinc-800 text-zinc-500 border border-zinc-700">
-    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-    Desktop
-  </span>
-);
-
 interface FormatSelectorProps {
   mediaInfo: MediaInfo;
   onFormatSelect: (options: FormatOptions) => void;
@@ -944,10 +935,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                         ))}
                       </div>
                     </div>
-                    <div className={`${isWebMode ? 'opacity-40 pointer-events-none' : ''}`}>
-                      <SmallToggle value={options.embedSubs} onChange={() => update({ embedSubs: !options.embedSubs })} label="Embutir no video" />
-                      {isWebMode && <div className="mt-1"><DesktopOnlyTag /></div>}
-                    </div>
+                    <SmallToggle value={options.embedSubs} onChange={() => update({ embedSubs: !options.embedSubs })} label="Embutir no video" />
                   </motion.div>
                 )}
               </div>
@@ -1059,7 +1047,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
 
             {/* ── SponsorBlock ── */}
             <AccordionSection id="sponsorblock" title="SponsorBlock" blockId="sponsorblock">
-              <div className={`px-3 pb-3 pt-2 space-y-2 ${isWebMode ? 'opacity-40 pointer-events-none' : ''}`}>
+              <div className="px-3 pb-3 pt-2 space-y-2">
                 <p className="fs-sm text-zinc-600">Remover automaticamente partes indesejadas do video</p>
                 <div className="flex flex-wrap gap-2.5">
                   {[
@@ -1120,9 +1108,8 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                 <div>
                   <Toggle value={!!options.writeThumbnail} onChange={() => update({ writeThumbnail: !options.writeThumbnail })} label="Thumbnail" desc="Salvar imagem da miniatura" icon={<BlockIcon blockId="thumbnail" />} />
                   {options.writeThumbnail && (
-                    <div className={`mt-2 ${isWebMode ? 'opacity-40 pointer-events-none' : ''}`}>
+                    <div className="mt-2">
                       <SmallToggle value={!!options.embedThumbnail} onChange={() => update({ embedThumbnail: !options.embedThumbnail })} label="Incorporar thumbnail" />
-                      {isWebMode && <div className="mt-1"><DesktopOnlyTag /></div>}
                     </div>
                   )}
                 </div>
