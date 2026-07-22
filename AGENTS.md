@@ -30,6 +30,7 @@ Antes de propor alterações ou debugar, você deve ler o arquivo correspondente
             ├── docs/setup-deployment.md   ──> Pipeline de Build e electron-builder
             ├── docs/known-bugs.md         ──> Histórico de falhas conhecidas e soluções
             ├── docs/download-flow-trace.md──> Rastreamento do ciclo de vida do download
+            ├── docs/security-and-updates.md──> Segurança, Host Pinning, SHA-512 e Auto-Update
             └── docs/yt-dlp-reference.md   ──> Parâmetros e flags oficiais do yt-dlp
 ```
 
