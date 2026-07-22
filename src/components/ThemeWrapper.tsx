@@ -9,33 +9,34 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
   // Map theme modes to root classes
   const themeClass = {
     light: 'text-zinc-900 light',
-    dark: 'bg-[#05070c] text-slate-100 dark',
-    gray: 'bg-[#05070c] text-slate-200 gray-mode'
+    dark: 'text-slate-100 dark',
+    gray: 'text-slate-200 gray-mode'
   }[settings.themeMode];
 
-  // Accent mapping helper to inject inline CSS variables or provide classes
+  // Accent mapping helper — SKILL.md tone inclination: --primary, --primary-glow, --primary-rgb
   const accentVars = {
-    indigo: { primary: '#6366f1', rgb: '99, 102, 241', hover: '#4f46e5' },
-    emerald: { primary: '#10b981', rgb: '16, 185, 129', hover: '#059669' },
-    amber: { primary: '#f59e0b', rgb: '245, 158, 11', hover: '#d97706' },
-    rose: { primary: '#f43f5e', rgb: '244, 63, 94', hover: '#e11d48' },
-    violet: { primary: '#8b5cf6', rgb: '139, 92, 246', hover: '#7c3aed' },
-    sky: { primary: '#0ea5e9', rgb: '14, 165, 233', hover: '#0284c7' },
-    teal: { primary: '#14b8a6', rgb: '20, 184, 166', hover: '#0d9488' },
-    fuchsia: { primary: '#d946ef', rgb: '217, 70, 239', hover: '#c084fc' },
-    orange: { primary: '#f97316', rgb: '249, 115, 22', hover: '#ea580c' },
-    cyan: { primary: '#06b6d4', rgb: '6, 182, 212', hover: '#0891b2' },
-    lime: { primary: '#84cc16', rgb: '132, 204, 22', hover: '#65a30d' },
-    crimson: { primary: '#ef4444', rgb: '239, 68, 68', hover: '#dc2626' },
-    pink: { primary: '#ec4899', rgb: '236, 72, 153', hover: '#db2777' },
-    slate: { primary: '#94a3b8', rgb: '148, 163, 184', hover: '#64748b' }
-  }[settings.accentColor as any] || { primary: '#6366f1', rgb: '99, 102, 241', hover: '#4f46e5' };
+    indigo: { primary: '#6366f1', rgb: '99, 102, 241', hover: '#4f46e5', glow: 'rgba(79,70,229,0.20)' },
+    emerald: { primary: '#10b981', rgb: '16, 185, 129', hover: '#059669', glow: 'rgba(5,150,105,0.20)' },
+    amber: { primary: '#f59e0b', rgb: '245, 158, 11', hover: '#d97706', glow: 'rgba(217,119,6,0.20)' },
+    rose: { primary: '#f43f5e', rgb: '244, 63, 94', hover: '#e11d48', glow: 'rgba(225,29,72,0.20)' },
+    violet: { primary: '#8b5cf6', rgb: '139, 92, 246', hover: '#7c3aed', glow: 'rgba(124,58,237,0.20)' },
+    sky: { primary: '#0ea5e9', rgb: '14, 165, 233', hover: '#0284c7', glow: 'rgba(2,132,199,0.20)' },
+    teal: { primary: '#14b8a6', rgb: '20, 184, 166', hover: '#0d9488', glow: 'rgba(13,148,136,0.20)' },
+    fuchsia: { primary: '#d946ef', rgb: '217, 70, 239', hover: '#c084fc', glow: 'rgba(192,132,252,0.20)' },
+    orange: { primary: '#f97316', rgb: '249, 115, 22', hover: '#ea580c', glow: 'rgba(234,88,12,0.20)' },
+    cyan: { primary: '#06b6d4', rgb: '6, 182, 212', hover: '#0891b2', glow: 'rgba(8,145,178,0.20)' },
+    lime: { primary: '#84cc16', rgb: '132, 204, 22', hover: '#65a30d', glow: 'rgba(101,163,13,0.20)' },
+    crimson: { primary: '#ef4444', rgb: '239, 68, 68', hover: '#dc2626', glow: 'rgba(220,38,38,0.20)' },
+    pink: { primary: '#ec4899', rgb: '236, 72, 153', hover: '#db2777', glow: 'rgba(219,39,119,0.20)' },
+    slate: { primary: '#94a3b8', rgb: '148, 163, 184', hover: '#64748b', glow: 'rgba(100,116,139,0.20)' }
+  }[settings.accentColor as any] || { primary: '#6366f1', rgb: '99, 102, 241', hover: '#4f46e5', glow: 'rgba(79,70,229,0.20)' };
 
-  // Set inline variables so Tailwind CSS or inline styles can use standard theme values easily
+  // SKILL.md tone inclination variables — --primary, --primary-glow, --primary-rgb
   const style = {
     '--color-primary': accentVars.primary,
     '--color-primary-rgb': accentVars.rgb,
     '--color-primary-hover': accentVars.hover,
+    '--color-primary-glow': accentVars.glow,
   } as React.CSSProperties;
 
   return (
@@ -50,8 +51,27 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
         <NeuralBlackBackground />
       )}
 
-      {/* Content wrapper with higher z-index to stay above meshes */}
-      <div className="relative h-full">
+      {/* Ambient glow — colored radials blurred behind glass elements (reference: bg-glow-container) */}
+      {settings.themeMode !== 'light' && (
+        <div className="absolute inset-0 z-[1] pointer-events-none overflow-hidden">
+          <div
+            style={{
+              position: 'absolute',
+              inset: '-20%',
+              background: `
+                radial-gradient(circle at 15% 25%, rgba(255, 59, 48, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 85% 25%, rgba(48, 209, 88, 0.06) 0%, transparent 50%),
+                radial-gradient(circle at 50% 85%, rgba(var(--color-primary-rgb), 0.10) 0%, transparent 60%)
+              `,
+              filter: 'blur(120px)',
+              animation: 'bgmove 35s ease-in-out infinite alternate',
+            }}
+          />
+        </div>
+      )}
+
+      {/* Content wrapper */}
+      <div className="relative h-full z-[2]">
         {children}
       </div>
     </div>

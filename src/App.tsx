@@ -71,14 +71,7 @@ function DashboardContent() {
       <Sidebar isOpen={sidebarOpen} toggleOpen={() => setSidebarOpen(!sidebarOpen)} />
 
       {/* Main Panel */}
-      <main className={`flex-1 overflow-y-auto overflow-x-hidden overscroll-contain relative p-4 md:p-8 [mask-image:linear-gradient(to_bottom,transparent_0%,black_4%,black_96%,transparent_100%)] ${settings.themeMode === 'light' ? '' : 'bg-black/35'}`}>
-        {/* Subtle background abstract decorations matching premium Nothing OS feel (hidden in light mode) */}
-        {settings.themeMode !== 'light' && (
-          <>
-            <div className="absolute top-[-10%] left-[20%] w-[350px] h-[350px] rounded-full bg-indigo-500/5 blur-[100px] pointer-events-none" />
-            <div className="absolute bottom-[-10%] right-[10%] w-[450px] h-[450px] rounded-full bg-emerald-500/3 blur-[120px] pointer-events-none" />
-          </>
-        )}
+      <main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain relative p-4 md:p-8 [mask-image:linear-gradient(to_bottom,transparent_0%,black_4%,black_96%,transparent_100%)]">
 
         {/* Auto-Update Banner */}
         <UpdateBanner />

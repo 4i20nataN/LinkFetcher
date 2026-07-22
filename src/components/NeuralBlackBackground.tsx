@@ -344,15 +344,10 @@ export const NeuralBlackBackground: React.FC = () => {
         style={{
           position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
           zIndex: 2, pointerEvents: 'none', willChange: 'transform',
+          opacity: 0.7,
+          transform: 'scale(1.05)',
         }}
       />
-
-      <style>{`
-        @keyframes bgmove {
-          0% { transform: scale(1) rotate(0deg); }
-          100% { transform: scale(1.08) rotate(2deg); }
-        }
-      `}</style>
     </div>
   );
 };
