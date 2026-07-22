@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Nothing OS / LinkFetcher Desktop color palette -->
+    <!-- Dark theme (default) -->
+    <color name="windowBackground">#0a0a0b</color>        <!-- zinc-950 -->
+    <color name="surfaceBase">#18181b</color>              <!-- zinc-900 -->
+    <color name="surfaceGlass">#b318181b</color>           <!-- zinc-900 @ 70% opacity (ARGB) -->
+    <color name="borderSubtle">#0dffffff</color>           <!-- white @ 5% (ARGB) -->
+    <color name="borderStrong">#1affffff</color>           <!-- white @ 10% (ARGB) -->
+    <color name="textPrimary">#fafafa</color>              <!-- zinc-50 -->
+    <color name="textSecondary">#a1a1aa</color>            <!-- zinc-400 -->
+    <color name="textMuted">#71717a</color>                <!-- zinc-500 -->
+
+    <!-- Accent colors (matching desktop Settings accent selector) -->
+    <color name="accentIndigo">#6366f1</color>             <!-- indigo-500 -->
+    <color name="accentEmerald">#10b981</color>            <!-- emerald-500 -->
+    <color name="accentViolet">#8b5cf6</color>             <!-- violet-500 -->
+    <color name="accentAmber">#f59e0b</color>              <!-- amber-500 -->
+    <color name="accentRose">#f43f5e</color>               <!-- rose-500 -->
+    <color name="accentCyan">#06b6d4</color>               <!-- cyan-500 -->
+
+    <!-- Default accent (indigo) -->
+    <color name="colorPrimary">#6366f1</color>
+    <color name="colorPrimaryDark">#4f46e5</color>         <!-- indigo-600 -->
+    <color name="colorAccent">#6366f1</color>
+
+    <!-- Status / semantic -->
+    <color name="success">#10b981</color>
+    <color name="warning">#f59e0b</color>
+    <color name="error">#f43f5e</color>
+    <color name="info">#06b6d4</color>
+
+    <!-- WebView background - TRANSPARENT so web content theme shows through -->
+    <color name="webviewBackground">@android:color/transparent</color>
+</resources>

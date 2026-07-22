@@ -42,7 +42,6 @@ release/
 electron/resources/
 
 # Capacitor (generated platforms)
-android/
 ios/
 
 # yt-dlp / ffmpeg (bundled, not source)
