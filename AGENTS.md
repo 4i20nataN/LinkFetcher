@@ -131,22 +131,3 @@ npm run build && npx electron-builder --win
 ```
 
 O `npm run build` gera `dist-web/` (Vite) e `dist/electron/` (esbuild). O `electron-builder` empacota no asar. Se pular a limpeza, arquivos antigos com hashes diferentes ficam no asar e o Electron não encontra o `index.html`.
-
----
-
-## 11. ATUALIZAÇÃO DO SESSION LOG
-
-Ao concluir cada sessão de trabalho, adicione uma entrada resumida em **docs/session-log.md** sob a data corrente. Cada entrada deve conter:
-
-- **Commit/Change tag** (ex: `fix(desc): ...` ou `...` para trabalho em andamento)
-- **Descrição curta** (1-2 linhas) explicando o que foi feito e como
-- Foco em mudanças significativas, não em cada pequeno ajuste
-
-Exemplo de formato:
-
-```markdown
-## 2026-07-15 (feat/ui-redesign)
-
-- `d83c5d7` fix(desc): spacing and 'Nenhuma' option for description format
-  - Added 'none' default to `descFormat`; SummaryPanel only shows tag when txt/md selected
-```
