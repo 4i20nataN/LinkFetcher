@@ -123,7 +123,7 @@ body {
 }
 
 .light {
-  background: linear-gradient(rgba(var(--color-primary-rgb, 99, 102, 241), 0.015), rgba(var(--color-primary-rgb, 99, 102, 241), 0.015)), #dfe3ea !important;
+  background: linear-gradient(rgba(var(--color-primary-rgb, 99, 102, 241), 0.015), rgba(var(--color-primary-rgb, 99, 102, 241), 0.015)), #F4F6F9 !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════ */
@@ -151,17 +151,17 @@ body {
 }
 
 .light {
-  --lf-surface: rgba(255, 255, 255, 0.22);
+  --lf-surface: rgba(255, 255, 255, 0.22);        /* #FFFFFF base */
   --lf-surface-rgb: 255, 255, 255;
-  --lf-surface-raised: rgba(255, 255, 255, 0.30);
-  --lf-surface-sunken: rgba(255, 255, 255, 0.14);
-  --lf-border: rgba(190, 200, 215, 0.35);
-  --lf-border-strong: rgba(190, 200, 215, 0.50);
-  --lf-border-hover: rgba(190, 200, 215, 0.45);
-  --lf-text: #141821;
-  --lf-text-secondary: #454d60;
-  --lf-text-muted: #6b7280;
-  --lf-text-faint: #9ca3af;
+  --lf-surface-raised: rgba(248, 249, 250, 0.30);  /* #F8F9FA base */
+  --lf-surface-sunken: rgba(238, 242, 255, 0.14);  /* #EEF2FF base */
+  --lf-border: rgba(226, 232, 240, 0.35);          /* #E2E8F0 base */
+  --lf-border-strong: rgba(237, 242, 247, 0.50);   /* #EDF2F7 base */
+  --lf-border-hover: rgba(203, 213, 225, 0.45);    /* #CBD5E1 base */
+  --lf-text: #0F172A;                              /* títulos */
+  --lf-text-secondary: #1E293B;                    /* textos principais */
+  --lf-text-muted: #475569;                        /* subtítulos */
+  --lf-text-faint: #64748B;                        /* textos secundários */
   --lf-input-bg: rgba(255, 255, 255, 0.55);
   --lf-skeleton: rgba(230, 235, 243, 0.60);
   --lf-badge: rgba(220, 226, 236, 0.45);
