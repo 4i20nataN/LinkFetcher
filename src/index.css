@@ -73,23 +73,23 @@ body {
 
 /* Frosted Glass Utilities — Obsidian Glass Design System */
 @utility glass-card {
-  background: rgba(10, 14, 23, 0.40);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(60px) saturate(1.8);
-  -webkit-backdrop-filter: blur(60px) saturate(1.8);
+  background: rgba(10, 14, 23, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(80px) saturate(1.4);
+  -webkit-backdrop-filter: blur(80px) saturate(1.4);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55),
-              inset 0 1px 1px rgba(255, 255, 255, 0.12),
-              inset 0 -1px 2px rgba(0, 0, 0, 0.4);
+              inset 0 1px 0 rgba(255, 255, 255, 0.06),
+              inset 0 -1px 0 rgba(0, 0, 0, 0.3);
   transition: border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
 @utility glass-card-hover {
-  background: rgba(10, 14, 23, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(60px) saturate(1.8);
-  -webkit-backdrop-filter: blur(60px) saturate(1.8);
+  background: rgba(10, 14, 23, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(80px) saturate(1.4);
+  -webkit-backdrop-filter: blur(80px) saturate(1.4);
   box-shadow: 0 25px 55px rgba(0, 0, 0, 0.7),
-              inset 0 1px 2px rgba(255, 255, 255, 0.2);
+              inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 @utility glass-sidebar {
@@ -101,17 +101,17 @@ body {
 }
 
 @utility glass-input {
-  background: rgba(2, 3, 5, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
+  background: rgba(2, 3, 5, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(50px);
+  -webkit-backdrop-filter: blur(50px);
 }
 
 @utility glass-pill {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(50px);
+  -webkit-backdrop-filter: blur(50px);
 }
 
 /* ═══════════════════════════════════════════════════════════════ */
