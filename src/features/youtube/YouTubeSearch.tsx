@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { SearchResult } from '../../types';
 import { Search, Globe, Play, ArrowRight, Eye, AlertCircle } from 'lucide-react';
@@ -9,6 +9,80 @@ import {
 } from '../../components/ThemeWrapper';
 import { searchVideosWithAdapter } from '../../core/ytdlp/YtDlpAdapter';
 
+const CACHE_MAX = 20;
+const searchCache = new Map<string, SearchResult[]>();
+
+function cacheGet(key: string): SearchResult[] | undefined {
+  const val = searchCache.get(key);
+  if (val !== undefined) {
+    searchCache.delete(key);
+    searchCache.set(key, val);
+  }
+  return val;
+}
+
+function cacheSet(key: string, value: SearchResult[]) {
+  if (searchCache.size >= CACHE_MAX) {
+    const firstKey = searchCache.keys().next().value!;
+    searchCache.delete(firstKey);
+  }
+  searchCache.set(key, value);
+}
+
+const SearchResultCard = React.memo<{
+  video: SearchResult;
+  onSelect: (url: string) => void;
+  accentText: string;
+  label: string;
+}>(({ video, onSelect, accentText, label }) => (
+  <motion.div
+    initial={{ opacity: 0, scale: 0.98 }}
+    animate={{ opacity: 1, scale: 1 }}
+    exit={{ opacity: 0, scale: 0.98 }}
+    onClick={() => onSelect(video.url)}
+    className="group rounded-2xl glass-card p-3 transition-all duration-300 cursor-pointer flex flex-col justify-between hover:bg-white/10"
+  >
+    <div>
+      <div className="relative aspect-video rounded-xl overflow-hidden border border-white/5 bg-zinc-950 shrink-0">
+        <img
+          src={video.thumbnail}
+          alt={video.title}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          referrerPolicy="no-referrer"
+          loading="lazy"
+          decoding="async"
+        />
+        <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white">
+            <Play size={16} fill="currentColor" />
+          </div>
+        </div>
+        <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/80 backdrop-blur-md text-[10px] font-mono text-zinc-300">
+          {video.duration_string}
+        </span>
+      </div>
+      <h4 className="font-display font-semibold text-sm text-white mt-3 line-clamp-2 leading-snug group-hover:text-zinc-200 transition-colors">
+        {video.title}
+      </h4>
+      <p className="text-xs text-zinc-400 font-medium mt-1">
+        {video.uploader}
+      </p>
+    </div>
+    <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/5 text-[10px] text-zinc-500 font-medium">
+      <div className="flex gap-3">
+        <span className="flex items-center gap-1">
+          <Eye size={12} />
+          {video.view_count.toLocaleString()}
+        </span>
+      </div>
+      <span className={`text-xs font-semibold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${accentText}`}>
+        {label} <ArrowRight size={12} />
+      </span>
+    </div>
+  </motion.div>
+));
+SearchResultCard.displayName = 'SearchResultCard';
+
 export const YouTubeSearch: React.FC = () => {
   const { settings, setSelectedUrl, setActiveTab } = useApp();
   const { t } = useTranslation(settings);
@@ -16,11 +90,31 @@ export const YouTubeSearch: React.FC = () => {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const handleSearch = async (e?: React.FormEvent) => {
+  const handleSelectVideo = useCallback((videoUrl: string) => {
+    setSelectedUrl(videoUrl);
+    setActiveTab('analyze');
+  }, [setSelectedUrl, setActiveTab]);
+
+  const accentText = useMemo(() => getAccentTextClass(settings), [settings]);
+  const analyzeLabel = useMemo(() => settings.language === 'en' ? 'Analyze' : 'Analisar', [settings.language]);
+
+  const handleSearch = useCallback(async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!query.trim()) return;
-    
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const cacheKey = query.trim().toLowerCase();
+    const cached = cacheGet(cacheKey);
+    if (cached) {
+      setResults(cached);
+      return;
+    }
+
     setSearching(true);
     setError(null);
 
@@ -30,18 +124,20 @@ export const YouTubeSearch: React.FC = () => {
         platform: 'youtube',
         maxResults: 10
       });
-      setResults(data);
+      if (!controller.signal.aborted) {
+        setResults(data);
+        cacheSet(cacheKey, data);
+      }
     } catch (err: any) {
-      setError(err.message || 'Search failed');
+      if (!controller.signal.aborted) {
+        setError(err.message || 'Search failed');
+      }
     } finally {
-      setSearching(false);
+      if (!controller.signal.aborted) {
+        setSearching(false);
+      }
     }
-  };
-
-  const handleSelectVideo = (videoUrl: string) => {
-    setSelectedUrl(videoUrl);
-    setActiveTab('analyze');
-  };
+  }, [query]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 py-2 md:py-6 px-4">
@@ -122,60 +218,13 @@ export const YouTubeSearch: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <AnimatePresence>
               {results.map((video) => (
-                <motion.div
+                <SearchResultCard
                   key={video.id}
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  onClick={() => handleSelectVideo(video.url)}
-                  className="group rounded-2xl glass-card p-3 transition-all duration-300 cursor-pointer flex flex-col justify-between hover:bg-white/10"
-                >
-                  <div>
-                    {/* Thumbnail */}
-                    <div className="relative aspect-video rounded-xl overflow-hidden border border-white/5 bg-zinc-950 shrink-0">
-                      <img
-                        src={video.thumbnail}
-                        alt={video.title}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        referrerPolicy="no-referrer"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white">
-                          <Play size={16} fill="currentColor" />
-                        </div>
-                      </div>
-                      {/* Duration */}
-                      <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/80 backdrop-blur-md text-[10px] font-mono text-zinc-300">
-                        {video.duration_string}
-                      </span>
-                    </div>
-
-                    {/* Metadata */}
-                    <h4 className="font-display font-semibold text-sm text-white mt-3 line-clamp-2 leading-snug group-hover:text-zinc-200 transition-colors">
-                      {video.title}
-                    </h4>
-                    <p className="text-xs text-zinc-400 font-medium mt-1">
-                      {video.uploader}
-                    </p>
-                  </div>
-
-                  {/* Footer details info */}
-                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/5 text-[10px] text-zinc-500 font-medium">
-                    <div className="flex gap-3">
-                      <span className="flex items-center gap-1">
-                        <Eye size={12} />
-                        {video.view_count.toLocaleString()}
-                      </span>
-                    </div>
-
-                    {/* CTA arrow */}
-                    <span className={`text-xs font-semibold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${getAccentTextClass(settings)}`}>
-                      {t('btnAnalyzeVideo')} <ArrowRight size={12} />
-                    </span>
-                  </div>
-                </motion.div>
+                  video={video}
+                  onSelect={handleSelectVideo}
+                  accentText={accentText}
+                  label={analyzeLabel}
+                />
               ))}
             </AnimatePresence>
           </div>

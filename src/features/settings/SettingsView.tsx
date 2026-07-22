@@ -410,42 +410,70 @@ export const SettingsView: React.FC = () => {
 
             <div className="space-y-2">
               <span className="text-xs text-zinc-400 font-medium">{t('destinationFolder')}</span>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={settings.defaultDir}
-                  onChange={(e) => updateSettings({ defaultDir: e.target.value })}
-                  className="flex-1 px-3 py-2 rounded-xl bg-zinc-950/70 border border-zinc-800 text-xs text-zinc-300 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  placeholder={settings.language === 'en' ? 'Download folder path...' : 'Caminho da pasta de downloads...'}
-                />
-                <button
-                  onClick={handleSelectFolder}
-                  className="px-3 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-zinc-700/50 transition-all whitespace-nowrap"
-                  title={settings.language === 'en' ? 'Choose folder (native dialog)' : 'Escolher pasta (diálogo nativo)'}
-                >
-                  <FolderPlus size={12} />
-                  {settings.language === 'en' ? 'Choose' : 'Escolher'}
-                </button>
-                <button
-                  onClick={handleOpenFolder}
-                  className="px-3 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-zinc-700/50 transition-all whitespace-nowrap"
-                >
-                  <FolderOpen size={12} />
-                  {showCopied
-                    ? (settings.language === 'en' ? 'Copied!' : 'Copiado!')
-                    : (settings.language === 'en' ? 'Open' : 'Abrir')}
-                </button>
-              </div>
-              <p className="text-[10px] text-zinc-600 flex items-center gap-1">
-                {isElectron ? '🖥️' : '🌐'}
-                {settings.language === 'en' 
-                  ? isElectron 
-                    ? 'Native folder dialogs available (Electron)' 
-                    : 'Web mode: folder picker uses File System Access API (limited)'
-                  : isElectron 
-                    ? 'Diálogos de pasta nativos disponíveis (Electron)' 
-                    : 'Modo Web: seletor usa File System Access API (limitado)'}
-              </p>
+
+              {isCapacitor ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800">
+                    <HardDrive size={13} className="text-zinc-500 flex-shrink-0" />
+                    <span className="text-[11px] text-zinc-400 font-mono truncate">
+                      {settings.defaultDir || 'context.filesDir/downloads'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleOpenFolder}
+                    className={`w-full px-3 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 hover:text-white text-xs font-semibold flex items-center justify-center gap-1.5 border border-zinc-700/50 transition-all`}
+                  >
+                    <FolderOpen size={12} />
+                    {showCopied
+                      ? (settings.language === 'en' ? 'Copied!' : 'Copiado!')
+                      : (settings.language === 'en' ? 'Copy Path' : 'Copiar Caminho')}
+                  </button>
+                  <p className="text-[10px] text-zinc-600 flex items-center gap-1">
+                    📱 {settings.language === 'en'
+                      ? 'Android: files saved to internal app storage (fixed path)'
+                      : 'Android: arquivos salvos no armazenamento interno do app (caminho fixo)'}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={settings.defaultDir}
+                      onChange={(e) => updateSettings({ defaultDir: e.target.value })}
+                      className="flex-1 px-3 py-2 rounded-xl bg-zinc-950/70 border border-zinc-800 text-xs text-zinc-300 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      placeholder={settings.language === 'en' ? 'Download folder path...' : 'Caminho da pasta de downloads...'}
+                    />
+                    <button
+                      onClick={handleSelectFolder}
+                      className="px-3 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-zinc-700/50 transition-all whitespace-nowrap"
+                      title={settings.language === 'en' ? 'Choose folder (native dialog)' : 'Escolher pasta (diálogo nativo)'}
+                    >
+                      <FolderPlus size={12} />
+                      {settings.language === 'en' ? 'Choose' : 'Escolher'}
+                    </button>
+                    <button
+                      onClick={handleOpenFolder}
+                      className="px-3 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-zinc-700/50 transition-all whitespace-nowrap"
+                    >
+                      <FolderOpen size={12} />
+                      {showCopied
+                        ? (settings.language === 'en' ? 'Copied!' : 'Copiado!')
+                        : (settings.language === 'en' ? 'Open' : 'Abrir')}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-zinc-600 flex items-center gap-1">
+                    {isElectron ? '🖥️' : '🌐'}
+                    {settings.language === 'en' 
+                      ? isElectron 
+                        ? 'Native folder dialogs available (Electron)' 
+                        : 'Web mode: folder picker uses File System Access API (limited)'
+                      : isElectron 
+                        ? 'Diálogos de pasta nativos disponíveis (Electron)' 
+                        : 'Modo Web: seletor usa File System Access API (limitado)'}
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="space-y-2">

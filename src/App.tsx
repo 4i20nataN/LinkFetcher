@@ -3,18 +3,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { AppProvider, useApp } from './context/AppContext';
 import { ThemeWrapper } from './components/ThemeWrapper';
 import { Sidebar } from './components/Sidebar';
-import { LinkAnalyzer } from './features/analyzer/LinkAnalyzer';
-import { YouTubeSearch } from './features/youtube/YouTubeSearch';
-import { DownloadManager } from './features/downloads/DownloadManager';
-import { FavoritesView } from './features/favorites/FavoritesView';
-import { DownloadLaterView } from './features/later/DownloadLaterView';
-import { SettingsView } from './features/settings/SettingsView';
+const LinkAnalyzer = React.lazy(() => import('./features/analyzer/LinkAnalyzer').then(m => ({ default: m.LinkAnalyzer })));
+const YouTubeSearch = React.lazy(() => import('./features/youtube/YouTubeSearch').then(m => ({ default: m.YouTubeSearch })));
+const DownloadManager = React.lazy(() => import('./features/downloads/DownloadManager').then(m => ({ default: m.DownloadManager })));
+const FavoritesView = React.lazy(() => import('./features/favorites/FavoritesView').then(m => ({ default: m.FavoritesView })));
+const DownloadLaterView = React.lazy(() => import('./features/later/DownloadLaterView').then(m => ({ default: m.DownloadLaterView })));
+const SettingsView = React.lazy(() => import('./features/settings/SettingsView').then(m => ({ default: m.SettingsView })));
 import UpdateBanner from './features/update/UpdateBanner';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -55,22 +55,13 @@ function DashboardContent() {
   }, [settings.themeMode]);
 
   const renderActiveView = () => {
-    switch (activeTab) {
-      case 'analyze':
-        return <LinkAnalyzer key="analyze" />;
-      case 'search':
-        return <YouTubeSearch key="search" />;
-      case 'manager':
-        return <DownloadManager key="manager" />;
-      case 'favorites':
-        return <FavoritesView key="favorites" />;
-      case 'later':
-        return <DownloadLaterView key="later" />;
-      case 'settings':
-        return <SettingsView key="settings" />;
-      default:
-        return <LinkAnalyzer key="analyze" />;
-    }
+    const views = { analyze: LinkAnalyzer, search: YouTubeSearch, manager: DownloadManager, favorites: FavoritesView, later: DownloadLaterView, settings: SettingsView } as const;
+    const View = views[activeTab as keyof typeof views] || LinkAnalyzer;
+    return (
+      <Suspense fallback={<div className="flex items-center justify-center h-32 text-zinc-500 text-sm">Carregando...</div>}>
+        <View key={activeTab} />
+      </Suspense>
+    );
   };
 
   return (

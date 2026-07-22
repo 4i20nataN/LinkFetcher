@@ -300,6 +300,50 @@ function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, accentBg, 
   );
 }
 
+interface AccordionSectionProps {
+  title: string;
+  blockId: BlockId;
+  isOpen: boolean;
+  onToggle: () => void;
+  accentBg: string;
+  children: React.ReactNode;
+}
+
+const AccordionSection = React.memo<AccordionSectionProps>(({ title, blockId, isOpen, onToggle, accentBg, children }) => (
+  <div className="rounded-xl bg-zinc-900/40 border border-white/5 glass-section">
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center justify-between p-3 pb-4 text-left hover:bg-white/[0.02] transition-colors"
+    >
+      <div className="flex items-center gap-2">
+        <BlockIcon blockId={blockId} />
+        <BlockTitle>{title}</BlockTitle>
+      </div>
+      <motion.div
+        animate={{ rotate: isOpen ? 180 : 0 }}
+        transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+      >
+        <ChevronDown size={14} className="text-zinc-500" />
+      </motion.div>
+    </button>
+    <AnimatePresence initial={false}>
+      {isOpen && (
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={{ height: { type: 'spring', stiffness: 400, damping: 30 }, opacity: { duration: 0.2 } }}
+          className="overflow-hidden"
+          style={{ willChange: 'transform' }}
+        >
+          {children}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  </div>
+));
+AccordionSection.displayName = 'AccordionSection';
+
 export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, formatOptions }: FormatSelectorProps) {
   const { settings, updateSettings } = useApp();
   const [activeTab, setActiveTab] = useState<TabId>('media');
@@ -544,43 +588,6 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
     });
   }, []);
 
-  const AccordionSection: React.FC<{ id: string; title: string; blockId: BlockId; children: React.ReactNode; defaultOpen?: boolean }> = ({ id, title, blockId, children, defaultOpen = false }) => {
-    const isOpen = openSections.has(id) || defaultOpen;
-    return (
-      <div className="rounded-xl bg-zinc-900/40 border border-white/5 glass-section">
-        <button
-          onClick={() => toggleSection(id)}
-          className="w-full flex items-center justify-between p-3 pb-4 text-left hover:bg-white/[0.02] transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <BlockIcon blockId={blockId} />
-            <BlockTitle>{title}</BlockTitle>
-          </div>
-          <motion.div
-            animate={{ rotate: isOpen ? 180 : 0 }}
-            transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
-          >
-            <ChevronDown size={14} className="text-zinc-500" />
-          </motion.div>
-        </button>
-        <AnimatePresence initial={false}>
-          {isOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ height: { type: 'spring', stiffness: 400, damping: 30 }, opacity: { duration: 0.2 } }}
-              className="overflow-hidden"
-              style={{ willChange: 'transform' }}
-            >
-              {children}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    );
-  };
-
   const Btn: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode; className?: string; disabled?: boolean }> = ({ active, onClick, children, className = '', disabled = false }) => (
     <motion.button
       onClick={onClick}
@@ -740,7 +747,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             </div>
 
             {/* ── Resolução ── */}
-            <AccordionSection id="resolution" title="Resolução" blockId="resolution">
+            <AccordionSection id="resolution" title="Resolução" blockId="resolution" isOpen={openSections.has('resolution')} onToggle={() => toggleSection('resolution')} accentBg={accentBg}>
               <div className="px-3 pb-3 pt-2 space-y-2">
                 <div className="flex flex-wrap gap-2.5">
                   {VIDEO_PRESETS.map(preset => {
@@ -774,7 +781,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             </AccordionSection>
 
             {/* ── Formato Video + Codecs ── */}
-            <AccordionSection id="video-format" title="Formatos" blockId="video-format">
+            <AccordionSection id="video-format" title="Formatos" blockId="video-format" isOpen={openSections.has('video-format')} onToggle={() => toggleSection('video-format')} accentBg={accentBg}>
               <div className="px-3 pb-3 pt-2 space-y-3">
                 <div className="flex flex-wrap gap-2.5">
                   {VIDEO_FORMATS.map(fmt => (
@@ -828,7 +835,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
 
             {/* ── Descrição ── */}
             {mediaInfo.description && (
-              <AccordionSection id="description" title="Descrição" blockId="metadata">
+              <AccordionSection id="description" title="Descrição" blockId="metadata" isOpen={openSections.has('description')} onToggle={() => toggleSection('description')} accentBg={accentBg}>
                 <div className="px-3 pb-3 pt-2 space-y-2">
                   <div className={`relative fs-sm text-zinc-400 leading-relaxed whitespace-pre-line ${descExpanded ? '' : 'line-clamp-5'}`}>
                     {mediaInfo.description}
@@ -858,7 +865,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             )}
 
             {/* ── Áudio ── */}
-            <AccordionSection id="audio" title="Áudio" blockId="audio-format">
+            <AccordionSection id="audio" title="Áudio" blockId="audio-format" isOpen={openSections.has('audio')} onToggle={() => toggleSection('audio')} accentBg={accentBg}>
               <div className="px-3 pb-3 pt-2 space-y-3">
                 <Toggle
                   value={options.audioOnly}
@@ -899,7 +906,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             </AccordionSection>
 
             {/* ── Legendas ── */}
-            <AccordionSection id="subtitles" title="Legendas" blockId="subtitles">
+            <AccordionSection id="subtitles" title="Legendas" blockId="subtitles" isOpen={openSections.has('subtitles')} onToggle={() => toggleSection('subtitles')} accentBg={accentBg}>
               <div className="px-3 pb-3 pt-2 space-y-3">
                 <Toggle
                   value={showSubs}
@@ -964,7 +971,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             </div>
 
             {/* ── Recorte de tempo ── */}
-            <AccordionSection id="trim" title="Recortar vídeo" blockId="trim">
+            <AccordionSection id="trim" title="Recortar vídeo" blockId="trim" isOpen={openSections.has('trim')} onToggle={() => toggleSection('trim')} accentBg={accentBg}>
               <div className="px-3 pb-3 pt-2 space-y-2">
                 {mediaInfo.durationSeconds > 0 ? (
                   <TimeRangeSlider
@@ -1010,7 +1017,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             </AccordionSection>
 
             {/* ── Modo de Saída + FPS (2 colunas) ── */}
-            <AccordionSection id="output" title="Modo de saída" blockId="output-mode">
+            <AccordionSection id="output" title="Modo de saída" blockId="output-mode" isOpen={openSections.has('output')} onToggle={() => toggleSection('output')} accentBg={accentBg}>
               <div className="px-3 pb-3 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -1046,7 +1053,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             </AccordionSection>
 
             {/* ── SponsorBlock ── */}
-            <AccordionSection id="sponsorblock" title="SponsorBlock" blockId="sponsorblock">
+            <AccordionSection id="sponsorblock" title="SponsorBlock" blockId="sponsorblock" isOpen={openSections.has('sponsorblock')} onToggle={() => toggleSection('sponsorblock')} accentBg={accentBg}>
               <div className="px-3 pb-3 pt-2 space-y-2">
                 <p className="fs-sm text-zinc-600">Remover automaticamente partes indesejadas do video</p>
                 <div className="flex flex-wrap gap-2.5">
@@ -1102,7 +1109,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             </AccordionSection>
 
             {/* ── Metadados + Thumbnail (2 colunas) ── */}
-            <AccordionSection id="metadata" title="Metadados" blockId="metadata">
+            <AccordionSection id="metadata" title="Metadados" blockId="metadata" isOpen={openSections.has('metadata')} onToggle={() => toggleSection('metadata')} accentBg={accentBg}>
               <div className="px-3 pb-3 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <Toggle value={options.embedMetadata} onChange={() => update({ embedMetadata: !options.embedMetadata })} label="Metadados" desc="Incorporar titulo, autor e outros dados" icon={<BlockIcon blockId="metadata" />} />
                 <div>
@@ -1117,7 +1124,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             </AccordionSection>
 
             {/* ── Comportamento + Limite de Velocidade (2 colunas) ── */}
-            <AccordionSection id="behavior" title="Comportamento" blockId="behavior">
+            <AccordionSection id="behavior" title="Comportamento" blockId="behavior" isOpen={openSections.has('behavior')} onToggle={() => toggleSection('behavior')} accentBg={accentBg}>
               <div className="px-3 pb-3 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
