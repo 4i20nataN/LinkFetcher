@@ -13,13 +13,13 @@ import { useEffect, useRef } from 'react';
 const IS_CAPACITOR = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
 
 const CONFIG = {
-  nodeCount: IS_CAPACITOR ? 60 : 110,
-  connectionDist: 160,
-  mouseRadius: 220,
-  lineWidth: 1.8,
-  nodeBaseSize: 3.5,
-  glowRadiusMult: 8,
-  velocity: 0.5,
+  nodeCount: IS_CAPACITOR ? 50 : 85,
+  connectionDist: 140,
+  mouseRadius: 160,
+  lineWidth: 1.2,
+  nodeBaseSize: 1.8,
+  glowRadiusMult: 4.5,
+  velocity: 0.35,
   twoPi: Math.PI * 2,
 };
 
@@ -171,7 +171,7 @@ export function NeuralConstellationBackground() {
 
     function createNodes(): NodeObj[] {
       return Array.from({ length: CONFIG.nodeCount }, () => {
-        const baseRadius = Math.random() * 2 + CONFIG.nodeBaseSize;
+        const baseRadius = Math.random() * 2.2 + CONFIG.nodeBaseSize;
         const color = CORE_COLORS[Math.floor(Math.random() * CORE_COLORS.length)];
         // Pre-render and cache sprite for this color
         const key = color.r * 10000 + color.g * 100 + color.b;
@@ -360,7 +360,7 @@ export function NeuralConstellationBackground() {
           glCtx.drawImage(glowSprite, n.x - drawW / 2, n.y - drawH / 2, drawW, drawH);
 
           // Central flare point
-          glCtx.globalAlpha = 0.95 * intensity;
+          glCtx.globalAlpha = 0.7 * intensity;
           glCtx.fillStyle = 'rgba(255, 255, 240, 1)';
           glCtx.beginPath();
           glCtx.arc(n.x, n.y, n.radius * 0.8, 0, CONFIG.twoPi);
