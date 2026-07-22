@@ -1,7 +1,5 @@
 import { useEffect, useRef } from 'react';
 
-interface NodeColor { r: number; g: number; b: number }
-
 interface NodeObj {
   x: number;
   y: number;
@@ -11,21 +9,30 @@ interface NodeObj {
   radius: number;
   glowIntensity: number;
   pulseDir: number;
-  color: NodeColor;
 }
 
-const COLOR_OPTIONS: NodeColor[] = [
-  { r: 50, g: 56, b: 68 },
-  { r: 70, g: 80, b: 100 },
-  { r: 90, g: 70, b: 60 },
-  { r: 40, g: 60, b: 80 },
-];
+const IS_CAPACITOR = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
+
+const CONFIG = {
+  nodeCount: IS_CAPACITOR ? 30 : 95,
+  connectionDist: 155,
+  mouseRadius: 200,
+  coreColor: 'rgba(50, 56, 68, 0.9)',
+  haloColor: 'rgba(255, 255, 255, 0.95)',
+  lineColor: '105, 118, 138',
+  glowColor: '255, 246, 230',
+  interactiveGlow: '255, 253, 245',
+  velocity: 0.45,
+  baseRadiusMin: 1.5,
+  baseRadiusRange: 2.5,
+  glowPulse: 0.01,
+};
 
 export function NeuralConstellationBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glareRef = useRef<HTMLCanvasElement>(null);
   const nodesRef = useRef<NodeObj[]>([]);
-  const mouseRef = { x: null as number | null, y: null as number | null, active: false };
+  const mouseRef = useRef({ x: null as number | null, y: null as number | null, active: false });
   const rafRef = useRef<number>(0);
 
   useEffect(() => {
@@ -36,20 +43,6 @@ export function NeuralConstellationBackground() {
     const ctx = canvas.getContext('2d')!;
     const glCtx = glare.getContext('2d')!;
 
-    const CONFIG = {
-      nodeCount: 60,
-      connectionDist: 160,
-      mouseRadius: 220,
-      coreColor: '#1a1a24',
-      haloColor: 'rgba(255, 255, 255, 0.95)',
-      lineColor: '60, 70, 90',
-      glowColor: '255, 215, 180',
-      interactiveGlow: '255, 240, 200',
-      lineWidth: 1.8,
-      nodeBaseSize: 3.5,
-      glowIntensity: 1.2,
-    };
-
     let w = 0;
     let h = 0;
 
@@ -59,17 +52,19 @@ export function NeuralConstellationBackground() {
     }
 
     function createNodes(): NodeObj[] {
-      return Array.from({ length: CONFIG.nodeCount }, () => ({
-        x: Math.random() * w,
-        y: Math.random() * h,
-        vx: (Math.random() - 0.5) * 0.5,
-        vy: (Math.random() - 0.5) * 0.5,
-        baseRadius: Math.random() * 2 + CONFIG.nodeBaseSize,
-        radius: 0,
-        glowIntensity: Math.random() * 0.6 + 0.4,
-        pulseDir: Math.random() > 0.5 ? 0.008 : -0.008,
-        color: COLOR_OPTIONS[Math.floor(Math.random() * COLOR_OPTIONS.length)],
-      })).map(n => { n.radius = n.baseRadius; return n; });
+      return Array.from({ length: CONFIG.nodeCount }, () => {
+        const baseRadius = Math.random() * CONFIG.baseRadiusRange + CONFIG.baseRadiusMin;
+        return {
+          x: Math.random() * w,
+          y: Math.random() * h,
+          vx: (Math.random() - 0.5) * CONFIG.velocity,
+          vy: (Math.random() - 0.5) * CONFIG.velocity,
+          baseRadius,
+          radius: baseRadius,
+          glowIntensity: Math.random() * 0.5 + 0.5,
+          pulseDir: Math.random() > 0.5 ? CONFIG.glowPulse : -CONFIG.glowPulse,
+        };
+      });
     }
 
     function updateNode(n: NodeObj) {
@@ -79,18 +74,22 @@ export function NeuralConstellationBackground() {
       if (n.y < 0 || n.y > h) n.vy *= -1;
 
       n.glowIntensity += n.pulseDir;
-      if (n.glowIntensity > 1.2 || n.glowIntensity < 0.3) n.pulseDir *= -1;
+      if (n.glowIntensity > 1 || n.glowIntensity < 0.4) n.pulseDir *= -1;
 
-      const mouse = mouseRef;
-      if (mouse.active && mouse.x !== null && mouse.y !== null) {
-        const dx = mouse.x - n.x;
-        const dy = mouse.y - n.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist < CONFIG.mouseRadius) {
-          const force = (CONFIG.mouseRadius - dist) / CONFIG.mouseRadius;
-          n.x += (dx / dist) * force * 0.4;
-          n.y += (dy / dist) * force * 0.4;
-          n.radius = n.baseRadius + force * 2.5;
+      if (!IS_CAPACITOR) {
+        const mouse = mouseRef.current;
+        if (mouse.active && mouse.x !== null && mouse.y !== null) {
+          const dx = mouse.x - n.x;
+          const dy = mouse.y - n.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < CONFIG.mouseRadius) {
+            const force = (CONFIG.mouseRadius - dist) / CONFIG.mouseRadius;
+            n.x += (dx / dist) * force * 0.35;
+            n.y += (dy / dist) * force * 0.35;
+            n.radius = n.baseRadius + force * 1.8;
+          } else {
+            n.radius += (n.baseRadius - n.radius) * 0.05;
+          }
         } else {
           n.radius += (n.baseRadius - n.radius) * 0.05;
         }
@@ -100,36 +99,42 @@ export function NeuralConstellationBackground() {
     }
 
     function drawPhysical(c: CanvasRenderingContext2D, n: NodeObj) {
+      c.shadowColor = 'rgba(15, 22, 38, 0.22)';
+      c.shadowBlur = 8;
+      c.shadowOffsetX = 1;
+      c.shadowOffsetY = 3;
+
       c.beginPath();
-      c.arc(n.x, n.y, n.radius + 2.5, 0, Math.PI * 2);
+      c.arc(n.x, n.y, n.radius + 1.8, 0, Math.PI * 2);
       c.fillStyle = CONFIG.haloColor;
       c.fill();
 
-      c.beginPath();
-      c.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
-      c.fillStyle = `rgb(${n.color.r}, ${n.color.g}, ${n.color.b})`;
-      c.fill();
+      c.shadowColor = 'transparent';
+      c.shadowBlur = 0;
+      c.shadowOffsetX = 0;
+      c.shadowOffsetY = 0;
 
       c.beginPath();
-      c.arc(n.x - n.radius * 0.2, n.y - n.radius * 0.2, n.radius * 0.3, 0, Math.PI * 2);
-      c.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      c.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+      c.fillStyle = CONFIG.coreColor;
       c.fill();
     }
 
     function drawGlow(c: CanvasRenderingContext2D, n: NodeObj) {
-      const intensity = CONFIG.glowIntensity * n.glowIntensity;
-      const r = n.radius * 6;
+      const r = n.radius * 6.5;
+      const gradient = c.createRadialGradient(n.x, n.y, 0, n.x, n.y, r);
+      gradient.addColorStop(0, `rgba(${CONFIG.glowColor}, ${0.9 * n.glowIntensity})`);
+      gradient.addColorStop(0.2, `rgba(${CONFIG.glowColor}, ${0.45 * n.glowIntensity})`);
+      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
 
-      c.globalAlpha = 0.3 * intensity;
       c.beginPath();
       c.arc(n.x, n.y, r, 0, Math.PI * 2);
-      c.fillStyle = CONFIG.glowColor;
+      c.fillStyle = gradient;
       c.fill();
-      c.globalAlpha = 1;
 
       c.beginPath();
       c.arc(n.x, n.y, n.radius * 0.8, 0, Math.PI * 2);
-      c.fillStyle = `rgba(255, 255, 240, ${0.95 * intensity})`;
+      c.fillStyle = '#ffffff';
       c.fill();
     }
 
@@ -150,41 +155,38 @@ export function NeuralConstellationBackground() {
 
           if (dist < CONFIG.connectionDist) {
             const factor = 1 - dist / CONFIG.connectionDist;
-            const alpha = factor * 0.5;
 
             ctx.beginPath();
             ctx.moveTo(a.x, a.y);
             ctx.lineTo(b.x, b.y);
-            ctx.lineWidth = CONFIG.lineWidth * factor;
-            ctx.strokeStyle = `rgba(${CONFIG.lineColor}, ${alpha})`;
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
-            ctx.shadowBlur = 4;
+            ctx.lineWidth = factor * 1.3;
+            ctx.strokeStyle = `rgba(${CONFIG.lineColor}, ${factor * 0.4})`;
             ctx.stroke();
-            ctx.shadowColor = 'transparent';
-            ctx.shadowBlur = 0;
 
             glCtx.beginPath();
             glCtx.moveTo(a.x, a.y);
             glCtx.lineTo(b.x, b.y);
-            glCtx.lineWidth = CONFIG.lineWidth * factor * 2.5;
-            glCtx.strokeStyle = `rgba(${CONFIG.glowColor}, ${factor * 0.6})`;
+            glCtx.lineWidth = factor * 2.2;
+            glCtx.strokeStyle = `rgba(${CONFIG.glowColor}, ${factor * 0.55})`;
             glCtx.stroke();
           }
         }
 
-        const mouse = mouseRef;
-        if (mouse.active && mouse.x !== null && mouse.y !== null) {
-          const dx = a.x - mouse.x;
-          const dy = a.y - mouse.y;
-          const dist = Math.hypot(dx, dy);
-          if (dist < CONFIG.mouseRadius) {
-            const factor = 1 - dist / CONFIG.mouseRadius;
-            glCtx.beginPath();
-            glCtx.moveTo(a.x, a.y);
-            glCtx.lineTo(mouse.x, mouse.y);
-            glCtx.lineWidth = factor * 3;
-            glCtx.strokeStyle = `rgba(${CONFIG.interactiveGlow}, ${factor * 0.8})`;
-            glCtx.stroke();
+        if (!IS_CAPACITOR) {
+          const mouse = mouseRef.current;
+          if (mouse.active && mouse.x !== null && mouse.y !== null) {
+            const dx = a.x - mouse.x;
+            const dy = a.y - mouse.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < CONFIG.mouseRadius) {
+              const factor = 1 - dist / CONFIG.mouseRadius;
+              glCtx.beginPath();
+              glCtx.moveTo(a.x, a.y);
+              glCtx.lineTo(mouse.x, mouse.y);
+              glCtx.lineWidth = factor * 2.5;
+              glCtx.strokeStyle = `rgba(${CONFIG.interactiveGlow}, ${factor * 0.75})`;
+              glCtx.stroke();
+            }
           }
         }
       }
@@ -199,12 +201,6 @@ export function NeuralConstellationBackground() {
     nodesRef.current = createNodes();
     animate();
 
-    const onMouseMove = (e: MouseEvent) => {
-      mouseRef.x = e.clientX;
-      mouseRef.y = e.clientY;
-      mouseRef.active = true;
-    };
-    const onMouseLeave = () => { mouseRef.active = false; };
     const onResize = () => {
       resize();
       for (const n of nodesRef.current) {
@@ -218,44 +214,71 @@ export function NeuralConstellationBackground() {
       resizeTimer = setTimeout(onResize, 150);
     };
 
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseleave', onMouseLeave);
     window.addEventListener('resize', onResizeDebounced);
+
+    if (!IS_CAPACITOR) {
+      const onMouseMove = (e: MouseEvent) => {
+        mouseRef.current.x = e.clientX;
+        mouseRef.current.y = e.clientY;
+        mouseRef.current.active = true;
+      };
+      const onMouseLeave = () => { mouseRef.current.active = false; };
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseleave', onMouseLeave);
+
+      return () => {
+        cancelAnimationFrame(rafRef.current);
+        if (resizeTimer) clearTimeout(resizeTimer);
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseleave', onMouseLeave);
+        window.removeEventListener('resize', onResizeDebounced);
+      };
+    }
 
     return () => {
       cancelAnimationFrame(rafRef.current);
       if (resizeTimer) clearTimeout(resizeTimer);
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseleave', onMouseLeave);
       window.removeEventListener('resize', onResizeDebounced);
     };
   }, []);
 
   return (
     <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-      <div className="depth-wave depth-wave-1 absolute rounded-full" />
-      <div className="depth-wave depth-wave-2 absolute rounded-full" />
-      <div className="depth-wave depth-wave-3 absolute rounded-full" />
+      <div className="depth-bg">
+        <div className="wave-layer wave-1" />
+        <div className="wave-layer wave-2" />
+        <div className="wave-layer wave-3" />
+      </div>
 
-      <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full block z-[2]" />
+      <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full block z-[2]" style={{ mixBlendMode: 'multiply' }} />
       <canvas ref={glareRef} className="absolute top-0 left-0 w-full h-full block z-[3] pointer-events-none" style={{ mixBlendMode: 'screen' }} />
 
       <style>{`
-        .depth-wave { filter: blur(8px); }
-        .depth-wave-1 {
-          width: 120%; height: 70%; top: -10%; left: -10%;
-          background: radial-gradient(ellipse at 30% 40%, rgba(148,163,184,0.55) 0%, rgba(180,195,215,0.4) 60%, rgba(200,210,222,0.1) 100%);
+        .depth-bg {
+          position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;
+          background:
+            radial-gradient(circle at 10% 10%, #ffffff 0%, rgba(255,255,255,0) 70%),
+            radial-gradient(circle at 90% 80%, #dbe1e9 0%, #bdc7d4 100%);
+          overflow: hidden;
+        }
+        .wave-layer {
+          position: absolute; width: 150%; height: 150%; top: -25%; left: -25%;
+          transform: rotate(-12deg); opacity: 0.85; pointer-events: none;
+        }
+        .wave-1 {
+          background: radial-gradient(ellipse at 30% 40%, rgba(255,255,255,0.95) 0%, rgba(240,243,247,0.9) 50%, rgba(200,210,222,0.3) 100%);
           clip-path: ellipse(80% 45% at 35% 50%);
+          filter: drop-shadow(-10px 15px 30px rgba(0,0,0,0.08));
         }
-        .depth-wave-2 {
-          width: 110%; height: 60%; bottom: -10%; right: -10%;
-          background: radial-gradient(ellipse at 70% 60%, rgba(130,145,170,0.5) 0%, rgba(160,175,195,0.35) 60%, rgba(180,195,210,0.1) 100%);
+        .wave-2 {
+          background: radial-gradient(ellipse at 70% 60%, rgba(255,255,255,0.85) 0%, rgba(228,233,241,0.8) 60%, rgba(185,197,212,0.4) 100%);
           clip-path: ellipse(75% 38% at 65% 55%);
+          filter: drop-shadow(-15px 25px 45px rgba(0,0,0,0.12));
         }
-        .depth-wave-3 {
-          width: 80%; height: 40%; top: 50%; left: 50%; transform: translate(-50%, -50%);
-          background: radial-gradient(ellipse at 50% 50%, rgba(160,175,195,0.6) 0%, rgba(190,200,215,0.4) 70%, rgba(215,223,232,0.1) 100%);
+        .wave-3 {
+          background: radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.98) 0%, rgba(245,247,250,0.9) 70%, rgba(215,223,232,0.5) 100%);
           clip-path: ellipse(50% 25% at 50% 50%);
+          filter: drop-shadow(0px 20px 40px rgba(0,0,0,0.06));
         }
       `}</style>
     </div>
