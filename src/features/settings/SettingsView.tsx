@@ -1,18 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { AppSettings } from '../../types';
 import { StorageService } from '../../core/storage/Storage';
 import { 
-  Settings, Volume2, Globe, Sliders, HardDrive, Bell, AlertCircle, 
-  Trash2, ShieldCheck, Download, Upload, Info, RefreshCw, Key, ExternalLink,
+  Settings, Globe, Sliders, HardDrive, AlertCircle, 
+  Trash2, ShieldCheck, Download, Upload, RefreshCw,
   FolderOpen, FolderPlus, Smile, Palette, Clipboard
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from '../../core/i18n';
 import { 
-  getAccentBgClass, getAccentTextClass, getAccentBorderClass, getAccentRingClass 
+  getAccentBgClass, getAccentTextClass, getAccentBorderClass
 } from '../../components/ThemeWrapper';
-import { getYtDlpStatusWithAdapter } from '../../core/ytdlp/YtDlpAdapter';
 
 const accentColorsList = [
   { id: 'indigo', name: 'indigo', color: 'bg-indigo-500' },
@@ -37,7 +35,6 @@ export const SettingsView: React.FC = () => {
   const [importText, setImportText] = useState('');
   const [showImportArea, setShowImportArea] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [ytdlpStatus, setYtdlpStatus] = useState<{ ready: boolean; binaryPath?: string } | null>(null);
 
   const isElectron = typeof window !== 'undefined' && !!window.electron;
   const isCapacitor = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
@@ -47,16 +44,9 @@ export const SettingsView: React.FC = () => {
     setTimeout(() => { setToastMsg(null); }, 2000);
   };
 
-  const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [showCopied, setShowCopied] = useState(false);
-  const [updateAvailable, setUpdateAvailable] = useState(false);
-  const [latestVersion, setLatestVersion] = useState('');
 
   useEffect(() => {
-    getYtDlpStatusWithAdapter()
-      .then(data => setYtdlpStatus(data))
-      .catch(() => setYtdlpStatus({ ready: false }));
-
     if (isElectron && (!settings.defaultDir || settings.defaultDir === 'Downloads')) {
       window.electron!.invoke('shell:getDownloadsPath').then((p: any) => {
         if (p && typeof p === 'string') {
@@ -72,28 +62,6 @@ export const SettingsView: React.FC = () => {
       window.electron.setAutoCheck(settings.updates);
     }
   }, [settings.updates, isElectron]);
-
-  const handleCheckUpdates = async () => {
-    setCheckingUpdates(true);
-    setUpdateAvailable(false);
-    showToast(settings.language === 'en' ? 'Checking GitHub repository for updates...' : 'Conectando ao GitHub para buscar atualizações...');
-    try {
-      const response = await fetch('https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest');
-      if (!response.ok) { throw new Error(`GitHub API returned ${response.status}`); }
-      const release = await response.json();
-      const latest = release.tag_name?.replace('v', '');
-      const current = __APP_VERSION__;
-      if (latest && latest !== current) {
-        setUpdateAvailable(true);
-        setLatestVersion(latest);
-        showToast(settings.language === 'en' ? `New version available: ${latest}` : `Nova versão disponível: ${latest}`);
-      } else {
-        showToast(settings.language === 'en' ? `You are running the latest version! (${current})` : `Você já está rodando a versão mais recente! (${current})`);
-      }
-    } catch (error) {
-      showToast(settings.language === 'en' ? 'Update check failed — try again later.' : 'Falha ao verificar atualizações — tente novamente.');
-    } finally { setCheckingUpdates(false); }
-  };
 
   const handleOpenFolder = async () => {
     const downloadPath = settings.defaultDir || '';
@@ -408,73 +376,53 @@ export const SettingsView: React.FC = () => {
               <HardDrive size={16} className={getAccentTextClass(settings)} /> {t('storageSettings')}
             </h3>
 
-            <div className="space-y-2">
-              <span className="text-xs text-zinc-400 font-medium">{t('destinationFolder')}</span>
-
-              {isCapacitor ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800">
-                    <HardDrive size={13} className="text-zinc-500 flex-shrink-0" />
-                    <span className="text-[11px] text-zinc-400 font-mono truncate">
-                      {settings.defaultDir || 'context.filesDir/downloads'}
-                    </span>
-                  </div>
+            {isCapacitor ? (
+              <p className="text-[11px] text-zinc-500">
+                📱 {settings.language === 'en'
+                  ? 'Downloads are saved to the app\'s internal storage automatically.'
+                  : 'Os downloads são salvos automaticamente no armazenamento interno do app.'}
+              </p>
+            ) : (
+              <div className="space-y-2">
+                <span className="text-xs text-zinc-400 font-medium">{t('destinationFolder')}</span>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={settings.defaultDir}
+                    onChange={(e) => updateSettings({ defaultDir: e.target.value })}
+                    className="flex-1 px-3 py-2 rounded-xl bg-zinc-950/70 border border-zinc-800 text-xs text-zinc-300 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    placeholder={settings.language === 'en' ? 'Download folder path...' : 'Caminho da pasta de downloads...'}
+                  />
+                  <button
+                    onClick={handleSelectFolder}
+                    className="px-3 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-zinc-700/50 transition-all whitespace-nowrap"
+                    title={settings.language === 'en' ? 'Choose folder (native dialog)' : 'Escolher pasta (diálogo nativo)'}
+                  >
+                    <FolderPlus size={12} />
+                    {settings.language === 'en' ? 'Choose' : 'Escolher'}
+                  </button>
                   <button
                     onClick={handleOpenFolder}
-                    className={`w-full px-3 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 hover:text-white text-xs font-semibold flex items-center justify-center gap-1.5 border border-zinc-700/50 transition-all`}
+                    className="px-3 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-zinc-700/50 transition-all whitespace-nowrap"
                   >
                     <FolderOpen size={12} />
                     {showCopied
                       ? (settings.language === 'en' ? 'Copied!' : 'Copiado!')
-                      : (settings.language === 'en' ? 'Copy Path' : 'Copiar Caminho')}
+                      : (settings.language === 'en' ? 'Open' : 'Abrir')}
                   </button>
-                  <p className="text-[10px] text-zinc-600 flex items-center gap-1">
-                    📱 {settings.language === 'en'
-                      ? 'Android: files saved to internal app storage (fixed path)'
-                      : 'Android: arquivos salvos no armazenamento interno do app (caminho fixo)'}
-                  </p>
                 </div>
-              ) : (
-                <>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={settings.defaultDir}
-                      onChange={(e) => updateSettings({ defaultDir: e.target.value })}
-                      className="flex-1 px-3 py-2 rounded-xl bg-zinc-950/70 border border-zinc-800 text-xs text-zinc-300 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      placeholder={settings.language === 'en' ? 'Download folder path...' : 'Caminho da pasta de downloads...'}
-                    />
-                    <button
-                      onClick={handleSelectFolder}
-                      className="px-3 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-zinc-700/50 transition-all whitespace-nowrap"
-                      title={settings.language === 'en' ? 'Choose folder (native dialog)' : 'Escolher pasta (diálogo nativo)'}
-                    >
-                      <FolderPlus size={12} />
-                      {settings.language === 'en' ? 'Choose' : 'Escolher'}
-                    </button>
-                    <button
-                      onClick={handleOpenFolder}
-                      className="px-3 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-zinc-700/50 transition-all whitespace-nowrap"
-                    >
-                      <FolderOpen size={12} />
-                      {showCopied
-                        ? (settings.language === 'en' ? 'Copied!' : 'Copiado!')
-                        : (settings.language === 'en' ? 'Open' : 'Abrir')}
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-zinc-600 flex items-center gap-1">
-                    {isElectron ? '🖥️' : '🌐'}
-                    {settings.language === 'en' 
-                      ? isElectron 
-                        ? 'Native folder dialogs available (Electron)' 
-                        : 'Web mode: folder picker uses File System Access API (limited)'
-                      : isElectron 
-                        ? 'Diálogos de pasta nativos disponíveis (Electron)' 
-                        : 'Modo Web: seletor usa File System Access API (limitado)'}
-                  </p>
-                </>
-              )}
-            </div>
+                <p className="text-[10px] text-zinc-600 flex items-center gap-1">
+                  {isElectron ? '🖥️' : '🌐'}
+                  {settings.language === 'en'
+                    ? isElectron
+                      ? 'Native folder dialogs available (Electron)'
+                      : 'Web mode: folder picker uses File System Access API (limited)'
+                    : isElectron
+                      ? 'Diálogos de pasta nativos disponíveis (Electron)'
+                      : 'Modo Web: seletor usa File System Access API (limitado)'}
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <span className="text-xs text-zinc-400 font-medium flex items-center gap-1">
@@ -615,37 +563,6 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
-      <div className="p-5 rounded-3xl glass-card space-y-4 shadow-md">
-        <h3 className="font-display font-bold text-sm text-white flex items-center gap-2">
-          <Download size={16} className={getAccentTextClass(settings)} />
-          {settings.language === 'en' ? 'Download Engine (yt-dlp)' : 'Motor de Download (yt-dlp)'}
-        </h3>
-
-        <div className="flex items-start gap-4">
-          <div className={`mt-0.5 w-2.5 h-2.5 rounded-full flex-shrink-0 ${ytdlpStatus === null ? 'bg-zinc-600 animate-pulse' : ytdlpStatus.ready ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50' : 'bg-red-500'}`} />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 text-sm">
-              <span className={`${ytdlpStatus?.ready ? 'text-emerald-400' : 'text-red-400'} font-semibold`}>
-                {ytdlpStatus === null 
-                  ? (settings.language === 'en' ? 'Checking...' : 'Verificando...')
-                  : ytdlpStatus.ready 
-                    ? (settings.language === 'en' ? 'Ready' : 'Pronto')
-                    : (settings.language === 'en' ? 'Not Found' : 'Não Encontrado')}
-              </span>
-              {ytdlpStatus?.binaryPath && (
-                <span className="text-[10px] text-zinc-500 font-mono truncate flex-1">
-                  {ytdlpStatus.binaryPath}
-                </span>
-              )}
-            </div>
-            <p className="text-[11px] text-zinc-500 mt-1">
-              {settings.language === 'en' 
-                ? 'Binaries bundled in electron/resources/ (production) or auto-resolved (dev). Web mode uses cached binaries.' 
-                : 'Binários embutidos em electron/resources/ (produção) ou auto-resolvidos (dev). Modo Web usa binários em cache.'}
-            </p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };
