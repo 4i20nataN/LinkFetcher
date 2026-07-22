@@ -24,16 +24,16 @@ const CONFIG = {
 };
 
 const CORE_COLORS = [
-  { r: 50, g: 56, b: 68 },
-  { r: 70, g: 80, b: 100 },
-  { r: 90, g: 70, b: 60 },
-  { r: 40, g: 60, b: 80 },
+  { r: 120, g: 115, b: 105 },
+  { r: 140, g: 130, b: 110 },
+  { r: 150, g: 140, b: 115 },
+  { r: 130, g: 125, b: 108 },
 ];
 
-const HALO_COLOR = 'rgba(255, 255, 255, 0.95)';
-const LINE_RGB = '60, 70, 90';
-const GLOW_RGB = '255, 215, 180';
-const INTERACTIVE_RGB = '255, 240, 200';
+const HALO_COLOR = 'rgba(180, 175, 165, 0.55)';
+const LINE_RGB = '160, 155, 145';
+const GLOW_RGB = '190, 180, 160';
+const INTERACTIVE_RGB = '180, 175, 160';
 
 interface NodeObj {
   x: number;
@@ -109,8 +109,8 @@ function createNodeSprite(radius: number, color: { r: number; g: number; b: numb
   ctx.arc(cx, cy, radius, 0, CONFIG.twoPi);
   ctx.fill();
 
-  // Inner bright spot
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+  // Inner bright spot — subtle
+  ctx.fillStyle = 'rgba(200, 195, 185, 0.25)';
   ctx.beginPath();
   ctx.arc(cx - radius * 0.2, cy - radius * 0.2, radius * 0.3, 0, CONFIG.twoPi);
   ctx.fill();
@@ -130,9 +130,9 @@ function createGlowSprite(radius: number): HTMLCanvasElement {
   const cy = size / 2;
 
   const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-  grad.addColorStop(0, `rgba(${GLOW_RGB}, 0.85)`);
-  grad.addColorStop(0.15, `rgba(${GLOW_RGB}, 0.5)`);
-  grad.addColorStop(0.5, `rgba(${GLOW_RGB}, 0.15)`);
+  grad.addColorStop(0, `rgba(${GLOW_RGB}, 0.30)`);
+  grad.addColorStop(0.25, `rgba(${GLOW_RGB}, 0.12)`);
+  grad.addColorStop(0.6, `rgba(${GLOW_RGB}, 0.04)`);
   grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
   ctx.fillStyle = grad;
   ctx.beginPath();
@@ -185,8 +185,8 @@ export function NeuralConstellationBackground() {
           vy: (Math.random() - 0.5) * CONFIG.velocity,
           baseRadius,
           radius: baseRadius,
-          glowIntensity: Math.random() * 0.6 + 0.4,
-          pulseDir: Math.random() > 0.5 ? 0.008 : -0.008,
+          glowIntensity: Math.random() * 0.3 + 0.5,
+          pulseDir: Math.random() > 0.5 ? 0.003 : -0.003,
           color,
         };
       });
@@ -244,7 +244,7 @@ export function NeuralConstellationBackground() {
 
         // Pulse
         n.glowIntensity += n.pulseDir;
-        if (n.glowIntensity > 1.2 || n.glowIntensity < 0.3) n.pulseDir *= -1;
+        if (n.glowIntensity > 0.85 || n.glowIntensity < 0.45) n.pulseDir *= -1;
 
         // Mouse interaction (desktop only)
         if (!IS_CAPACITOR && mouse.active) {
@@ -295,10 +295,10 @@ export function NeuralConstellationBackground() {
             ctx.lineTo(b.x, b.y);
             ctx.stroke();
 
-            // Glow line (on glare canvas)
-            glCtx.globalAlpha = factor * 0.6;
+            // Glow line (on glare canvas) — subtle
+            glCtx.globalAlpha = factor * 0.2;
             glCtx.strokeStyle = `rgba(${GLOW_RGB}, 1)`;
-            glCtx.lineWidth = CONFIG.lineWidth * factor * 2.5;
+            glCtx.lineWidth = CONFIG.lineWidth * factor * 1.5;
             glCtx.beginPath();
             glCtx.moveTo(a.x, a.y);
             glCtx.lineTo(b.x, b.y);
@@ -320,9 +320,9 @@ export function NeuralConstellationBackground() {
           const mrSq = CONFIG.mouseRadius * CONFIG.mouseRadius;
           if (distSq < mrSq) {
             const factor = 1 - Math.sqrt(distSq) / CONFIG.mouseRadius;
-            glCtx.globalAlpha = factor * 0.8;
+            glCtx.globalAlpha = factor * 0.25;
             glCtx.strokeStyle = `rgba(${INTERACTIVE_RGB}, 1)`;
-            glCtx.lineWidth = factor * 3;
+            glCtx.lineWidth = factor * 1.5;
             glCtx.beginPath();
             glCtx.moveTo(n.x, n.y);
             glCtx.lineTo(mouse.x, mouse.y);
@@ -352,16 +352,16 @@ export function NeuralConstellationBackground() {
       if (glowSprite) {
         for (let i = 0; i < nodes.length; i++) {
           const n = nodes[i];
-          const intensity = 1.2 * n.glowIntensity;
+          const intensity = 0.45 * n.glowIntensity;
           const scale = (n.radius / repRadius) * (n.radius / repRadius);
           const drawW = glowSprite.width * scale;
           const drawH = glowSprite.height * scale;
           glCtx.globalAlpha = intensity;
           glCtx.drawImage(glowSprite, n.x - drawW / 2, n.y - drawH / 2, drawW, drawH);
 
-          // Central flare point
-          glCtx.globalAlpha = 0.7 * intensity;
-          glCtx.fillStyle = 'rgba(255, 255, 240, 1)';
+          // Central flare point (subtle)
+          glCtx.globalAlpha = 0.12 * intensity;
+          glCtx.fillStyle = 'rgba(200, 195, 180, 1)';
           glCtx.beginPath();
           glCtx.arc(n.x, n.y, n.radius * 0.8, 0, CONFIG.twoPi);
           glCtx.fill();
@@ -392,20 +392,20 @@ export function NeuralConstellationBackground() {
         className="absolute inset-0"
         style={{
           background: `
-            radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.8) 0%, transparent 60%),
-            radial-gradient(circle at 80% 70%, rgba(220, 230, 240, 0.6) 0%, transparent 50%),
-            #e8ebf0
+            radial-gradient(circle at 20% 30%, rgba(220, 218, 210, 0.4) 0%, transparent 60%),
+            radial-gradient(circle at 80% 70%, rgba(210, 208, 200, 0.3) 0%, transparent 50%),
+            #e4e2dc
           `,
         }}
       />
 
-      {/* Depth wave layers */}
-      <div className="absolute inset-0 z-[1]" style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.06))' }}>
+      {/* Depth wave layers — subtle */}
+      <div className="absolute inset-0 z-[1]">
         <div
           className="absolute"
           style={{
             width: '120%', height: '70%', top: '-10%', left: '-10%',
-            background: 'radial-gradient(ellipse at 30% 40%, rgba(255,255,255,0.9) 0%, rgba(235,240,248,0.7) 60%, rgba(200,210,222,0.2) 100%)',
+            background: 'radial-gradient(ellipse at 30% 40%, rgba(210,208,200,0.30) 0%, rgba(200,198,192,0.15) 60%, transparent 100%)',
             clipPath: 'ellipse(80% 45% at 35% 50%)',
           }}
         />
@@ -413,7 +413,7 @@ export function NeuralConstellationBackground() {
           className="absolute"
           style={{
             width: '110%', height: '60%', bottom: '-10%', right: '-10%',
-            background: 'radial-gradient(ellipse at 70% 60%, rgba(255,255,255,0.85) 0%, rgba(225,232,242,0.6) 60%, rgba(180,195,210,0.2) 100%)',
+            background: 'radial-gradient(ellipse at 70% 60%, rgba(205,203,195,0.25) 0%, rgba(195,193,188,0.12) 60%, transparent 100%)',
             clipPath: 'ellipse(75% 38% at 65% 55%)',
           }}
         />
@@ -421,7 +421,7 @@ export function NeuralConstellationBackground() {
           className="absolute"
           style={{
             width: '80%', height: '40%', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-            background: 'radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.95) 0%, rgba(245,247,250,0.7) 70%, rgba(215,223,232,0.3) 100%)',
+            background: 'radial-gradient(ellipse at 50% 50%, rgba(215,213,205,0.20) 0%, rgba(205,203,198,0.08) 70%, transparent 100%)',
             clipPath: 'ellipse(50% 25% at 50% 50%)',
           }}
         />
@@ -441,7 +441,7 @@ export function NeuralConstellationBackground() {
         ref={glareCanvasRef}
         style={{
           position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-          zIndex: 3, pointerEvents: 'none', mixBlendMode: 'screen',
+          zIndex: 3, pointerEvents: 'none',
         }}
       />
     </div>
