@@ -261,6 +261,23 @@ body {
   -webkit-backdrop-filter: blur(4px) saturate(130%);
 }
 
+/* Light mode: brighter surface opacities for section cards */
+.light .lf-surface-40 {
+  background-color: rgba(255, 255, 255, 0.92);
+}
+
+.light .lf-surface-30 {
+  background-color: rgba(255, 255, 255, 0.85);
+}
+
+.light .lf-surface-20 {
+  background-color: rgba(255, 255, 255, 0.75);
+}
+
+.light .lf-surface-10 {
+  background-color: rgba(255, 255, 255, 0.30);
+}
+
 /* Text color context variants */
 .lf-text-white {
   color: #fff;
