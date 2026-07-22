@@ -1,28 +1,23 @@
 import React, { useEffect, useState } from 'react';
 
+const IS_CAPACITOR = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
+
 export function ParticleBackground() {
-  const [particles, setParticles] = useState<{ id: number, sizeClass: string, left: string, riseDuration: number, colorDuration: number, riseDelay: number, colorDelay: number }[]>([]);
+  const [particles, setParticles] = useState<{ id: number, sizeClass: string, left: string, bottom: string }[]>([]);
 
   useEffect(() => {
-    const numParticles = 35;
+    const numParticles = IS_CAPACITOR ? 12 : 35;
     const sizes = ['p-tiny', 'p-small', 'p-medium', 'p-large', 'p-xlarge'];
     const newParticles = [];
 
     for (let i = 0; i < numParticles; i++) {
       const randomSize = sizes[Math.floor(Math.random() * sizes.length)];
-      const riseDuration = 14 + Math.random() * 12;
-      const colorDuration = 25 + Math.random() * 15;
-      const riseDelay = -(Math.random() * riseDuration);
-      const colorDelay = -(Math.random() * colorDuration);
 
       newParticles.push({
         id: i,
         sizeClass: randomSize,
         left: `${Math.random() * 100}%`,
-        riseDuration,
-        colorDuration,
-        riseDelay,
-        colorDelay
+        bottom: `${Math.random() * 100}%`,
       });
     }
     setParticles(newParticles);
@@ -34,11 +29,10 @@ export function ParticleBackground() {
         <div
           key={p.id}
           className={`particle ${p.sizeClass}`}
-          style={{
-            left: p.left,
-            bottom: '-10px',
-            animation: `riseOrganic ${p.riseDuration}s linear infinite ${p.riseDelay}s, colorShift ${p.colorDuration}s ease-in-out infinite ${p.colorDelay}s`
-          }}
+          style={IS_CAPACITOR
+            ? { left: p.left, bottom: p.bottom }
+            : { left: p.left, bottom: '-10px', animation: `riseOrganic 20s linear infinite, colorShift 30s ease-in-out infinite` }
+          }
         />
       ))}
     </div>
