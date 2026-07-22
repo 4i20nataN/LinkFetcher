@@ -1,0 +1,75 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    permissions:
+      contents: read
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
+      - uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4.0.2
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run build
+      - run: npm run package -- --win
+      - name: hash artifacts
+        shell: bash
+        run: |
+          cd dist
+          for f in *.exe; do
+            sha256sum "$f" >> ../CHECKSUMS.txt
+            sha512sum "$f" >> ../CHECKSUMS.sha512.txt
+          done
+      - uses: actions/upload-artifact@6027e3dd177782cd8ab9af838c04fd81a07f1d47 # v4.4.0
+        with:
+          name: build-output
+          path: |
+            dist/*.exe
+            CHECKSUMS.txt
+            CHECKSUMS.sha512.txt
+
+  sign-and-publish:
+    needs: build
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: build-output
+          path: dist
+      - uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4.0.2
+        with:
+          node-version: 20
+      - name: generate signed manifest
+        env:
+          RELEASE_SIGNING_PRIVATE_KEY: ${{ secrets.RELEASE_SIGNING_PRIVATE_KEY }}
+        run: node scripts/generate-signed-manifest.mjs
+        # Espera-se um script (não incluso aqui) que:
+        #  1. lê hashes de dist/CHECKSUMS*.txt
+        #  2. monta manifest.json seguindo main/updater/types.ts
+        #  3. assina com node:crypto (Ed25519) usando RELEASE_SIGNING_PRIVATE_KEY
+        #  4. grava dist/manifest.json e dist/manifest.json.sig
+        #  5. NUNCA imprime a chave privada em log (usar ::add-mask::)
+      - name: generate SBOM
+        run: npx @cyclonedx/cyclonedx-npm --output-file dist/sbom.cdx.json
+      - name: publish release
+        uses: softprops/action-gh-release@01570a1f39cb168c169c802c3bceb9e93fb10974 # v2.0.8
+        with:
+          files: |
+            dist/*.exe
+            dist/manifest.json
+            dist/manifest.json.sig
+            dist/CHECKSUMS.txt
+            dist/CHECKSUMS.sha512.txt
+            dist/sbom.cdx.json

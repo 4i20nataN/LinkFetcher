@@ -1,0 +1,76 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+dist-web/
+build/
+*.tsbuildinfo
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Vite / bundler cache
+.vite/
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.code-workspace
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Electron
+release/
+electron/resources/
+
+# Capacitor (generated platforms)
+android/
+ios/
+
+# yt-dlp / ffmpeg (bundled, not source)
+.cache/
+yt-dlp/
+*.exe
+
+# Misc artifacts
+*.tgz
+*.blockmap
+.nul
+nul
+
+# Test / signing artifacts
+_test_key*
+_test_pub*
+manifest.json
+manifest.json.sig
+CHECKSUMS*.txt
+
+# Accidentally committed images
+*.jpg
+*.jpeg
+
+# TypeScript
+*.tsbuildinfo
+
+# Unrelated artifacts
+LinkFatcher_Background.html
+.update-signing-key.txt
+RELEASE-GUIDE.md
