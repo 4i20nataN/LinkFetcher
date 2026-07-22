@@ -43,6 +43,7 @@ class DownloadEngineClass {
     notifications: true,
     updates: false,
     colorfulIcons: false,
+    clipboardEnabled: true,
   };
 
   constructor() {

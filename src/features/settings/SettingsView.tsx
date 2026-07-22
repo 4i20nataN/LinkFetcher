@@ -5,7 +5,7 @@ import { StorageService } from '../../core/storage/Storage';
 import { 
   Settings, Volume2, Globe, Sliders, HardDrive, Bell, AlertCircle, 
   Trash2, ShieldCheck, Download, Upload, Info, RefreshCw, Key, ExternalLink,
-  FolderOpen, FolderPlus, Smile, Palette
+  FolderOpen, FolderPlus, Smile, Palette, Clipboard
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from '../../core/i18n';
@@ -40,6 +40,7 @@ export const SettingsView: React.FC = () => {
   const [ytdlpStatus, setYtdlpStatus] = useState<{ ready: boolean; binaryPath?: string } | null>(null);
 
   const isElectron = typeof window !== 'undefined' && !!window.electron;
+  const isCapacitor = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -143,30 +144,32 @@ export const SettingsView: React.FC = () => {
 
   const handleExport = () => {
     try {
-      const dataStr = StorageService.exportConfig();
+      const dataStr = StorageService.exportLinksBackup();
       const blob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `downloader-config-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `linkfetcher-links-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       showToast(t('backupSuccess'));
     } catch (_) {
-      showToast(settings.language === 'en' ? 'Failed to export settings' : 'Falha ao exportar configurações');
+      showToast(settings.language === 'en' ? 'Failed to export links' : 'Falha ao exportar links');
     }
   };
 
   const handleImport = () => {
     if (!importText.trim()) return;
-    const success = StorageService.importConfig(importText);
-    if (success) {
-      showToast(t('importSuccess') + (settings.language === 'en' ? ' Restarting...' : ' Reiniciando...'));
+    const result = StorageService.importLinksBackup(importText);
+    if (result.errors.length === 0 && result.imported > 0) {
+      showToast(`${settings.language === 'en' ? 'Imported' : 'Importado'} ${result.imported} ${settings.language === 'en' ? 'items' : 'itens'}. ${settings.language === 'en' ? 'Restarting...' : 'Reiniciando...'}`);
       setTimeout(() => { window.location.reload(); }, 1000);
-    } else {
+    } else if (result.imported === 0) {
       showToast(t('importFailed'));
+    } else {
+      showToast(`${settings.language === 'en' ? 'Imported' : 'Importado'} ${result.imported} ${settings.language === 'en' ? 'items' : 'itens'} (${result.errors.join(', ')})`);
     }
   };
 
@@ -211,7 +214,7 @@ export const SettingsView: React.FC = () => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
         <div className="space-y-6">
           <div className="p-5 rounded-3xl glass-card space-y-4 shadow-md">
             <h3 className="font-display font-bold text-sm text-white flex items-center gap-2">
@@ -309,6 +312,29 @@ export const SettingsView: React.FC = () => {
                 />
               </button>
             </div>
+
+            <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/40 border border-white/5">
+              <div className="space-y-1">
+                <span className="text-xs text-white font-medium flex items-center gap-1.5">
+                  <Clipboard size={14} className="text-zinc-400" />
+                  {settings.language === 'en' ? 'Allow Clipboard Access' : 'Permitir Acesso à Área de Transferência'}
+                </span>
+                <p className="text-[10px] text-zinc-500">
+                  {settings.language === 'en' ? 'Enable "paste link" button to read from clipboard automatically' : 'Ativar botão "colar link" para ler automaticamente da área de transferência'}
+                </p>
+              </div>
+              <button
+                onClick={() => updateSettings({ clipboardEnabled: !settings.clipboardEnabled })}
+                className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.clipboardEnabled ? getAccentBgClass(settings) : 'bg-zinc-800'}`}
+              >
+                <motion.div
+                  layout
+                  className="absolute top-[2px] left-[2px] w-[16px] h-[16px] rounded-full bg-white shadow-sm"
+                  animate={{ x: settings.clipboardEnabled ? 16 : 0 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                />
+              </button>
+            </div>
           </div>
 
           <div className="p-5 rounded-3xl glass-card space-y-4 shadow-md">
@@ -333,35 +359,45 @@ export const SettingsView: React.FC = () => {
                 ))}
               </div>
 
-              <label className="flex items-center justify-between cursor-pointer group">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/40 border border-white/5">
                 <div className="space-y-0.5">
-                  <span className="text-xs font-semibold text-zinc-300 group-hover:text-white transition-colors">{t('wifiOnly')}</span>
+                  <span className="text-xs font-semibold text-zinc-300">{t('wifiOnly')}</span>
                   <p className="text-[10px] text-zinc-500">{t('wifiOnlyDesc')}</p>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={settings.wifiOnly}
-                  onChange={(e) => updateSettings({ wifiOnly: e.target.checked })}
-                  className={`w-9 h-5 bg-zinc-800 rounded-full appearance-none relative checked:bg-current ${getAccentTextClass(settings)} checked:before:translate-x-4 before:content-[''] before:absolute before:w-4 before:h-4 before:rounded-full before:bg-zinc-300 before:top-0.5 before:left-0.5 before:transition-transform cursor-pointer shadow-inner`}
-                />
-              </label>
+                <button
+                  onClick={() => updateSettings({ wifiOnly: !settings.wifiOnly })}
+                  className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.wifiOnly ? getAccentBgClass(settings) : 'bg-zinc-800'}`}
+                >
+                  <motion.div
+                    layout
+                    className="absolute top-[2px] left-[2px] w-[16px] h-[16px] rounded-full bg-white shadow-sm"
+                    animate={{ x: settings.wifiOnly ? 16 : 0 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  />
+                </button>
+              </div>
 
-              <label className="flex items-center justify-between cursor-pointer group">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/40 border border-white/5">
                 <div className="space-y-0.5">
-                  <span className="text-xs font-semibold text-zinc-300 group-hover:text-white transition-colors">
+                  <span className="text-xs font-semibold text-zinc-300">
                     {settings.language === 'en' ? 'Start Downloads Automatically' : 'Iniciar Downloads Automaticamente'}
                   </span>
                   <p className="text-[10px] text-zinc-500">
                     {settings.language === 'en' ? 'Starts downloading right after analyzer finishes.' : 'Inicia o download logo após a análise, sem aguardar na fila.'}
                   </p>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={settings.autoDownload}
-                  onChange={(e) => updateSettings({ autoDownload: e.target.checked })}
-                  className={`w-9 h-5 bg-zinc-800 rounded-full appearance-none relative checked:bg-current ${getAccentTextClass(settings)} checked:before:translate-x-4 before:content-[''] before:absolute before:w-4 before:h-4 before:rounded-full before:bg-zinc-300 before:top-0.5 before:left-0.5 before:transition-transform cursor-pointer shadow-inner`}
-                />
-              </label>
+                <button
+                  onClick={() => updateSettings({ autoDownload: !settings.autoDownload })}
+                  className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.autoDownload ? getAccentBgClass(settings) : 'bg-zinc-800'}`}
+                >
+                  <motion.div
+                    layout
+                    className="absolute top-[2px] left-[2px] w-[16px] h-[16px] rounded-full bg-white shadow-sm"
+                    animate={{ x: settings.autoDownload ? 16 : 0 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -433,31 +469,41 @@ export const SettingsView: React.FC = () => {
             </div>
 
             <div className="space-y-3.5 pt-2">
-              <label className="flex items-center justify-between cursor-pointer group">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/40 border border-white/5">
                 <div className="space-y-0.5">
-                  <span className="text-xs font-semibold text-zinc-300 group-hover:text-white transition-colors">{t('notifLabel')}</span>
+                  <span className="text-xs font-semibold text-zinc-300">{t('notifLabel')}</span>
                   <p className="text-[10px] text-zinc-500">{t('notifDesc')}</p>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={settings.notifications}
-                  onChange={(e) => updateSettings({ notifications: e.target.checked })}
-                  className={`w-9 h-5 bg-zinc-800 rounded-full appearance-none relative checked:bg-current ${getAccentTextClass(settings)} checked:before:translate-x-4 before:content-[''] before:absolute before:w-4 before:h-4 before:rounded-full before:bg-zinc-300 before:top-0.5 before:left-0.5 before:transition-transform cursor-pointer shadow-inner`}
-                />
-              </label>
+                <button
+                  onClick={() => updateSettings({ notifications: !settings.notifications })}
+                  className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.notifications ? getAccentBgClass(settings) : 'bg-zinc-800'}`}
+                >
+                  <motion.div
+                    layout
+                    className="absolute top-[2px] left-[2px] w-[16px] h-[16px] rounded-full bg-white shadow-sm"
+                    animate={{ x: settings.notifications ? 16 : 0 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  />
+                </button>
+              </div>
 
-              <label className="flex items-center justify-between cursor-pointer group">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/40 border border-white/5">
                 <div className="space-y-0.5">
-                  <span className="text-xs font-semibold text-zinc-300 group-hover:text-white transition-colors">{t('updatesLabel')}</span>
+                  <span className="text-xs font-semibold text-zinc-300">{t('updatesLabel')}</span>
                   <p className="text-[10px] text-zinc-500">{t('updatesDesc')}</p>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={settings.updates}
-                  onChange={(e) => updateSettings({ updates: e.target.checked })}
-                  className={`w-9 h-5 bg-zinc-800 rounded-full appearance-none relative checked:bg-current ${getAccentTextClass(settings)} checked:before:translate-x-4 before:content-[''] before:absolute before:w-4 before:h-4 before:rounded-full before:bg-zinc-300 before:top-0.5 before:left-0.5 before:transition-transform cursor-pointer shadow-inner`}
-                />
-              </label>
+                <button
+                  onClick={() => updateSettings({ updates: !settings.updates })}
+                  className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.updates ? getAccentBgClass(settings) : 'bg-zinc-800'}`}
+                >
+                  <motion.div
+                    layout
+                    className="absolute top-[2px] left-[2px] w-[16px] h-[16px] rounded-full bg-white shadow-sm"
+                    animate={{ x: settings.updates ? 16 : 0 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -465,6 +511,11 @@ export const SettingsView: React.FC = () => {
             <h3 className="font-display font-bold text-sm text-white flex items-center gap-2">
               <RefreshCw size={16} className={getAccentTextClass(settings)} /> {t('backupSettings')}
             </h3>
+            <p className="text-[10px] text-zinc-500">
+              {settings.language === 'en'
+                ? 'Export/import only links (favorites, downloads, download later). Lightweight format for easy sharing.'
+                : 'Exportar/importar apenas links (favoritos, downloads, baixar depois). Formato leve para fácil compartilhamento.'}
+            </p>
 
             <div className="flex gap-2">
               <button
@@ -488,12 +539,12 @@ export const SettingsView: React.FC = () => {
                 className="space-y-2 pt-2"
               >
                 <span className="text-[10px] text-zinc-500 font-mono block">
-                  {settings.language === 'en' ? 'Enter JSON configuration code:' : 'Insira o código JSON de configuração:'}
+                  {settings.language === 'en' ? 'Paste the links JSON below:' : 'Cole o JSON de links abaixo:'}
                 </span>
                 <textarea
                   value={importText}
                   onChange={(e) => setImportText(e.target.value)}
-                  placeholder='{"settings": {...}, "favorites": []}'
+                  placeholder='{"favorites": [...], "downloadLater": [...], "downloads": [...]}'
                   rows={4}
                   className="w-full p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 font-mono placeholder-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />

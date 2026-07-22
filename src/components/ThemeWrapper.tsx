@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { ParticleBackground } from './ParticleBackground';
 import { NeuralConstellationBackground } from './NeuralConstellationBackground';
+import { NeuralBlackBackground } from './NeuralBlackBackground';
 
 export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { settings } = useApp();
@@ -9,8 +9,8 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
   // Map theme modes to root classes
   const themeClass = {
     light: 'text-zinc-900 light',
-    dark: 'bg-[#0a0a0c] text-slate-100 dark',
-    gray: 'bg-[#3a3f47] text-slate-200 gray-mode'
+    dark: 'bg-[#05070c] text-slate-100 dark',
+    gray: 'bg-[#05070c] text-slate-200 gray-mode'
   }[settings.themeMode];
 
   // Accent mapping helper to inject inline CSS variables or provide classes
@@ -43,16 +43,11 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
       className={`h-screen transition-colors duration-300 select-none ${themeClass} relative overflow-hidden`} 
       style={style}
     >
-      {/* Background: Neural Constellation for light, gradient meshes + particles for dark/gray */}
+      {/* Background: NeuralWhite for light, NeuralBlack for dark/gray */}
       {settings.themeMode === 'light' ? (
         <NeuralConstellationBackground />
       ) : (
-        <>
-          <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-blue-600/10 blur-[130px] rounded-full pointer-events-none z-0" />
-          <div className="absolute top-[30%] right-[-5%] w-[40%] h-[40%] bg-purple-600/8 blur-[110px] rounded-full pointer-events-none z-0" />
-          <div className="absolute bottom-[-10%] left-[20%] w-[35%] h-[35%] bg-indigo-500/4 blur-[120px] pointer-events-none z-0" />
-          <ParticleBackground />
-        </>
+        <NeuralBlackBackground />
       )}
 
       {/* Content wrapper with higher z-index to stay above meshes */}

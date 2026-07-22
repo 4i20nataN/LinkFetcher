@@ -272,6 +272,10 @@ export const LinkAnalyzer: React.FC = () => {
   };
 
   const handlePaste = async () => {
+    if (!settings.clipboardEnabled) {
+      setError(settings.language === 'en' ? 'Clipboard access is disabled in settings. Enable it in Settings > Visual Preferences.' : 'Acesso à área de transferência desabilitado nas configurações. Ative em Configurações > Preferências Visuais.');
+      return;
+    }
     if (!navigator.clipboard?.readText) {
       setError(settings.language === 'en' ? 'Clipboard access is unavailable here. Type or paste manually.' : 'Acesso à área de transferência indisponível aqui. Digite ou cole o link manualmente.');
       return;

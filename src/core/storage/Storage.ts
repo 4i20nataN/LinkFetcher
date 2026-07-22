@@ -105,6 +105,7 @@ export class StorageService {
       notifications: true,
       updates: false,
       colorfulIcons: false,
+      clipboardEnabled: true,
     };
   }
 
@@ -151,5 +152,117 @@ export class StorageService {
     localStorage.removeItem('universal_downloader_favorites');
     localStorage.removeItem('universal_downloader_later');
     localStorage.removeItem('universal_downloader_items');
+  }
+
+  // --- LIGHTWEIGHT BACKUP (links only) ---
+  static exportLinksBackup(): string {
+    const favorites = this.getFavorites();
+    const later = this.getDownloadLater();
+    
+    // Get download history (finished items only with URLs)
+    let downloads: { url: string; title: string; platform: string }[] = [];
+    try {
+      const stored = localStorage.getItem('universal_downloader_items');
+      if (stored) {
+        const items = JSON.parse(stored);
+        downloads = items
+          .filter((i: any) => i.url && i.status !== 'queued')
+          .map((i: any) => ({
+            url: i.url,
+            title: i.title || '',
+            platform: i.platform || 'generic'
+          }));
+      }
+    } catch (_) {}
+
+    const data = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      favorites: favorites.map(f => ({ url: f.url, title: f.title, platform: f.platform })),
+      downloads: downloads,
+      downloadLater: later.map(l => ({ url: l.url, title: l.title, platform: l.platform }))
+    };
+    return JSON.stringify(data, null, 2);
+  }
+
+  static importLinksBackup(jsonStr: string): { imported: number; errors: string[] } {
+    const errors: string[] = [];
+    let imported = 0;
+
+    try {
+      const data = JSON.parse(jsonStr);
+      
+      // Import favorites
+      if (Array.isArray(data.favorites)) {
+        const currentFavs = this.getFavorites();
+        const existingUrls = new Set(currentFavs.map(f => f.url));
+        
+        for (const item of data.favorites) {
+          if (item.url && !existingUrls.has(item.url)) {
+            this.toggleFavorite({
+              id: crypto.randomUUID(),
+              title: item.title || 'Imported',
+              url: item.url,
+              platform: item.platform || 'generic',
+              thumbnailUrl: ''
+            });
+            imported++;
+          }
+        }
+      }
+
+      // Import download later
+      if (Array.isArray(data.downloadLater)) {
+        for (const item of data.downloadLater) {
+          if (item.url) {
+            this.addToDownloadLater({
+              id: crypto.randomUUID(),
+              title: item.title || 'Imported',
+              url: item.url,
+              platform: item.platform || 'generic',
+              thumbnailUrl: ''
+            });
+            imported++;
+          }
+        }
+      }
+
+      // Import downloads to history
+      if (Array.isArray(data.downloads)) {
+        try {
+          const stored = localStorage.getItem('universal_downloader_items');
+          const existingItems: any[] = stored ? JSON.parse(stored) : [];
+          const existingUrls = new Set(existingItems.map((i: any) => i.url));
+
+          for (const item of data.downloads) {
+            if (item.url && !existingUrls.has(item.url)) {
+              existingItems.push({
+                id: crypto.randomUUID(),
+                title: item.title || 'Imported',
+                url: item.url,
+                platform: item.platform || 'generic',
+                status: 'completed',
+                addedAt: new Date().toISOString(),
+                format: { id: '', ext: '', quality: '', sizeEst: '', sizeBytes: 0, codec: '', type: 'video' },
+                sizeTotal: 0,
+                sizeDownloaded: 0,
+                progress: 100,
+                speed: 0,
+                eta: 0,
+                thumbnailUrl: ''
+              });
+              imported++;
+            }
+          }
+          localStorage.setItem('universal_downloader_items', JSON.stringify(existingItems));
+        } catch (e) {
+          errors.push('Failed to import download history');
+        }
+      }
+    } catch (e) {
+      errors.push('Invalid JSON format');
+    }
+
+    return { imported, errors };
   }
 }

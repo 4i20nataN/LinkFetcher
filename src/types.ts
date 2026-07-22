@@ -133,6 +133,7 @@ export interface AppSettings {
   notifications: boolean;
   updates: boolean;
   colorfulIcons: boolean;
+  clipboardEnabled: boolean;
   customApiUrl?: string;
 }
 
