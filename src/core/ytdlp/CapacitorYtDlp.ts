@@ -62,6 +62,9 @@ export interface DownloadParams {
   sponsorblockRemove?: string;
   fpsMax?: number;
   customFilename?: string;
+  videoFormat?: string;
+  videoCodec?: string;
+  customFormat?: string;
 }
 
 export interface DownloadResult {

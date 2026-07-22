@@ -517,6 +517,9 @@ class DownloadEngineClass {
           sponsorblockRemove: item.sponsorblockRemove || undefined,
           fpsMax: item.fpsMax,
           customFilename: item.customFilename,
+          videoFormat: item.videoFormat || undefined,
+          videoCodec: item.videoCodec || undefined,
+          customFormat: item.customFormat || undefined,
         });
       }).catch((err: any) => {
         const target = this.items.find(i => i.id === item.id);

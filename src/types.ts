@@ -85,6 +85,9 @@ export interface DownloadItem {
   fpsMax?: number;
   bandLimit?: number;
   customFilename?: string;
+  videoFormat?: string;
+  videoCodec?: string;
+  customFormat?: string;
   sizeTotal: number;
   sizeDownloaded: number;
   progress: number;
