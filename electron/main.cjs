@@ -18,6 +18,7 @@ function logDebug(...args) {
 
 let mainWindow;
 let tray = null;
+let trayIcon = null;
 const cancelMap = new Map();
 
 function createTrayIcon() {
@@ -49,7 +50,7 @@ function buildTrayContextMenu() {
     {
       label: 'LinkFetcher',
       enabled: false,
-      icon: tray?.getImage() || nativeImage.createEmpty()
+      icon: trayIcon || nativeImage.createEmpty()
     },
     { type: 'separator' },
     {
@@ -121,7 +122,8 @@ function createWindow() {
       e.preventDefault();
       mainWindow.hide();
       if (!tray) {
-        tray = new Tray(createTrayIcon());
+        trayIcon = createTrayIcon();
+        tray = new Tray(trayIcon);
         tray.setToolTip('LinkFetcher');
         tray.setContextMenu(buildTrayContextMenu());
         tray.on('double-click', () => {
