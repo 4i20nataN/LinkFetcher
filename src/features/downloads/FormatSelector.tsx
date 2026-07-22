@@ -199,7 +199,7 @@ function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, accentBg, 
   return (
     <div className="space-y-3">
       <div className="relative h-6 flex items-center select-none" data-time-range-track>
-        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 rounded-full bg-zinc-800" />
+        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 rounded-full lf-surface-raised" />
         <div
           className={`absolute top-1/2 -translate-y-1/2 h-1 rounded-full ${accentBg}`}
           style={{ left: `${startPct}%`, width: `${Math.max(0, endPct - startPct)}%` }}
@@ -276,10 +276,10 @@ function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, accentBg, 
           onBlur={e => commitInput('start', e.target.value)}
           onChange={e => setInputStart(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-          className="w-16 px-2 py-1.5 rounded-lg bg-zinc-900 border border-white/5 fs-sm font-mono text-white text-center placeholder-zinc-600 focus:outline-none focus:border-white/15"
+          className="w-16 px-2 py-1.5 rounded-lg lf-surface lf-border fs-sm font-mono text-white text-center placeholder-zinc-600 focus:outline-none focus:border-white/15"
           placeholder="00:00"
         />
-        <span className="text-zinc-600 text-xs">-</span>
+        <span className="lf-text-faint text-xs">-</span>
         <input
           type="text"
           value={inputEnd}
@@ -287,11 +287,11 @@ function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, accentBg, 
           onBlur={e => commitInput('end', e.target.value)}
           onChange={e => setInputEnd(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-          className="w-16 px-2 py-1.5 rounded-lg bg-zinc-900 border border-white/5 fs-sm font-mono text-white text-center placeholder-zinc-600 focus:outline-none focus:border-white/15"
+          className="w-16 px-2 py-1.5 rounded-lg lf-surface lf-border fs-sm font-mono text-white text-center placeholder-zinc-600 focus:outline-none focus:border-white/15"
           placeholder="fim"
         />
         {cutDuration > 0 && (
-          <span className="ml-auto fs-sm text-zinc-500 font-mono">
+          <span className="ml-auto fs-sm lf-text-muted font-mono">
             {formatTime(cutDuration)}
           </span>
         )}
@@ -310,7 +310,7 @@ interface AccordionSectionProps {
 }
 
 const AccordionSection = React.memo<AccordionSectionProps>(({ title, blockId, isOpen, onToggle, accentBg, children }) => (
-  <div className="rounded-xl bg-zinc-900/40 border border-white/5 glass-section">
+  <div className="rounded-xl lf-surface-40 lf-border glass-section">
     <button
       onClick={onToggle}
       className="w-full flex items-center justify-between p-3 pb-4 text-left hover:bg-white/[0.02] transition-colors"
@@ -323,7 +323,7 @@ const AccordionSection = React.memo<AccordionSectionProps>(({ title, blockId, is
         animate={{ rotate: isOpen ? 180 : 0 }}
         transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
       >
-        <ChevronDown size={14} className="text-zinc-500" />
+        <ChevronDown size={14} className="lf-text-muted" />
       </motion.div>
     </button>
     <AnimatePresence initial={false}>
@@ -474,26 +474,26 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
     return (
       <div className="space-y-3">
         {/* Preview card */}
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-zinc-900/40 border border-white/5">
-          <div className="w-16 h-16 rounded-lg overflow-hidden border border-white/10 bg-zinc-950 shrink-0">
+        <div className="flex items-center gap-3 p-3 rounded-xl lf-surface-40 lf-border">
+          <div className="w-16 h-16 rounded-lg overflow-hidden lf-border-strong lf-surface shrink-0">
             <img src={mediaInfo.thumbnailUrl || mediaInfo.originalUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" crossOrigin="anonymous" loading="lazy" decoding="async" />
           </div>
           <div className="min-w-0 flex-1 space-y-1">
             <p className="fs-sm font-semibold text-white truncate">{mediaInfo.title}</p>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="fs-sm text-zinc-400 font-mono">{mediaInfo.resolution || 'Imagem'}</span>
+              <span className="fs-sm lf-text-secondary font-mono">{mediaInfo.resolution || 'Imagem'}</span>
               {origExt && (
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-zinc-800 text-zinc-400 uppercase">{origExt}</span>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold lf-surface-raised lf-text-secondary uppercase">{origExt}</span>
               )}
               {mediaInfo.sizeEst !== 'N/A' && (
-                <span className="fs-sm text-zinc-500">{mediaInfo.sizeEst}</span>
+                <span className="fs-sm lf-text-muted">{mediaInfo.sizeEst}</span>
               )}
             </div>
           </div>
         </div>
 
         {imageFormats.length > 0 && (
-          <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
+          <div className="p-3 rounded-xl lf-surface-40 lf-border space-y-2">
             <div className="flex items-center gap-2">
               <BlockIcon blockId="resolution" />
               <BlockTitle>{settings.language === 'en' ? 'Convert to' : 'Converter para'}</BlockTitle>
@@ -509,15 +509,15 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   className={`
                     border rounded-lg fs-sm font-bold transition-all text-center py-2.5
                     ${options.format === fmt.id
-                      ? `bg-zinc-900/40 text-white ${accentBorder}`
-                      : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}
+                      ? `lf-surface-40 text-white ${accentBorder}`
+                      : 'lf-surface-40 lf-border lf-text-secondary hover:text-zinc-200 hover:bg-zinc-800'}
                   `}
                 >
                   {fmt.quality}
                 </button>
               ))}
             </div>
-            <p className="text-[9px] text-zinc-600 italic">A conversão é feita localmente via Canvas API</p>
+            <p className="text-[9px] lf-text-faint italic">A conversão é feita localmente via Canvas API</p>
           </div>
         )}
       </div>
@@ -528,24 +528,24 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
   const isOverMaxRes = selectedPreset && selectedPreset.height !== Infinity && maxRes > 0 && selectedPreset.height > maxRes;
 
   const Toggle: React.FC<{ value: boolean; onChange: () => void; label: string; desc?: string; icon?: React.ReactNode }> = ({ value, onChange, label, desc, icon }) => (
-    <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-900/40 border border-white/5">
+    <div className="flex items-center justify-between p-3 rounded-xl lf-surface-40 lf-border">
       <div className="flex items-center gap-2">
-        {icon && <span className="text-zinc-400">{icon}</span>}
+        {icon && <span className="lf-text-secondary">{icon}</span>}
         <div>
           <p className="fs-sm font-semibold text-white">{label}</p>
-          {desc && <p className="fs-sm text-zinc-500 mt-0.5">{desc}</p>}
+          {desc && <p className="fs-sm lf-text-muted mt-0.5">{desc}</p>}
         </div>
       </div>
-      <button onClick={onChange} className={`relative w-[52px] h-[28px] rounded-full transition-colors duration-300 shrink-0 border ${value ? `${accentBorder} bg-zinc-900/40` : 'border-zinc-700 bg-zinc-800'}`}>
+      <button onClick={onChange} className={`relative w-[52px] h-[28px] rounded-full transition-colors duration-300 shrink-0 border ${value ? `${accentBorder} lf-surface-40` : 'border-zinc-700 lf-surface-raised'}`}>
         <div className={`absolute top-[2px] w-[22px] h-[22px] rounded-full transition-all duration-300 shadow-md ${value ? `left-[26px] ${accentBg}` : 'left-[2px] bg-zinc-400'}`} />
       </button>
     </div>
   );
 
   const SmallToggle: React.FC<{ value: boolean; onChange: () => void; label: string }> = ({ value, onChange, label }) => (
-    <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900/30 border border-white/5">
-      <label className="fs-sm text-zinc-400">{label}</label>
-      <button onClick={onChange} className={`relative w-10 h-[24px] rounded-full transition-colors duration-300 shrink-0 border ${value ? `${accentBorder} bg-zinc-900/40` : 'border-zinc-700 bg-zinc-800'}`}>
+    <div className="flex items-center justify-between p-2.5 rounded-lg lf-surface-30 lf-border">
+      <label className="fs-sm lf-text-secondary">{label}</label>
+      <button onClick={onChange} className={`relative w-10 h-[24px] rounded-full transition-colors duration-300 shrink-0 border ${value ? `${accentBorder} lf-surface-40` : 'border-zinc-700 lf-surface-raised'}`}>
         <div className={`absolute top-[2px] w-[18px] h-[18px] rounded-full transition-all duration-300 ${value ? `left-[18px] ${accentBg}` : 'left-[2px] bg-zinc-400'}`} />
       </button>
     </div>
@@ -567,7 +567,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.95 }}
               transition={{ type: 'spring', stiffness: 450, damping: 25 }}
-              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg bg-zinc-800 border border-white/10 fs-sm text-zinc-300 whitespace-nowrap z-[100] shadow-2xl pointer-events-none"
+              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg lf-surface-raised lf-border-strong fs-sm lf-text-secondary whitespace-nowrap z-[100] shadow-2xl pointer-events-none"
             >
               {tip}
               <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-zinc-800" />
@@ -598,8 +598,8 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
       className={`
         relative !overflow-visible border rounded-xl px-3 py-1.5 fs-sm font-bold transition-colors text-center
         ${active ? 'z-10' : 'z-0'}
-        ${disabled ? 'bg-zinc-900/20 border-white/5 text-zinc-600 cursor-not-allowed' :
-          active ? `bg-zinc-900/40 ${accentBorder} text-white` : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}
+        ${disabled ? 'lf-surface-20 lf-border lf-text-faint cursor-not-allowed' :
+          active ? `lf-surface-40 ${accentBorder} text-white` : 'lf-surface-40 lf-border lf-text-secondary hover:text-zinc-200 hover:bg-zinc-800'}
         ${className}
       `}
     >
@@ -614,7 +614,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
 
   return (
     <div className="space-y-3" style={{ '--ui-scale': uiScale } as React.CSSProperties}>
-      <div className="flex items-center gap-1 border-b border-white/5">
+      <div className="flex items-center gap-1 border-b lf-border">
         {([
           { id: 'media' as TabId, blockId: 'video-format' as BlockId, label: 'Mídia' },
           { id: 'advanced' as TabId, blockId: 'behavior' as BlockId, label: 'Avançado' },
@@ -624,7 +624,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 fs-sm font-semibold transition-all relative ${isActive ? accentText : 'text-zinc-500 hover:text-zinc-300'}`}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 fs-sm font-semibold transition-all relative ${isActive ? accentText : 'lf-text-muted hover:text-zinc-300'}`}
             >
               <BlockIcon blockId={tab.blockId} size={14} />
               {tab.label}
@@ -641,20 +641,20 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
       </div>
       <div className="flex justify-end -mt-2 mb-1">
         <div className="flex items-center gap-0.5">
-          <span className="fs-sm text-zinc-600 mr-0.5">🔍</span>
-          <button onClick={() => setUiScale(s => Math.max(0, s - 5))} className="w-5 h-5 rounded flex items-center justify-center fs-sm text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">A-</button>
-          <span className="fs-xs text-zinc-500 w-7 text-center font-mono">{uiScale}%</span>
-          <button onClick={() => setUiScale(s => Math.min(100, s + 5))} className="w-5 h-5 rounded flex items-center justify-center fs-sm text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">A+</button>
+          <span className="fs-sm lf-text-faint mr-0.5">🔍</span>
+          <button onClick={() => setUiScale(s => Math.max(0, s - 5))} className="w-5 h-5 rounded flex items-center justify-center fs-sm lf-text-faint hover:text-zinc-300 hover:bg-zinc-800 transition-colors">A-</button>
+          <span className="fs-xs lf-text-muted w-7 text-center font-mono">{uiScale}%</span>
+          <button onClick={() => setUiScale(s => Math.min(100, s + 5))} className="w-5 h-5 rounded flex items-center justify-center fs-sm lf-text-faint hover:text-zinc-300 hover:bg-zinc-800 transition-colors">A+</button>
         </div>
       </div>
 
-      <div className="flex items-start gap-3 p-3 rounded-xl bg-zinc-900/40 border border-white/5">
-        <div className="w-16 h-16 rounded-lg overflow-hidden border border-white/5 bg-zinc-950 shrink-0">
+      <div className="flex items-start gap-3 p-3 rounded-xl lf-surface-40 lf-border">
+        <div className="w-16 h-16 rounded-lg overflow-hidden lf-border lf-surface shrink-0">
           <img src={mediaInfo.thumbnailUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
         </div>
         <div className="min-w-0 flex-1 space-y-1">
           <p className="fs-sm font-semibold text-white truncate">{mediaInfo.title}</p>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 fs-sm text-zinc-500">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 fs-sm lf-text-muted">
             {mediaInfo.channel && (
               <span className="flex items-center gap-1">
                 <User size={10} />
@@ -674,7 +674,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
               </span>
             )}
           </div>
-          <div className="flex items-center gap-3 fs-sm text-zinc-500 font-mono">
+          <div className="flex items-center gap-3 fs-sm lf-text-muted font-mono">
             <span>{mediaInfo.formats.length} formatos</span>
             {mediaInfo.duration && <span>{mediaInfo.duration}</span>}
           </div>
@@ -686,7 +686,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
           <motion.div key="media" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ type: 'spring', stiffness: 400, damping: 28 }} className="space-y-4">
 
             {/* ── Nome do Arquivo + Nome Limpo ── */}
-            <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
+            <div className="p-3 rounded-xl lf-surface-40 lf-border space-y-2">
               <div className="flex items-center gap-2">
                 <BlockIcon blockId="behavior" />
                 <BlockTitle>Nome do Arquivo</BlockTitle>
@@ -700,7 +700,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   update({ customFilename: val });
                 }}
                 placeholder="Se vazio, usa o titulo original do video"
-                className="w-full px-3 py-2 rounded-lg bg-zinc-800/60 border border-white/5 fs-lg text-white placeholder-zinc-500 focus:outline-none focus:border-white/15 transition-colors font-mono"
+                className="w-full px-3 py-2 rounded-lg lf-surface-raised lf-border fs-lg text-white placeholder-zinc-500 focus:outline-none focus:border-white/15 transition-colors font-mono"
               />
               <div className="flex flex-wrap items-center gap-2.5">
                 {[
@@ -717,12 +717,12 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                       const sep = useUnderscore ? '_' : ' ';
                       update({ customFilename: cur ? `${cur}${sep}${val}` : val });
                     }}
-                    className="px-2 py-1 rounded-md bg-zinc-800/60 border border-white/5 fs-sm text-zinc-400 hover:text-white hover:border-white/10 transition-colors"
+                    className="px-2 py-1 rounded-md lf-surface-raised lf-border fs-sm lf-text-secondary hover:text-white hover:border-white/10 transition-colors"
                   >
                     {t.label}
                   </button>
                 ))}
-                <div className="flex items-center gap-1 ml-1 pl-2 border-l border-white/5">
+                <div className="flex items-center gap-1 ml-1 pl-2 border-l lf-border">
                   <button
                     onClick={() => {
                       const next = !useUnderscore;
@@ -731,15 +731,15 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                         update({ customFilename: options.customFilename.replace(/ /g, '_') });
                       }
                     }}
-                    className={`relative w-7 h-4 rounded-full transition-colors shrink-0 ${useUnderscore ? accentBg : 'bg-zinc-800'}`}
+                    className={`relative w-7 h-4 rounded-full transition-colors shrink-0 ${useUnderscore ? accentBg : 'lf-surface-raised'}`}
                   >
                     <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${useUnderscore ? 'left-[14px]' : 'left-0.5'}`} />
                   </button>
-                  <span className="fs-sm text-zinc-600">Sem Espaco</span>
+                  <span className="fs-sm lf-text-faint">Sem Espaco</span>
                 </div>
-                <div className="flex items-center gap-1 ml-1 pl-2 border-l border-white/5">
-                  <label className="fs-sm text-zinc-400">Nome limpo (sem caracteres especiais)</label>
-                  <button onClick={() => update({ restrictFilenames: !options.restrictFilenames })} className={`relative w-7 h-4 rounded-full transition-colors shrink-0 ${options.restrictFilenames ? accentBg : 'bg-zinc-800'}`}>
+                <div className="flex items-center gap-1 ml-1 pl-2 border-l lf-border">
+                  <label className="fs-sm lf-text-secondary">Nome limpo (sem caracteres especiais)</label>
+                  <button onClick={() => update({ restrictFilenames: !options.restrictFilenames })} className={`relative w-7 h-4 rounded-full transition-colors shrink-0 ${options.restrictFilenames ? accentBg : 'lf-surface-raised'}`}>
                     <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${options.restrictFilenames ? 'left-[14px]' : 'left-0.5'}`} />
                   </button>
                 </div>
@@ -768,9 +768,9 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   })}
                 </div>
                 {maxRes > 0 && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-900/30 border border-white/5">
-                    <Info size={12} className="text-zinc-500 shrink-0" />
-                    <p className="fs-sm text-zinc-400">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg lf-surface-30 lf-border">
+                    <Info size={12} className="lf-text-muted shrink-0" />
+                    <p className="fs-sm lf-text-secondary">
                       {settings.language === 'en'
                         ? `This video is available up to ${maxRes}p. Higher presets will download at the maximum available quality.`
                         : `Este video esta disponivel ate ${maxRes}p. Presets maiores serao baixados na maxima qualidade disponivel.`}
@@ -798,7 +798,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                     </Btn>
                   ))}
                 </div>
-                <div className="space-y-2 pt-2 mt-2 border-t border-white/5">
+                <div className="space-y-2 pt-2 mt-2 border-t lf-border">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <BlockIcon blockId="behavior" />
@@ -837,13 +837,13 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             {mediaInfo.description && (
               <AccordionSection id="description" title="Descrição" blockId="metadata" isOpen={openSections.has('description')} onToggle={() => toggleSection('description')} accentBg={accentBg}>
                 <div className="px-3 pb-3 pt-2 space-y-2">
-                  <div className={`relative fs-sm text-zinc-400 leading-relaxed whitespace-pre-line ${descExpanded ? '' : 'line-clamp-5'}`}>
+                  <div className={`relative fs-sm lf-text-secondary leading-relaxed whitespace-pre-line ${descExpanded ? '' : 'line-clamp-5'}`}>
                     {mediaInfo.description}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setDescExpanded(!descExpanded)}
-                      className="fs-xs text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1"
+                      className="fs-xs lf-text-muted hover:text-zinc-300 transition-colors flex items-center gap-1"
                     >
                       {descExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                       {descExpanded ? 'Recolher' : 'Ver completa'}
@@ -954,8 +954,8 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
           <motion.div key="advanced" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ type: 'spring', stiffness: 400, damping: 28 }} className="space-y-4">
 
             {/* ── Formato customizado ── */}
-            <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 space-y-2">
-              <button onClick={() => setShowCustomFormat(!showCustomFormat)} className="flex items-center gap-1.5 fs-sm text-zinc-500 hover:text-zinc-300 transition-colors">
+            <div className="p-3 rounded-xl lf-surface-40 lf-border space-y-2">
+              <button onClick={() => setShowCustomFormat(!showCustomFormat)} className="flex items-center gap-1.5 fs-sm lf-text-muted hover:text-zinc-300 transition-colors">
                 {showCustomFormat ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                 Formato customizado (yt-dlp)
               </button>
@@ -965,7 +965,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   value={options.format || ''}
                   onChange={e => update({ format: e.target.value })}
                   placeholder="bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b"
-                  className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-white/5 fs-sm font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/15"
+                  className="w-full px-3 py-2 rounded-lg lf-surface lf-border fs-sm font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/15"
                 />
               )}
             </div>
@@ -983,7 +983,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                   />
                 ) : (
                   <>
-                    <p className="fs-sm text-zinc-600">Baixar apenas um trecho. Formato: MM:SS ou HH:MM:SS</p>
+                    <p className="fs-sm lf-text-faint">Baixar apenas um trecho. Formato: MM:SS ou HH:MM:SS</p>
                     <div className="flex gap-2 items-center">
                       <input
                         type="text"
@@ -995,9 +995,9 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                           else if (val) update({ downloadSections: `*${val}-` });
                           else update({ downloadSections: end ? `*-${end}` : '' });
                         }}
-                        className="flex-1 px-3 py-2 rounded-lg bg-zinc-900 border border-white/5 fs-sm font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/15"
+                        className="flex-1 px-3 py-2 rounded-lg lf-surface lf-border fs-sm font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/15"
                       />
-                      <span className="text-zinc-600 text-xs">-</span>
+                      <span className="lf-text-faint text-xs">-</span>
                       <input
                         type="text"
                         placeholder="Fim (fim)"
@@ -1008,7 +1008,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                           else if (val) update({ downloadSections: `*-${val}` });
                           else update({ downloadSections: start ? `*${start}-` : '' });
                         }}
-                        className="flex-1 px-3 py-2 rounded-lg bg-zinc-900 border border-white/5 fs-sm font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/15"
+                        className="flex-1 px-3 py-2 rounded-lg lf-surface lf-border fs-sm font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/15"
                       />
                     </div>
                   </>
@@ -1055,7 +1055,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             {/* ── SponsorBlock ── */}
             <AccordionSection id="sponsorblock" title="SponsorBlock" blockId="sponsorblock" isOpen={openSections.has('sponsorblock')} onToggle={() => toggleSection('sponsorblock')} accentBg={accentBg}>
               <div className="px-3 pb-3 pt-2 space-y-2">
-                <p className="fs-sm text-zinc-600">Remover automaticamente partes indesejadas do video</p>
+                <p className="fs-sm lf-text-faint">Remover automaticamente partes indesejadas do video</p>
                 <div className="flex flex-wrap gap-2.5">
                   {[
                     { id: 'sponsor', label: 'Sponsors' },

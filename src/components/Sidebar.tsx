@@ -26,7 +26,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = ({
   return (
     <>
       {/* Mobile Header bar */}
-      <header className="lg:hidden min-h-16 border-b border-white/5 bg-black/40 backdrop-blur-md sticky top-0 z-50 flex items-center justify-between px-4 safe-top">
+      <header className="lg:hidden min-h-16 border-b lf-border bg-black/40 backdrop-blur-md sticky top-0 z-50 flex items-center justify-between px-4 safe-top">
         <div className="flex items-center gap-2">
           <div className={`p-2 rounded-xl ${getAccentBgClass(settings)} text-white shadow-lg shadow-indigo-500/10`}>
             <Sparkles size={20} className="animate-pulse" />
@@ -74,7 +74,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = ({
             <h1 className="font-display font-extrabold text-xl tracking-tight text-white leading-tight">
               Universal
             </h1>
-            <p className="text-xs text-zinc-400 font-mono tracking-wider uppercase">{t('mediaDownloader')}</p>
+            <p className="text-xs lf-text-secondary font-mono tracking-wider uppercase">{t('mediaDownloader')}</p>
           </div>
         </div>
 
@@ -97,7 +97,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = ({
                   w-full relative group flex items-center justify-between gap-3 px-4 py-3.5 rounded-xl text-left transition-all duration-300
                   ${isActive 
                     ? 'text-white font-semibold' 
-                    : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                    : 'lf-text-secondary hover:text-white hover:bg-white/5'
                   }
                 `}
               >
@@ -132,7 +132,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = ({
                   </span>
                   <div>
                     <span className="font-medium text-sm block leading-none">{item.label}</span>
-                    <span className="text-[10px] text-zinc-500 block mt-1 group-hover:text-zinc-400 font-sans">
+                    <span className="text-[10px] lf-text-muted block mt-1 group-hover:text-zinc-400 font-sans">
                       {item.desc}
                     </span>
                   </div>
@@ -153,15 +153,15 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = ({
         {/* User profile / watermark footer */}
         <div className="absolute bottom-6 left-6 right-6 p-4 rounded-2xl glass-card flex flex-col gap-2">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center font-bold text-xs text-zinc-300">
+            <div className="w-8 h-8 rounded-full lf-surface-raised border lf-border-strong flex items-center justify-center font-bold text-xs lf-text-secondary">
               {authorInitials}
             </div>
             <div className="overflow-hidden">
               <span className="font-semibold text-xs text-zinc-200 block truncate">{authorEmail}</span>
-              <span className="text-[10px] text-zinc-500 font-mono uppercase block">{t('adminRole')}</span>
+              <span className="text-[10px] lf-text-muted font-mono uppercase block">{t('adminRole')}</span>
             </div>
           </div>
-          <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] text-zinc-500">
+          <div className="pt-2 border-t lf-border flex items-center justify-between text-[10px] lf-text-muted">
             <span>{settings.language === 'en' ? 'Version 2.4.0 (Pro)' : 'Versão 2.4.0 (Pro)'}</span>
             <span className="font-mono text-emerald-500">● {t('activeDriver')}</span>
           </div>

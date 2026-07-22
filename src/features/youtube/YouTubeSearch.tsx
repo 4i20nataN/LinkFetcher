@@ -43,7 +43,7 @@ const SearchResultCard = React.memo<{
     className="group rounded-2xl glass-card p-3 transition-all duration-300 cursor-pointer flex flex-col justify-between hover:bg-white/10"
   >
     <div>
-      <div className="relative aspect-video rounded-xl overflow-hidden border border-white/5 bg-zinc-950 shrink-0">
+      <div className="relative aspect-video rounded-xl overflow-hidden border lf-border lf-surface shrink-0">
         <img
           src={video.thumbnail}
           alt={video.title}
@@ -57,18 +57,18 @@ const SearchResultCard = React.memo<{
             <Play size={16} fill="currentColor" />
           </div>
         </div>
-        <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/80 backdrop-blur-md text-[10px] font-mono text-zinc-300">
+        <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/80 backdrop-blur-md text-[10px] font-mono lf-text-secondary">
           {video.duration_string}
         </span>
       </div>
       <h4 className="font-display font-semibold text-sm text-white mt-3 line-clamp-2 leading-snug group-hover:text-zinc-200 transition-colors">
         {video.title}
       </h4>
-      <p className="text-xs text-zinc-400 font-medium mt-1">
+      <p className="text-xs lf-text-secondary font-medium mt-1">
         {video.uploader}
       </p>
     </div>
-    <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/5 text-[10px] text-zinc-500 font-medium">
+    <div className="flex items-center justify-between mt-4 pt-3 border-t lf-border text-[10px] lf-text-muted font-medium">
       <div className="flex gap-3">
         <span className="flex items-center gap-1">
           <Eye size={12} />
@@ -149,7 +149,7 @@ export const YouTubeSearch: React.FC = () => {
             {t('onlineSearch')}
           </h2>
         </div>
-        <p className="text-zinc-400 text-sm md:text-base">
+        <p className="lf-text-secondary text-sm md:text-base">
           {t('searchSubtitle')}
         </p>
       </div>
@@ -157,7 +157,7 @@ export const YouTubeSearch: React.FC = () => {
       {/* Search Input bar */}
       <form onSubmit={handleSearch} className="flex gap-3">
         <div className="relative flex-1">
-          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 lf-text-muted" />
           <input
             type="text"
             value={query}
@@ -191,7 +191,7 @@ export const YouTubeSearch: React.FC = () => {
 
       {/* Results View */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between text-xs text-zinc-500 font-medium">
+        <div className="flex items-center justify-between text-xs lf-text-muted font-medium">
           <span>
             {query 
               ? (settings.language === 'en' ? `Results for "${query}"` : `Resultados para "${query}"`) 

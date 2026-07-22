@@ -53,23 +53,23 @@ const LUCIDE_MAP: Record<BlockId, React.ComponentType<{ size?: number; className
 };
 
 const COLOR_MAP: Record<BlockId, string> = {
-  resolution: 'text-zinc-400',
-  'video-format': 'text-zinc-400',
-  'audio-extract': 'text-zinc-400',
-  'audio-format': 'text-zinc-400',
-  'audio-quality': 'text-zinc-400',
+  resolution: 'lf-text-secondary',
+  'video-format': 'lf-text-secondary',
+  'audio-extract': 'lf-text-secondary',
+  'audio-format': 'lf-text-secondary',
+  'audio-quality': 'lf-text-secondary',
   subtitles: 'text-blue-400',
-  'custom-format': 'text-zinc-400',
+  'custom-format': 'lf-text-secondary',
   trim: 'text-amber-400',
-  'output-mode': 'text-zinc-400',
-  fps: 'text-zinc-400',
+  'output-mode': 'lf-text-secondary',
+  fps: 'lf-text-secondary',
   sponsorblock: 'text-purple-400',
   metadata: 'text-emerald-400',
   thumbnail: 'text-sky-400',
-  behavior: 'text-zinc-400',
-  fragments: 'text-zinc-400',
-  retries: 'text-zinc-400',
-  'speed-limit': 'text-zinc-400',
+  behavior: 'lf-text-secondary',
+  fragments: 'lf-text-secondary',
+  retries: 'lf-text-secondary',
+  'speed-limit': 'lf-text-secondary',
 };
 
 export const BlockIcon: React.FC<{ blockId: BlockId; size?: number }> = ({ blockId, size = 14 }) => {
@@ -84,9 +84,9 @@ export const BlockIcon: React.FC<{ blockId: BlockId; size?: number }> = ({ block
   if (style === 'lucide-color') {
     return <Icon size={size} className={COLOR_MAP[blockId]} />;
   }
-  return <Icon size={size} className="text-zinc-400" />;
+  return <Icon size={size} className="lf-text-secondary" />;
 };
 
 export const BlockTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <label className="fs-sm font-bold text-zinc-300 tracking-wide">{children}</label>
+  <label className="fs-sm font-bold lf-text-secondary tracking-wide">{children}</label>
 );

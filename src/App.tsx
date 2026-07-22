@@ -59,7 +59,7 @@ function DashboardContent() {
     const views = { analyze: LinkAnalyzer, search: YouTubeSearch, manager: DownloadManager, favorites: FavoritesView, later: DownloadLaterView, settings: SettingsView, privacy: PrivacyPolicy } as const;
     const View = views[activeTab as keyof typeof views] || LinkAnalyzer;
     return (
-      <Suspense fallback={<div className="flex items-center justify-center h-32 text-zinc-500 text-sm">Carregando...</div>}>
+      <Suspense fallback={<div className="flex items-center justify-center h-32 lf-text-muted text-sm">Carregando...</div>}>
         <View key={activeTab} />
       </Suspense>
     );

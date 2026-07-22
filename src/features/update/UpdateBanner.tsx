@@ -241,11 +241,11 @@ export default function UpdateBanner() {
         >
           {/* Checking */}
           {stage === 'checking' && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-zinc-900/60 border border-white/5 backdrop-blur-md">
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl lf-surface border lf-border backdrop-blur-md">
               <div className="relative">
-                <Loader2 size={16} className="animate-spin text-zinc-400" />
+                <Loader2 size={16} className="animate-spin lf-text-secondary" />
               </div>
-              <span className="text-sm text-zinc-400">Verificando atualizações...</span>
+              <span className="text-sm lf-text-secondary">Verificando atualizações...</span>
             </div>
           )}
 
@@ -275,8 +275,8 @@ export default function UpdateBanner() {
                         v{updateInfo.version}
                       </span>
                     </p>
-                    <p className="text-[11px] text-zinc-500 mt-0.5 flex items-center gap-1.5">
-                      <Shield size={10} className="text-zinc-600" />
+                    <p className="text-[11px] lf-text-muted mt-0.5 flex items-center gap-1.5">
+                      <Shield size={10} className="lf-text-faint" />
                       Verificada &bull; v{currentVersion} → v{updateInfo.version}
                     </p>
                   </div>
@@ -292,7 +292,7 @@ export default function UpdateBanner() {
                   </motion.button>
                   <button
                     onClick={dismiss}
-                    className="p-1.5 text-zinc-600 hover:text-zinc-400 transition-colors rounded-md hover:bg-white/5"
+                    className="p-1.5 lf-text-faint hover:text-zinc-400 transition-colors rounded-md hover:bg-white/5"
                     aria-label="Dispensar"
                   >
                     <X size={14} />
@@ -304,7 +304,7 @@ export default function UpdateBanner() {
 
           {/* Downloading — Premium Progress */}
           {stage === 'downloading' && (
-            <div className="relative overflow-hidden rounded-xl border border-white/5 bg-zinc-900/60 backdrop-blur-md">
+            <div className="relative overflow-hidden rounded-xl border lf-border lf-surface backdrop-blur-md">
               <div className="px-4 py-3.5">
                 <div className="flex items-center justify-between mb-2.5">
                   <div className="flex items-center gap-2.5">
@@ -313,7 +313,7 @@ export default function UpdateBanner() {
                   </div>
                   <div className="flex items-center gap-2 text-[11px]">
                     {totalBytes > 0 && (
-                      <span className="text-zinc-600 font-mono">
+                      <span className="lf-text-faint font-mono">
                         {formatBytes(receivedBytes)} / {formatBytes(totalBytes)}
                       </span>
                     )}
@@ -341,8 +341,8 @@ export default function UpdateBanner() {
 
                 {/* Security badge */}
                 <div className="flex items-center gap-1.5 mt-2">
-                  <Shield size={10} className="text-zinc-600" />
-                  <span className="text-[10px] text-zinc-600">SHA-256 verificado após download</span>
+                  <Shield size={10} className="lf-text-faint" />
+                  <span className="text-[10px] lf-text-faint">SHA-256 verificado após download</span>
                 </div>
               </div>
             </div>
@@ -372,7 +372,7 @@ export default function UpdateBanner() {
                         </span>
                       )}
                     </p>
-                    <p className="text-[11px] text-zinc-500 mt-0.5">
+                    <p className="text-[11px] lf-text-muted mt-0.5">
                       O app será fechado e o instalador será iniciado automaticamente
                     </p>
                   </div>
@@ -401,21 +401,21 @@ export default function UpdateBanner() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-zinc-200">Falha na atualização</p>
-                    <p className="text-[11px] text-zinc-500 mt-0.5 truncate">{errorMsg}</p>
+                    <p className="text-[11px] lf-text-muted mt-0.5 truncate">{errorMsg}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <motion.button
                     whileTap={{ scale: 0.96 }}
                     onClick={checkForUpdates}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium rounded-lg transition-colors border border-white/5"
+                    className="flex items-center gap-1.5 px-3 py-1.5 lf-surface-raised hover:bg-zinc-700 lf-text-secondary text-xs font-medium rounded-lg transition-colors border lf-border"
                   >
                     <RotateCcw size={12} />
                     Tentar
                   </motion.button>
                   <button
                     onClick={dismiss}
-                    className="p-1.5 text-zinc-600 hover:text-zinc-400 transition-colors rounded-md hover:bg-white/5"
+                    className="p-1.5 lf-text-faint hover:text-zinc-400 transition-colors rounded-md hover:bg-white/5"
                     aria-label="Fechar"
                   >
                     <X size={14} />

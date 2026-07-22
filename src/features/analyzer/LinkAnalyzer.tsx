@@ -61,20 +61,20 @@ const SummaryPanel: React.FC<{ formatOptions: FormatOptions; selectedFormat: Med
   if (items.length === 0) return null;
 
   return (
-    <div className="p-3 rounded-xl bg-zinc-900/40 border border-white/5 glass-result">
+    <div className="p-3 rounded-xl lf-surface-40 border lf-border glass-result">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Resultado</span>
+        <span className="text-[10px] lf-text-muted font-medium uppercase tracking-wider">Resultado</span>
         <div className="flex-1 h-px bg-white/5" />
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1">
         {items.map((item, i) => (
-          <span key={i} className="flex items-center gap-1.5 text-[11px] text-zinc-300">
+          <span key={i} className="flex items-center gap-1.5 text-[11px] lf-text-secondary">
             <span className="text-[10px]">{item.icon}</span>
             {item.label}
           </span>
         ))}
         {mediaInfo.duration && (
-          <span className="flex items-center gap-1.5 text-[11px] text-zinc-300">
+          <span className="flex items-center gap-1.5 text-[11px] lf-text-secondary">
             <span className="text-[10px]">🕒</span>
             {mediaInfo.duration}
           </span>
@@ -449,7 +449,7 @@ export const LinkAnalyzer: React.FC = () => {
         <h2 className="font-display font-extrabold text-3xl md:text-4xl text-white tracking-tight">
           {t('universalDownloader')}
         </h2>
-        <p className="text-zinc-400 text-sm md:text-base">
+        <p className="lf-text-secondary text-sm md:text-base">
           {settings.language === 'en' 
             ? 'Enter video, audio or image link from any supported platform to start.' 
             : 'Insira o link de vídeos, áudios ou imagens de qualquer plataforma suportada para começar.'}
@@ -466,8 +466,8 @@ export const LinkAnalyzer: React.FC = () => {
               onChange={(e) => setUrl(e.target.value)}
               placeholder={t('mainPlaceholder')}
               autoComplete="off"
-              className={`
-                w-full pl-4 pr-12 py-3.5 rounded-xl bg-zinc-950/70 border border-zinc-800 text-sm text-white placeholder-zinc-500
+                className={`
+                w-full pl-4 pr-12 py-3.5 rounded-xl lf-surface border lf-border text-sm text-white placeholder-zinc-500
                 focus:border-transparent focus:outline-none focus:ring-2 ${getAccentRingClass(settings)} transition-all
               `}
               onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
@@ -498,7 +498,7 @@ export const LinkAnalyzer: React.FC = () => {
                     bandLimit: 0,
                   });
                 }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-white/5 text-zinc-400 hover:text-white transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-white/5 lf-text-secondary hover:text-white transition-colors"
               >
                 <Trash2 size={16} />
               </button>
@@ -509,7 +509,7 @@ export const LinkAnalyzer: React.FC = () => {
             <button
               onClick={handlePaste}
               type="button"
-              className="flex-1 md:flex-none px-4 py-3.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-850 text-zinc-200 border border-zinc-700/50 hover:text-white font-medium text-sm transition-all"
+              className="flex-1 md:flex-none px-4 py-3.5 rounded-xl lf-surface-raised hover:bg-zinc-850 text-zinc-200 border lf-border hover:text-white font-medium text-sm transition-all"
             >
               {t('btnPaste')}
             </button>
@@ -519,7 +519,7 @@ export const LinkAnalyzer: React.FC = () => {
               className={`
                 flex-1 md:flex-none px-6 py-3.5 rounded-xl text-white font-semibold text-sm transition-all shadow-lg
                 ${loading || !url 
-                  ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700/50 shadow-none' 
+                  ? 'lf-surface-raised lf-text-muted cursor-not-allowed border lf-border shadow-none' 
                   : `${getAccentBgClass(settings)} hover:shadow-indigo-500/20`
                 }
               `}
@@ -636,25 +636,25 @@ export const LinkAnalyzer: React.FC = () => {
 
       {/* Skeleton Loading Card */}
       {loading && (
-        <div className="p-4 md:p-6 rounded-2xl bg-zinc-900/40 border border-white/5 animate-pulse space-y-6">
+        <div className="p-4 md:p-6 rounded-2xl lf-surface-40 border lf-border animate-pulse space-y-6">
           <div className="flex flex-col md:flex-row gap-6">
-            <div className="w-full md:w-56 h-36 bg-zinc-800 rounded-xl shrink-0" />
+            <div className="w-full md:w-56 h-36 lf-surface-raised rounded-xl shrink-0" />
             <div className="flex-1 space-y-4">
-              <div className="h-4 bg-zinc-800 rounded-full w-2/3" />
-              <div className="h-3 bg-zinc-800 rounded-full w-1/3" />
+              <div className="h-4 lf-surface-raised rounded-full w-2/3" />
+              <div className="h-3 lf-surface-raised rounded-full w-1/3" />
               <div className="grid grid-cols-2 gap-4 pt-2">
-                <div className="h-3 bg-zinc-800 rounded-full w-3/4" />
-                <div className="h-3 bg-zinc-800 rounded-full w-1/2" />
-                <div className="h-3 bg-zinc-800 rounded-full w-2/3" />
-                <div className="h-3 bg-zinc-800 rounded-full w-1/3" />
+                <div className="h-3 lf-surface-raised rounded-full w-3/4" />
+                <div className="h-3 lf-surface-raised rounded-full w-1/2" />
+                <div className="h-3 lf-surface-raised rounded-full w-2/3" />
+                <div className="h-3 lf-surface-raised rounded-full w-1/3" />
               </div>
             </div>
           </div>
-          <div className="border-t border-white/5 pt-6 space-y-4">
-            <div className="h-4 bg-zinc-800 rounded-full w-1/4" />
+          <div className="border-t lf-border pt-6 space-y-4">
+            <div className="h-4 lf-surface-raised rounded-full w-1/4" />
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {[1, 2, 3].map(i => (
-                <div key={i} className="h-14 bg-zinc-800 rounded-xl" />
+                <div key={i} className="h-14 lf-surface-raised rounded-xl" />
               ))}
             </div>
           </div>
@@ -673,7 +673,7 @@ export const LinkAnalyzer: React.FC = () => {
             {/* Header / Thumbnail Block */}
             <div className="flex flex-col md:flex-row gap-6">
               {/* Thumbnail Container */}
-              <div className="relative group w-full md:w-64 h-40 rounded-xl shrink-0 overflow-hidden border border-white/5 bg-zinc-950">
+              <div className="relative group w-full md:w-64 h-40 rounded-xl shrink-0 overflow-hidden border lf-border lf-surface">
                 <img 
                   src={mediaInfo.thumbnailUrl} 
                   alt={mediaInfo.title}
@@ -701,10 +701,10 @@ export const LinkAnalyzer: React.FC = () => {
                   <h3 className="font-display font-bold text-lg md:text-xl text-white leading-snug">
                     {mediaInfo.title}
                   </h3>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-zinc-400 font-medium font-sans">
-                    <span className="text-zinc-300 font-semibold">{t('authorLabel')} {mediaInfo.author}</span>
-                    <span className="text-zinc-600">•</span>
-                    <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/5 text-[10px] uppercase font-mono tracking-wider flex items-center gap-1.5 text-zinc-300">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs lf-text-secondary font-medium font-sans">
+                    <span className="lf-text-secondary font-semibold">{t('authorLabel')} {mediaInfo.author}</span>
+                    <span className="lf-text-faint">•</span>
+                    <span className="px-2 py-0.5 rounded-md bg-white/5 border lf-border text-[10px] uppercase font-mono tracking-wider flex items-center gap-1.5 lf-text-secondary">
                       {mediaInfo.type === 'video' && <><FileVideo size={10} className={getAccentTextClass(settings)} /> {settings.language === 'en' ? 'Video' : 'Vídeo'}</>}
                       {mediaInfo.type === 'audio' && <><Music size={10} className={getAccentTextClass(settings)} /> {settings.language === 'en' ? 'Audio' : 'Áudio'}</>}
                       {mediaInfo.type === 'image' && <><ImageIcon size={10} className={getAccentTextClass(settings)} /> {settings.language === 'en' ? 'Image' : 'Imagem'}</>}
@@ -720,7 +720,7 @@ export const LinkAnalyzer: React.FC = () => {
                       px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all
                       ${isFav 
                         ? `${getAccentBorderClass(settings)} bg-current text-white` 
-                        : 'border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:text-white hover:bg-zinc-850'
+                        : 'lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850'
                       }
                     `}
                     style={isFav ? { backgroundColor: `rgba(var(--color-primary-rgb), 0.1)`, color: 'var(--color-primary)' } : {}}
@@ -735,7 +735,7 @@ export const LinkAnalyzer: React.FC = () => {
                       px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all
                       ${isLater 
                         ? `${getAccentBorderClass(settings)} bg-current text-white` 
-                        : 'border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:text-white hover:bg-zinc-850'
+                        : 'lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850'
                       }
                     `}
                     style={isLater ? { backgroundColor: `rgba(var(--color-primary-rgb), 0.1)`, color: 'var(--color-primary)' } : {}}
@@ -746,7 +746,7 @@ export const LinkAnalyzer: React.FC = () => {
 
                   <button
                     onClick={handleDownloadThumbnail}
-                    className="px-3.5 py-2 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:text-white hover:bg-zinc-850 text-xs font-semibold flex items-center gap-2 transition-all"
+                    className="px-3.5 py-2 rounded-xl border lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850 text-xs font-semibold flex items-center gap-2 transition-all"
                   >
                     <ImageIcon size={14} className={getAccentTextClass(settings)} />
                     {settings.language === 'en' ? 'Download Thumbnail' : 'Baixar Capa'}
@@ -756,7 +756,7 @@ export const LinkAnalyzer: React.FC = () => {
                     href={mediaInfo.originalUrl}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="px-3.5 py-2 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:text-white hover:bg-zinc-850 text-xs font-semibold flex items-center gap-2 transition-all"
+                    className="px-3.5 py-2 rounded-xl border lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850 text-xs font-semibold flex items-center gap-2 transition-all"
                   >
                     <ExternalLink size={14} />
                     {t('btnOriginal')}
@@ -766,9 +766,9 @@ export const LinkAnalyzer: React.FC = () => {
             </div>
 
             {/* Format Selector with Probe Options */}
-            <div className="border-t border-white/5 pt-6 space-y-5">
+            <div className="border-t lf-border pt-6 space-y-5">
               {probeLoading && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-zinc-500/10 border border-white/5 text-zinc-300 text-xs font-medium">
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-zinc-500/10 border lf-border lf-text-secondary text-xs font-medium">
                   <RefreshCw size={14} className="animate-spin" />
                   {settings.language === 'en' ? 'Probing media info...' : 'Analisando informações da mídia...'}
                 </div>
@@ -789,7 +789,7 @@ export const LinkAnalyzer: React.FC = () => {
             </div>
 
             {/* Execute Download trigger */}
-            <div className="border-t border-white/5 pt-6 space-y-4">
+            <div className="border-t lf-border pt-6 space-y-4">
               <SummaryPanel formatOptions={formatOptions} selectedFormat={selectedFormat} mediaInfo={mediaInfo} />
               <div className="flex justify-end">
                 <button
@@ -819,12 +819,12 @@ export const LinkAnalyzer: React.FC = () => {
           const Icon = item.icon;
           return (
             <div key={idx} className="p-4 rounded-2xl glass-card flex gap-3.5 items-start">
-              <div className={`p-2 rounded-lg bg-zinc-900 ${getAccentTextClass(settings)} shrink-0`}>
+              <div className={`p-2 rounded-lg lf-surface ${getAccentTextClass(settings)} shrink-0`}>
                 <Icon size={16} />
               </div>
               <div>
                 <p className="font-semibold text-xs text-white">{item.title}</p>
-                <p className="text-[10px] text-zinc-400 mt-1">{item.desc}</p>
+                <p className="text-[10px] lf-text-secondary mt-1">{item.desc}</p>
               </div>
             </div>
           );

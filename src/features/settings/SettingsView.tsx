@@ -165,7 +165,7 @@ export const SettingsView: React.FC = () => {
             initial={{ opacity: 0, y: 50, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50, scale: 0.95 }}
-            className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] right-6 z-50 px-4 py-3 rounded-xl bg-zinc-900 border border-white/10 text-xs font-semibold text-white shadow-2xl flex items-center gap-2.5"
+            className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] right-6 z-50 px-4 py-3 rounded-xl lf-surface lf-border-strong text-xs font-semibold text-white shadow-2xl flex items-center gap-2.5"
           >
             <ShieldCheck size={16} className={getAccentTextClass(settings)} />
             {toastMsg}
@@ -177,7 +177,7 @@ export const SettingsView: React.FC = () => {
         <h2 className="font-display font-extrabold text-3xl md:text-4xl text-white tracking-tight">
           {t('settingsTitle')}
         </h2>
-        <p className="text-zinc-400 text-sm md:text-base">
+        <p className="lf-text-secondary text-sm md:text-base">
           {t('settingsSubtitle')}
         </p>
       </div>
@@ -190,8 +190,8 @@ export const SettingsView: React.FC = () => {
             </h3>
 
             <div className="space-y-2">
-              <span className="text-xs text-zinc-400 font-medium">{t('themeMode')}</span>
-              <div className="grid grid-cols-3 gap-2 p-1 rounded-xl bg-zinc-950/60 border border-white/5">
+              <span className="text-xs lf-text-secondary font-medium">{t('themeMode')}</span>
+              <div className="grid grid-cols-3 gap-2 p-1 rounded-xl lf-surface lf-border">
                 {[
                   { id: 'light', name: t('themeLight') },
                   { id: 'dark', name: t('themeDark') },
@@ -200,7 +200,7 @@ export const SettingsView: React.FC = () => {
                   <button
                     key={mode.id}
                     onClick={() => updateSettings({ themeMode: mode.id as any })}
-                    className={`py-2 rounded-lg text-xs font-semibold transition-all ${settings.themeMode === mode.id ? 'bg-zinc-900 text-white shadow-md border border-white/5' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`py-2 rounded-lg text-xs font-semibold transition-all ${settings.themeMode === mode.id ? 'lf-surface text-white shadow-md lf-border' : 'lf-text-muted hover:text-zinc-300'}`}
                   >
                     {mode.name}
                   </button>
@@ -209,7 +209,7 @@ export const SettingsView: React.FC = () => {
             </div>
 
             <div className="space-y-2.5">
-              <span className="text-xs text-zinc-400 font-medium block">{t('accentColor')}</span>
+              <span className="text-xs lf-text-secondary font-medium block">{t('accentColor')}</span>
               <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
                 {accentColorsList.map((color) => {
                   const isSelected = settings.accentColor === color.id;
@@ -220,7 +220,7 @@ export const SettingsView: React.FC = () => {
                       className={`p-2 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${isSelected ? `${getAccentBorderClass(settings)} bg-white/5` : 'border-zinc-800 bg-transparent hover:bg-white/5'}`}
                     >
                       <span className={`w-4 h-4 rounded-full ${color.color} block shadow-inner`} />
-                      <span className="text-[10px] text-zinc-400 font-medium capitalize">{t(color.name as any)}</span>
+                      <span className="text-[10px] lf-text-secondary font-medium capitalize">{t(color.name as any)}</span>
                     </button>
                   );
                 })}
@@ -228,10 +228,10 @@ export const SettingsView: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <span className="text-xs text-zinc-400 font-medium flex items-center gap-1">
+              <span className="text-xs lf-text-secondary font-medium flex items-center gap-1">
                 <Palette size={14} /> {settings.language === 'en' ? 'Icon Style' : 'Estilo dos Icones'}
               </span>
-              <div className="grid grid-cols-3 gap-2 p-1 rounded-xl bg-zinc-950/60 border border-white/5">
+              <div className="grid grid-cols-3 gap-2 p-1 rounded-xl lf-surface lf-border">
                 {[
                   { id: 'emoji', name: 'Emoji', icon: '🎬' },
                   { id: 'lucide-mono', name: 'Lucide', icon: null },
@@ -240,37 +240,37 @@ export const SettingsView: React.FC = () => {
                   <button
                     key={mode.id}
                     onClick={() => updateSettings({ iconStyle: mode.id as any })}
-                    className={`py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${settings.iconStyle === mode.id ? 'bg-zinc-900 text-white shadow-md border border-white/5' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${settings.iconStyle === mode.id ? 'lf-surface text-white shadow-md lf-border' : 'lf-text-muted hover:text-zinc-300'}`}
                   >
                     {mode.icon ? (
                       <span className="text-sm">{mode.icon}</span>
                     ) : (
-                      <Palette size={12} className={mode.id === 'lucide-color' ? 'text-amber-400' : 'text-zinc-400'} />
+                      <Palette size={12} className={mode.id === 'lucide-color' ? 'text-amber-400' : 'lf-text-secondary'} />
                     )}
                     {mode.name}
                   </button>
                 ))}
               </div>
-              <p className="text-[10px] text-zinc-600">
+              <p className="text-[10px] lf-text-faint">
                 {settings.language === 'en'
                   ? 'Choose how icons appear on download option blocks and format selector cards.'
                   : 'Escolha como os icones aparecem nos blocos de opcoes de download e cards do seletor de formato.'}
               </p>
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/40 border border-white/5">
+            <div className="flex items-center justify-between p-3 rounded-xl lf-surface-40 lf-border">
               <div className="space-y-1">
                 <span className="text-xs text-white font-medium flex items-center gap-1.5">
-                  <Smile size={14} className="text-zinc-400" />
+                  <Smile size={14} className="lf-text-secondary" />
                   {settings.language === 'en' ? 'Colorful Sidebar Emojis' : 'Emojis Coloridos na Lateral'}
                 </span>
-                <p className="text-[10px] text-zinc-500">
+                <p className="text-[10px] lf-text-muted">
                   {settings.language === 'en' ? 'Keep sidebar emojis colored at all times instead of grayscale' : 'Manter emojis da barra lateral sempre coloridos em vez de preto e branco'}
                 </p>
               </div>
               <button
                 onClick={() => updateSettings({ colorfulIcons: !settings.colorfulIcons })}
-                className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.colorfulIcons ? getAccentBgClass(settings) : 'bg-zinc-800'}`}
+                className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.colorfulIcons ? getAccentBgClass(settings) : 'lf-surface-raised'}`}
               >
                 <motion.div
                   layout
@@ -281,19 +281,19 @@ export const SettingsView: React.FC = () => {
               </button>
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/40 border border-white/5">
+            <div className="flex items-center justify-between p-3 rounded-xl lf-surface-40 lf-border">
               <div className="space-y-1">
                 <span className="text-xs text-white font-medium flex items-center gap-1.5">
-                  <Clipboard size={14} className="text-zinc-400" />
+                  <Clipboard size={14} className="lf-text-secondary" />
                   {settings.language === 'en' ? 'Allow Clipboard Access' : 'Permitir Acesso à Área de Transferência'}
                 </span>
-                <p className="text-[10px] text-zinc-500">
+                <p className="text-[10px] lf-text-muted">
                   {settings.language === 'en' ? 'Enable "paste link" button to read from clipboard automatically' : 'Ativar botão "colar link" para ler automaticamente da área de transferência'}
                 </p>
               </div>
               <button
                 onClick={() => updateSettings({ clipboardEnabled: !settings.clipboardEnabled })}
-                className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.clipboardEnabled ? getAccentBgClass(settings) : 'bg-zinc-800'}`}
+                className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.clipboardEnabled ? getAccentBgClass(settings) : 'lf-surface-raised'}`}
               >
                 <motion.div
                   layout
@@ -312,29 +312,29 @@ export const SettingsView: React.FC = () => {
 
             <div className="space-y-2">
               <div className="flex justify-between text-xs font-medium">
-                <span className="text-zinc-400">{t('simultaneousDownloads')}</span>
+                <span className="lf-text-secondary">{t('simultaneousDownloads')}</span>
                 <span className="text-white">{t('simultCount', { count: settings.maxConcurrent })}</span>
               </div>
-              <div className="flex gap-2 p-1 rounded-xl bg-zinc-950/60 border border-white/5">
+              <div className="flex gap-2 p-1 rounded-xl lf-surface lf-border">
                 {[1, 2, 3, 5, 10].map((num) => (
                   <button
                     key={num}
                     onClick={() => updateSettings({ maxConcurrent: num })}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${settings.maxConcurrent === num ? 'bg-zinc-900 text-white shadow-md border border-white/5' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${settings.maxConcurrent === num ? 'lf-surface text-white shadow-md lf-border' : 'lf-text-muted hover:text-zinc-300'}`}
                   >
                     {num}
                   </button>
                 ))}
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/40 border border-white/5">
+              <div className="flex items-center justify-between p-3 rounded-xl lf-surface-40 lf-border">
                 <div className="space-y-0.5">
-                  <span className="text-xs font-semibold text-zinc-300">{t('wifiOnly')}</span>
-                  <p className="text-[10px] text-zinc-500">{t('wifiOnlyDesc')}</p>
+                  <span className="text-xs font-semibold lf-text-secondary">{t('wifiOnly')}</span>
+                  <p className="text-[10px] lf-text-muted">{t('wifiOnlyDesc')}</p>
                 </div>
                 <button
                   onClick={() => updateSettings({ wifiOnly: !settings.wifiOnly })}
-                  className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.wifiOnly ? getAccentBgClass(settings) : 'bg-zinc-800'}`}
+                  className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.wifiOnly ? getAccentBgClass(settings) : 'lf-surface-raised'}`}
                 >
                   <motion.div
                     layout
@@ -345,18 +345,18 @@ export const SettingsView: React.FC = () => {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/40 border border-white/5">
+              <div className="flex items-center justify-between p-3 rounded-xl lf-surface-40 lf-border">
                 <div className="space-y-0.5">
-                  <span className="text-xs font-semibold text-zinc-300">
+                  <span className="text-xs font-semibold lf-text-secondary">
                     {settings.language === 'en' ? 'Start Downloads Automatically' : 'Iniciar Downloads Automaticamente'}
                   </span>
-                  <p className="text-[10px] text-zinc-500">
+                  <p className="text-[10px] lf-text-muted">
                     {settings.language === 'en' ? 'Starts downloading right after analyzer finishes.' : 'Inicia o download logo após a análise, sem aguardar na fila.'}
                   </p>
                 </div>
                 <button
                   onClick={() => updateSettings({ autoDownload: !settings.autoDownload })}
-                  className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.autoDownload ? getAccentBgClass(settings) : 'bg-zinc-800'}`}
+                  className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.autoDownload ? getAccentBgClass(settings) : 'lf-surface-raised'}`}
                 >
                   <motion.div
                     layout
@@ -377,25 +377,25 @@ export const SettingsView: React.FC = () => {
             </h3>
 
             {isCapacitor ? (
-              <p className="text-[11px] text-zinc-500">
+              <p className="text-[11px] lf-text-muted">
                 📱 {settings.language === 'en'
                   ? 'Downloads are saved to the app\'s internal storage automatically.'
                   : 'Os downloads são salvos automaticamente no armazenamento interno do app.'}
               </p>
             ) : (
               <div className="space-y-2">
-                <span className="text-xs text-zinc-400 font-medium">{t('destinationFolder')}</span>
+                <span className="text-xs lf-text-secondary font-medium">{t('destinationFolder')}</span>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={settings.defaultDir}
                     onChange={(e) => updateSettings({ defaultDir: e.target.value })}
-                    className="flex-1 px-3 py-2 rounded-xl bg-zinc-950/70 border border-zinc-800 text-xs text-zinc-300 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className="flex-1 px-3 py-2 rounded-xl lf-surface border border-zinc-800 text-xs lf-text-secondary font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     placeholder={settings.language === 'en' ? 'Download folder path...' : 'Caminho da pasta de downloads...'}
                   />
                   <button
                     onClick={handleSelectFolder}
-                    className="px-3 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-zinc-700/50 transition-all whitespace-nowrap"
+                    className="px-3 py-2 rounded-xl lf-surface-raised hover:bg-zinc-800 lf-text hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-zinc-700/50 transition-all whitespace-nowrap"
                     title={settings.language === 'en' ? 'Choose folder (native dialog)' : 'Escolher pasta (diálogo nativo)'}
                   >
                     <FolderPlus size={12} />
@@ -403,7 +403,7 @@ export const SettingsView: React.FC = () => {
                   </button>
                   <button
                     onClick={handleOpenFolder}
-                    className="px-3 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-zinc-700/50 transition-all whitespace-nowrap"
+                    className="px-3 py-2 rounded-xl lf-surface-raised hover:bg-zinc-800 lf-text hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-zinc-700/50 transition-all whitespace-nowrap"
                   >
                     <FolderOpen size={12} />
                     {showCopied
@@ -411,7 +411,7 @@ export const SettingsView: React.FC = () => {
                       : (settings.language === 'en' ? 'Open' : 'Abrir')}
                   </button>
                 </div>
-                <p className="text-[10px] text-zinc-600 flex items-center gap-1">
+                <p className="text-[10px] lf-text-faint flex items-center gap-1">
                   {isElectron ? '🖥️' : '🌐'}
                   {settings.language === 'en'
                     ? isElectron
@@ -425,10 +425,10 @@ export const SettingsView: React.FC = () => {
             )}
 
             <div className="space-y-2">
-              <span className="text-xs text-zinc-400 font-medium flex items-center gap-1">
+              <span className="text-xs lf-text-secondary font-medium flex items-center gap-1">
                 <Globe size={14} /> {t('appLanguage')}
               </span>
-              <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-zinc-950/60 border border-white/5">
+              <div className="grid grid-cols-2 gap-2 p-1 rounded-xl lf-surface lf-border">
                 {[
                   { id: 'pt', name: 'Português (BR)' },
                   { id: 'en', name: 'English (US)' }
@@ -436,7 +436,7 @@ export const SettingsView: React.FC = () => {
                   <button
                     key={lang.id}
                     onClick={() => updateSettings({ language: lang.id as any })}
-                    className={`py-2 rounded-lg text-xs font-semibold transition-all ${settings.language === lang.id ? 'bg-zinc-900 text-white shadow-md border border-white/5' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`py-2 rounded-lg text-xs font-semibold transition-all ${settings.language === lang.id ? 'lf-surface text-white shadow-md lf-border' : 'lf-text-muted hover:text-zinc-300'}`}
                   >
                     {lang.name}
                   </button>
@@ -445,14 +445,14 @@ export const SettingsView: React.FC = () => {
             </div>
 
             <div className="space-y-3.5 pt-2">
-              <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/40 border border-white/5">
+              <div className="flex items-center justify-between p-3 rounded-xl lf-surface-40 lf-border">
                 <div className="space-y-0.5">
-                  <span className="text-xs font-semibold text-zinc-300">{t('notifLabel')}</span>
-                  <p className="text-[10px] text-zinc-500">{t('notifDesc')}</p>
+                  <span className="text-xs font-semibold lf-text-secondary">{t('notifLabel')}</span>
+                  <p className="text-[10px] lf-text-muted">{t('notifDesc')}</p>
                 </div>
                 <button
                   onClick={() => updateSettings({ notifications: !settings.notifications })}
-                  className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.notifications ? getAccentBgClass(settings) : 'bg-zinc-800'}`}
+                  className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.notifications ? getAccentBgClass(settings) : 'lf-surface-raised'}`}
                 >
                   <motion.div
                     layout
@@ -463,14 +463,14 @@ export const SettingsView: React.FC = () => {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/40 border border-white/5">
+              <div className="flex items-center justify-between p-3 rounded-xl lf-surface-40 lf-border">
                 <div className="space-y-0.5">
-                  <span className="text-xs font-semibold text-zinc-300">{t('updatesLabel')}</span>
-                  <p className="text-[10px] text-zinc-500">{t('updatesDesc')}</p>
+                  <span className="text-xs font-semibold lf-text-secondary">{t('updatesLabel')}</span>
+                  <p className="text-[10px] lf-text-muted">{t('updatesDesc')}</p>
                 </div>
                 <button
                   onClick={() => updateSettings({ updates: !settings.updates })}
-                  className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.updates ? getAccentBgClass(settings) : 'bg-zinc-800'}`}
+                  className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.updates ? getAccentBgClass(settings) : 'lf-surface-raised'}`}
                 >
                   <motion.div
                     layout
@@ -487,7 +487,7 @@ export const SettingsView: React.FC = () => {
             <h3 className="font-display font-bold text-sm text-white flex items-center gap-2">
               <RefreshCw size={16} className={getAccentTextClass(settings)} /> {t('backupSettings')}
             </h3>
-            <p className="text-[10px] text-zinc-500">
+            <p className="text-[10px] lf-text-muted">
               {settings.language === 'en'
                 ? 'Export/import only links (favorites, downloads, download later). Lightweight format for easy sharing.'
                 : 'Exportar/importar apenas links (favoritos, downloads, baixar depois). Formato leve para fácil compartilhamento.'}
@@ -496,13 +496,13 @@ export const SettingsView: React.FC = () => {
             <div className="flex gap-2">
               <button
                 onClick={handleExport}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 border border-zinc-700/50 transition-all"
+                className="flex-1 px-4 py-2.5 rounded-xl lf-surface-raised hover:bg-zinc-800 lf-text hover:text-white text-xs font-semibold flex items-center justify-center gap-2 border border-zinc-700/50 transition-all"
               >
                 <Upload size={14} /> {t('exportBackup')}
               </button>
               <button
                 onClick={() => setShowImportArea(!showImportArea)}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-200 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 border border-zinc-700/50 transition-all"
+                className="flex-1 px-4 py-2.5 rounded-xl lf-surface-raised hover:bg-zinc-800 lf-text hover:text-white text-xs font-semibold flex items-center justify-center gap-2 border border-zinc-700/50 transition-all"
               >
                 <Download size={14} /> {t('importBackup')}
               </button>
@@ -514,7 +514,7 @@ export const SettingsView: React.FC = () => {
                 animate={{ opacity: 1, height: 'auto' }}
                 className="space-y-2 pt-2"
               >
-                <span className="text-[10px] text-zinc-500 font-mono block">
+                <span className="text-[10px] lf-text-muted font-mono block">
                   {settings.language === 'en' ? 'Paste the links JSON below:' : 'Cole o JSON de links abaixo:'}
                 </span>
                 <textarea
@@ -522,7 +522,7 @@ export const SettingsView: React.FC = () => {
                   onChange={(e) => setImportText(e.target.value)}
                   placeholder='{"favorites": [...], "downloadLater": [...], "downloads": [...]}'
                   rows={4}
-                  className="w-full p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 font-mono placeholder-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full p-2.5 rounded-lg lf-surface border border-zinc-800 text-xs lf-text-secondary font-mono placeholder-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
                 <button
                   onClick={handleImport}
@@ -541,7 +541,7 @@ export const SettingsView: React.FC = () => {
           <h4 className="font-semibold text-xs text-red-400 flex items-center gap-1.5">
             <AlertCircle size={14} /> {settings.language === 'en' ? 'Dangerous Storage Management' : 'Gerenciamento de Armazenamento Perigoso'}
           </h4>
-          <p className="text-[10px] text-zinc-500 mt-1 max-w-sm">
+          <p className="text-[10px] lf-text-muted mt-1 max-w-sm">
             {settings.language === 'en' 
               ? 'These actions irreversibly clear local browser lists. Use with extreme caution.' 
               : 'Estas ações limpam as listas locais armazenadas no navegador de forma irreversível. Use com bastante cautela.'}
@@ -574,7 +574,7 @@ export const SettingsView: React.FC = () => {
           <span className="text-xs font-semibold text-white block">
             {settings.language === 'en' ? 'Privacy Policy' : 'Política de Privacidade'}
           </span>
-          <span className="text-[10px] text-zinc-500">
+          <span className="text-[10px] lf-text-muted">
             {settings.language === 'en' ? 'View how we handle your data' : 'Veja como tratamos seus dados'}
           </span>
         </div>

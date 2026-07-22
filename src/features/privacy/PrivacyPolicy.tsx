@@ -69,8 +69,8 @@ export function PrivacyPolicy() {
           onClick={() => setActiveTab('settings')}
           className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200
             ${isLight
-              ? 'text-zinc-600 border border-zinc-200/50 bg-white/40 hover:bg-white/70 hover:border-blue-300 hover:text-blue-600'
-              : 'text-zinc-400 border border-white/5 bg-white/[0.02] hover:bg-white/[0.06] hover:border-blue-500/30 hover:text-blue-400'
+              ? 'lf-text-secondary lf-border bg-white/40 hover:bg-white/70 hover:border-blue-300 hover:text-blue-600'
+              : 'lf-text-secondary lf-border bg-white/[0.02] hover:bg-white/[0.06] hover:border-blue-500/30 hover:text-blue-400'
             }`}
         >
           <ArrowLeft size={14} />
@@ -87,7 +87,7 @@ export function PrivacyPolicy() {
           }`}
       >
         {/* Header */}
-        <div className={`flex items-center justify-between pb-6 mb-7 border-b flex-wrap gap-5 ${isLight ? 'border-zinc-200/60' : 'border-white/5'}`}>
+        <div className={`flex items-center justify-between pb-6 mb-7 border-b lf-border flex-wrap gap-5`}>
           <div className="flex items-center gap-3.5">
             <div
               className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0
@@ -102,7 +102,7 @@ export function PrivacyPolicy() {
               <h1 className={`text-xl font-bold tracking-tight ${isLight ? 'text-zinc-900' : 'text-white'}`}>
                 Link<span className="text-blue-500">Fatcher</span>
               </h1>
-              <p className={`text-[11px] mt-0.5 ${isLight ? 'text-zinc-500' : 'text-zinc-400'}`}>
+              <p className={`text-[11px] mt-0.5 lf-text-secondary`}>
                 Política de Privacidade
               </p>
             </div>
@@ -122,7 +122,7 @@ export function PrivacyPolicy() {
             </h2>
             <div
               className={`text-xs border-l-2 pl-3.5 mb-2.5
-                ${isLight ? 'text-zinc-500 border-blue-500' : 'text-zinc-400 border-blue-500'}`}
+                ${isLight ? 'text-zinc-500 border-blue-500' : 'lf-text-secondary border-blue-500'}`}
             >
               Última atualização: 15 de julho de 2026
             </div>
@@ -153,7 +153,7 @@ export function PrivacyPolicy() {
                     <li
                       key={i}
                       className={`text-[13px] leading-relaxed pl-5 relative
-                        ${isLight ? 'text-zinc-600' : 'text-white/70'}`}
+                        ${isLight ? 'text-zinc-600' : 'lf-text-secondary'}`}
                     >
                       <span className="absolute left-0 top-0 text-blue-500 font-light">▹</span>
                       {item}
@@ -193,7 +193,7 @@ export function PrivacyPolicy() {
           {/* Commitment note */}
           <p
             className={`mt-2.5 text-[13px] border-l-2 pl-4.5
-              ${isLight ? 'text-zinc-500 border-blue-500' : 'text-zinc-400 border-blue-500'}`}
+              ${isLight ? 'text-zinc-500 border-blue-500' : 'lf-text-secondary border-blue-500'}`}
           >
             <span className="text-blue-500 font-medium">🔒 Compromisso</span> — A LinkFatcher é construída com foco em privacidade desde a origem.
             Seus links e dados são tratados com o mais alto nível de confidencialidade.
@@ -203,7 +203,7 @@ export function PrivacyPolicy() {
         {/* Footer */}
         <div
           className={`mt-8 pt-5 border-t flex justify-between items-center flex-wrap gap-3.5 text-xs
-            ${isLight ? 'border-zinc-200/50 text-zinc-500' : 'border-white/[0.04] text-zinc-400'}`}
+            ${isLight ? 'border-zinc-200/50 lf-text-secondary' : 'lf-border lf-text-secondary'}`}
         >
           <div className="flex items-center gap-3.5">
             <span
@@ -229,7 +229,7 @@ export function PrivacyPolicy() {
               Suporte
             </a>
             <span>·</span>
-            <span className={isLight ? 'text-zinc-400' : 'text-zinc-500'}>v{version}</span>
+            <span className="lf-text-secondary">v{version}</span>
           </div>
         </div>
       </div>

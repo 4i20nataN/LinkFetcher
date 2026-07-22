@@ -176,7 +176,7 @@ export const DownloadManager: React.FC = () => {
             initial={{ opacity: 0, y: 50, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50, scale: 0.95 }}
-            className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] right-6 z-50 px-4 py-3 rounded-xl bg-zinc-900 border border-white/10 text-xs font-semibold text-white shadow-2xl flex items-center gap-2.5"
+            className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] right-6 z-50 px-4 py-3 rounded-xl lf-surface border lf-border-strong text-xs font-semibold text-white shadow-2xl flex items-center gap-2.5"
           >
             <ShieldCheck size={16} className={getAccentTextClass(settings)} />
             {toastMsg}
@@ -189,7 +189,7 @@ export const DownloadManager: React.FC = () => {
         <h2 className="font-display font-extrabold text-3xl md:text-4xl text-white tracking-tight">
           {t('downloadsTitle')}
         </h2>
-        <p className="text-zinc-400 text-sm md:text-base">
+        <p className="lf-text-secondary text-sm md:text-base">
           {t('downloadsSubtitle')}
         </p>
       </div>
@@ -221,7 +221,7 @@ export const DownloadManager: React.FC = () => {
               <span className="font-display font-bold text-sm text-white">{overallProgress}%</span>
             </div>
             <div>
-              <span className="text-[10px] text-zinc-500 font-mono uppercase block">{t('generalProgress')}</span>
+              <span className="text-[10px] lf-text-muted font-mono uppercase block">{t('generalProgress')}</span>
               <span className="text-sm font-bold text-white block mt-0.5">
                 {settings.language === 'en' ? 'Downloading' : 'Baixando'} {downloadingOrQueued.length} {downloadingOrQueued.length === 1 ? (settings.language === 'en' ? 'item' : 'mídia') : (settings.language === 'en' ? 'items' : 'mídias')}
               </span>
@@ -229,12 +229,12 @@ export const DownloadManager: React.FC = () => {
           </div>
 
           {/* Speed stats */}
-          <div className="flex items-center gap-3.5 border-y md:border-y-0 md:border-x border-white/5 py-4 md:py-0 md:px-6">
-            <div className={`p-2 rounded-xl bg-zinc-900 ${getAccentTextClass(settings)} shrink-0`}>
+          <div className="flex items-center gap-3.5 border-y md:border-y-0 md:border-x lf-border py-4 md:py-0 md:px-6">
+            <div className={`p-2 rounded-xl lf-surface ${getAccentTextClass(settings)} shrink-0`}>
               <TrendingUp size={20} className="animate-bounce" />
             </div>
             <div>
-              <span className="text-[10px] text-zinc-500 font-mono uppercase block">{t('activeSpeed')}</span>
+              <span className="text-[10px] lf-text-muted font-mono uppercase block">{t('activeSpeed')}</span>
               <span className="text-base font-bold text-white block mt-0.5">{formatSpeed(totalSpeed)}</span>
             </div>
           </div>
@@ -243,13 +243,13 @@ export const DownloadManager: React.FC = () => {
           <div className="flex flex-wrap gap-2 justify-start md:justify-end">
             <button 
               onClick={handlePauseAll}
-              className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/40 text-[10px] font-bold text-zinc-300 hover:text-white transition-colors"
+              className="px-3 py-1.5 rounded-lg lf-surface-raised hover:bg-zinc-700 border border-zinc-700/40 text-[10px] font-bold lf-text-secondary hover:text-white transition-colors"
             >
               {settings.language === 'en' ? 'Pause All' : 'Pausar Todos'}
             </button>
             <button 
               onClick={handleResumeAll}
-              className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/40 text-[10px] font-bold text-zinc-300 hover:text-white transition-colors"
+              className="px-3 py-1.5 rounded-lg lf-surface-raised hover:bg-zinc-700 border border-zinc-700/40 text-[10px] font-bold lf-text-secondary hover:text-white transition-colors"
             >
               {settings.language === 'en' ? 'Resume All' : 'Retomar Todos'}
             </button>
@@ -264,7 +264,7 @@ export const DownloadManager: React.FC = () => {
       )}
 
       {/* Categories Switch Tabs */}
-      <div className="flex flex-wrap gap-1.5 p-1 rounded-xl bg-zinc-950/60 border border-white/5">
+      <div className="flex flex-wrap gap-1.5 p-1 rounded-xl lf-surface/60 border lf-border">
         {[
           { id: 'all', label: settings.language === 'en' ? 'All' : 'Todos' },
           { id: 'active', label: settings.language === 'en' ? 'Active' : 'Em Andamento' },
@@ -289,19 +289,19 @@ export const DownloadManager: React.FC = () => {
               onClick={() => setFilter(tab.id as any)}
               className={`
                 px-4 py-2 rounded-lg text-xs font-semibold transition-all relative flex items-center gap-1.5
-                ${isActive ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}
+                ${isActive ? 'text-white' : 'lf-text-muted hover:text-zinc-300'}
               `}
             >
               {isActive && (
                 <motion.div
                   layoutId="active-manager-tab"
-                  className="absolute inset-0 bg-zinc-900 rounded-lg border border-white/5"
+                  className="absolute inset-0 lf-surface rounded-lg border lf-border"
                   transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                 />
               )}
               <span className="relative z-10">{tab.label}</span>
               {count > 0 && (
-                <span className={`relative z-10 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${isActive ? 'bg-white/15 text-zinc-100' : 'bg-white/5 text-zinc-500'}`}>
+                <span className={`relative z-10 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${isActive ? 'bg-white/15 text-zinc-100' : 'bg-white/5 lf-text-muted'}`}>
                   {count}
                 </span>
               )}
@@ -312,7 +312,7 @@ export const DownloadManager: React.FC = () => {
         {downloads.some(d => d.status === 'completed') && filter === 'completed' && (
           <button 
             onClick={handleClearFinished}
-            className="ml-auto px-3 py-1 rounded-lg text-zinc-500 hover:text-zinc-300 text-[10px] font-bold transition-colors"
+            className="ml-auto px-3 py-1 rounded-lg lf-text-muted hover:text-zinc-300 text-[10px] font-bold transition-colors"
           >
             {t('clearCompleted')}
           </button>
@@ -323,13 +323,13 @@ export const DownloadManager: React.FC = () => {
       <div className="space-y-3.5">
         {filteredDownloads.length === 0 ? (
           /* Empty State */
-          <div className="p-12 text-center rounded-2xl bg-zinc-900/10 border border-dashed border-white/5 flex flex-col items-center justify-center space-y-3">
-            <div className="p-3 rounded-2xl bg-zinc-900/60 text-zinc-500">
+          <div className="p-12 text-center rounded-2xl lf-surface/10 border border-dashed lf-border flex flex-col items-center justify-center space-y-3">
+            <div className="p-3 rounded-2xl lf-surface/60 lf-text-muted">
               <Clock size={28} />
             </div>
             <div>
-              <h4 className="font-semibold text-sm text-zinc-300">{settings.language === 'en' ? 'No downloads found' : 'Nenhum download encontrado'}</h4>
-              <p className="text-xs text-zinc-500 mt-1">
+              <h4 className="font-semibold text-sm lf-text-secondary">{settings.language === 'en' ? 'No downloads found' : 'Nenhum download encontrado'}</h4>
+              <p className="text-xs lf-text-muted mt-1">
                 {settings.language === 'en' ? 'Your filtered download list is currently empty.' : 'Sua lista de downloads filtrada está vazia no momento.'}
               </p>
             </div>
@@ -359,7 +359,7 @@ export const DownloadManager: React.FC = () => {
                   }`} />
 
                   {/* Thumbnail */}
-                  <div className="relative w-full md:w-28 aspect-video rounded-lg overflow-hidden border border-white/5 bg-zinc-950 shrink-0">
+                  <div className="relative w-full md:w-28 aspect-video rounded-lg overflow-hidden border lf-border lf-surface shrink-0">
                     <img
                       src={item.thumbnailUrl}
                       alt={item.title}
@@ -373,7 +373,7 @@ export const DownloadManager: React.FC = () => {
                         {platform.name}
                       </span>
                     )}
-                    <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-md text-[8px] font-mono text-zinc-300">
+                    <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-md text-[8px] font-mono lf-text-secondary">
                       {item.format.quality}
                     </span>
                   </div>
@@ -384,7 +384,7 @@ export const DownloadManager: React.FC = () => {
                       <h4 className="font-semibold text-xs text-white truncate pr-4" title={item.title}>
                         {item.title}
                       </h4>
-                      <span className="text-[10px] text-zinc-500 font-mono font-medium shrink-0">
+                      <span className="text-[10px] lf-text-muted font-mono font-medium shrink-0">
                         {item.format.ext.toUpperCase()} • {formatBytes(item.sizeTotal)}
                       </span>
                     </div>
@@ -439,8 +439,8 @@ export const DownloadManager: React.FC = () => {
                       </div>
                       
                       {/* Sub progress metrics */}
-                      <div className="flex justify-between items-center text-[10px] text-zinc-500 font-medium font-mono">
-                        <span className="text-zinc-400">
+                      <div className="flex justify-between items-center text-[10px] lf-text-muted font-medium font-mono">
+                        <span className="lf-text-secondary">
                           {formatBytes(item.sizeDownloaded)} / {formatBytes(item.sizeTotal)} ({item.progress}%)
                         </span>
                         
@@ -457,7 +457,7 @@ export const DownloadManager: React.FC = () => {
                               </span>
                             </>
                           )}
-                          {isQueued && <span className="text-zinc-500 animate-pulse">{settings.language === 'en' ? 'Waiting in queue...' : 'Aguardando na fila...'}</span>}
+                          {isQueued && <span className="lf-text-muted animate-pulse">{settings.language === 'en' ? 'Waiting in queue...' : 'Aguardando na fila...'}</span>}
                           {isPaused && <span className="text-amber-500">{settings.language === 'en' ? 'Paused' : 'Pausado'}</span>}
                           {isCompleted && <span className="text-emerald-500 flex items-center gap-0.5"><CheckCircle2 size={10} /> {settings.language === 'en' ? 'Completed' : 'Concluído'}</span>}
                           {isFailed && <span className="text-rose-500 flex items-center gap-0.5"><AlertTriangle size={10} /> {settings.language === 'en' ? 'Failed' : 'Falhou'}</span>}
@@ -472,14 +472,14 @@ export const DownloadManager: React.FC = () => {
                   </div>
 
                   {/* Quick controls Toolbelt block */}
-                  <div className="flex items-center gap-2 justify-end w-full md:w-auto shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-white/5">
+                  <div className="flex items-center gap-2 justify-end w-full md:w-auto shrink-0 pt-2 md:pt-0 border-t md:border-t-0 lf-border">
                     {/* Reordering Controls (Only for queue/active lists) */}
                     {['queued', 'downloading', 'paused'].includes(item.status) && (
-                      <div className="flex flex-col gap-1 mr-2 border-r border-white/5 pr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="flex flex-col gap-1 mr-2 border-r lf-border pr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                         <button 
                           onClick={() => handleMoveUp(index)}
                           disabled={index === 0}
-                          className="p-1 rounded hover:bg-white/5 text-zinc-500 hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent"
+                          className="p-1 rounded hover:bg-white/5 lf-text-muted hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent"
                           title={settings.language === 'en' ? 'Move up' : 'Mover para cima'}
                         >
                           <ArrowUp size={12} />
@@ -487,7 +487,7 @@ export const DownloadManager: React.FC = () => {
                         <button 
                           onClick={() => handleMoveDown(index)}
                           disabled={index === downloads.length - 1}
-                          className="p-1 rounded hover:bg-white/5 text-zinc-500 hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent"
+                          className="p-1 rounded hover:bg-white/5 lf-text-muted hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent"
                           title={settings.language === 'en' ? 'Move down' : 'Mover para baixo'}
                         >
                           <ArrowDown size={12} />
@@ -499,7 +499,7 @@ export const DownloadManager: React.FC = () => {
                     {isDownloading && (
                       <button
                         onClick={() => DownloadEngine.pauseDownload(item.id)}
-                        className="p-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-750 text-zinc-300 hover:text-white transition-colors"
+                        className="p-2.5 rounded-lg lf-surface-raised hover:bg-zinc-750 lf-text-secondary hover:text-white transition-colors"
                         title={settings.language === 'en' ? 'Pause' : 'Pausar'}
                       >
                         <Pause size={13} />
@@ -508,7 +508,7 @@ export const DownloadManager: React.FC = () => {
                     {isPaused && (
                       <button
                         onClick={() => DownloadEngine.resumeDownload(item.id)}
-                        className="p-2.5 rounded-lg bg-zinc-850 hover:bg-zinc-800 text-zinc-200 hover:text-white transition-colors"
+                        className="p-2.5 rounded-lg lf-surface-raised hover:bg-zinc-800 lf-text hover:text-white transition-colors"
                         title={settings.language === 'en' ? 'Resume' : 'Retomar'}
                       >
                         <Play size={13} fill="currentColor" />
@@ -517,7 +517,7 @@ export const DownloadManager: React.FC = () => {
                     {isFailed && (
                       <button
                         onClick={() => DownloadEngine.retryDownload(item.id)}
-                        className="p-2.5 rounded-lg bg-zinc-850 hover:bg-zinc-800 text-zinc-200 hover:text-white transition-colors"
+                        className="p-2.5 rounded-lg lf-surface-raised hover:bg-zinc-800 lf-text hover:text-white transition-colors"
                         title={settings.language === 'en' ? 'Retry Download' : 'Repetir Download'}
                       >
                         <RotateCcw size={13} />
@@ -528,7 +528,7 @@ export const DownloadManager: React.FC = () => {
                     {isCompleted && (
                       <button
                         onClick={() => handleOpenFolder(item)}
-                        className="p-2.5 rounded-lg bg-zinc-850 hover:bg-zinc-800 text-zinc-200 hover:text-white transition-colors"
+                        className="p-2.5 rounded-lg lf-surface-raised hover:bg-zinc-800 lf-text hover:text-white transition-colors"
                         title={settings.language === 'en' ? 'Open Folder' : 'Abrir Pasta'}
                       >
                         <FolderOpen size={13} />
@@ -537,7 +537,7 @@ export const DownloadManager: React.FC = () => {
 
                     <button
                       onClick={() => handleShare(item)}
-                      className="p-2.5 rounded-lg bg-zinc-850 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+                      className="p-2.5 rounded-lg lf-surface-raised hover:bg-zinc-800 lf-text-secondary hover:text-zinc-200 transition-colors"
                       title={settings.language === 'en' ? 'Share Link' : 'Compartilhar Link'}
                     >
                       <Share2 size={13} />
@@ -545,7 +545,7 @@ export const DownloadManager: React.FC = () => {
 
                     <button
                       onClick={() => DownloadEngine.removeDownload(item.id)}
-                      className="p-2.5 rounded-lg bg-zinc-850 hover:bg-red-950/40 text-zinc-500 hover:text-rose-400 transition-colors"
+                      className="p-2.5 rounded-lg lf-surface-raised hover:bg-red-950/40 lf-text-muted hover:text-rose-400 transition-colors"
                       title={settings.language === 'en' ? 'Delete Record' : 'Excluir Registro'}
                     >
                       <Trash2 size={13} />
