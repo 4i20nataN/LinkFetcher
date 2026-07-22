@@ -71,13 +71,13 @@ function DashboardContent() {
       <Sidebar isOpen={sidebarOpen} toggleOpen={() => setSidebarOpen(!sidebarOpen)} />
 
       {/* Main Panel */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain relative p-4 md:p-8 backdrop-blur-2xl">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain relative p-4 md:p-8">
 
         {/* Auto-Update Banner */}
         <UpdateBanner />
 
         {/* Dynamic transition container */}
-        <div className="relative z-10">
+        <div>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
