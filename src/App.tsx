@@ -15,6 +15,7 @@ const DownloadManager = React.lazy(() => import('./features/downloads/DownloadMa
 const FavoritesView = React.lazy(() => import('./features/favorites/FavoritesView').then(m => ({ default: m.FavoritesView })));
 const DownloadLaterView = React.lazy(() => import('./features/later/DownloadLaterView').then(m => ({ default: m.DownloadLaterView })));
 const SettingsView = React.lazy(() => import('./features/settings/SettingsView').then(m => ({ default: m.SettingsView })));
+const PrivacyPolicy = React.lazy(() => import('./features/privacy/PrivacyPolicy').then(m => ({ default: m.PrivacyPolicy })));
 import UpdateBanner from './features/update/UpdateBanner';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -55,7 +56,7 @@ function DashboardContent() {
   }, [settings.themeMode]);
 
   const renderActiveView = () => {
-    const views = { analyze: LinkAnalyzer, search: YouTubeSearch, manager: DownloadManager, favorites: FavoritesView, later: DownloadLaterView, settings: SettingsView } as const;
+    const views = { analyze: LinkAnalyzer, search: YouTubeSearch, manager: DownloadManager, favorites: FavoritesView, later: DownloadLaterView, settings: SettingsView, privacy: PrivacyPolicy } as const;
     const View = views[activeTab as keyof typeof views] || LinkAnalyzer;
     return (
       <Suspense fallback={<div className="flex items-center justify-center h-32 text-zinc-500 text-sm">Carregando...</div>}>

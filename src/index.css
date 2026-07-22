@@ -74,20 +74,21 @@ body {
 /* Frosted Glass Utilities in Tailwind v4 style */
 @utility glass-card {
   background-color: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(55px) saturate(1.8);
-  -webkit-backdrop-filter: blur(55px) saturate(1.8);
+  backdrop-filter: blur(60px) saturate(1.8);
+  -webkit-backdrop-filter: blur(60px) saturate(1.8);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.95), inset 0 1px 1px rgba(255, 255, 255, 0.06);
 }
 
 @utility glass-card-hover {
-  background-color: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(55px) saturate(1.8);
-  -webkit-backdrop-filter: blur(55px) saturate(1.8);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background-color: rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(60px) saturate(1.8);
+  -webkit-backdrop-filter: blur(60px) saturate(1.8);
+  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 @utility glass-sidebar {
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(8, 10, 16, 1);
   backdrop-filter: blur(30px) saturate(1.8);
   -webkit-backdrop-filter: blur(30px) saturate(1.8);
   border-right: 1px solid rgba(255, 255, 255, 0.05);
@@ -121,22 +122,22 @@ body {
 
 /* ── Glass Utilities ──────────────────────────────────────────── */
 .light .glass-card {
-  background-color: rgba(240, 243, 248, 0.8) !important;
-  backdrop-filter: blur(55px) saturate(1.8) !important;
-  -webkit-backdrop-filter: blur(55px) saturate(1.8) !important;
+  background-color: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(60px) saturate(1.8) !important;
+  -webkit-backdrop-filter: blur(60px) saturate(1.8) !important;
   border: 1px solid rgba(200, 208, 220, 0.5) !important;
   color: #141821 !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.06), inset 0 1px 1px rgba(255, 255, 255, 0.8) !important;
 }
 
 .light .glass-card-hover:hover {
-  background-color: rgba(240, 243, 248, 0.72) !important;
+  background-color: rgba(255, 255, 255, 0.58) !important;
   border-color: rgba(180, 190, 205, 0.6) !important;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.9) !important;
 }
 
 .light .glass-sidebar {
-  background-color: rgba(240, 243, 248, 0.04) !important;
+  background-color: rgba(240, 243, 248, 1) !important;
   backdrop-filter: blur(10px) saturate(1.6) !important;
   -webkit-backdrop-filter: blur(10px) saturate(1.6) !important;
   border-right: 1px solid rgba(190, 200, 215, 0.5) !important;
@@ -452,17 +453,17 @@ body {
 }
 
 .gray-mode .glass-card {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-  backdrop-filter: blur(55px) saturate(1.8) !important;
-  -webkit-backdrop-filter: blur(55px) saturate(1.8) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  backdrop-filter: blur(60px) saturate(1.8) !important;
+  -webkit-backdrop-filter: blur(60px) saturate(1.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
   color: #f1f5f9 !important;
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.95), inset 0 1px 1px rgba(255, 255, 255, 0.05) !important;
 }
 
 .gray-mode .glass-card-hover:hover {
-  background-color: rgba(255, 255, 255, 0.12) !important;
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
 }
 
 .gray-mode .glass-sidebar {

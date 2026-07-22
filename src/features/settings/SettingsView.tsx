@@ -30,7 +30,7 @@ const accentColorsList = [
 ];
 
 export const SettingsView: React.FC = () => {
-  const { settings, updateSettings, clearAllData } = useApp();
+  const { settings, updateSettings, clearAllData, setActiveTab } = useApp();
   const { t } = useTranslation(settings);
   const [importText, setImportText] = useState('');
   const [showImportArea, setShowImportArea] = useState(false);
@@ -562,6 +562,23 @@ export const SettingsView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      <button
+        onClick={() => setActiveTab('privacy')}
+        className="w-full p-4 rounded-2xl glass-card hover:bg-white/5 transition-all flex items-center gap-3 group"
+      >
+        <div className={`p-2 rounded-xl ${getAccentBgClass(settings)} text-white shadow-lg`}>
+          <ShieldCheck size={18} />
+        </div>
+        <div className="text-left">
+          <span className="text-xs font-semibold text-white block">
+            {settings.language === 'en' ? 'Privacy Policy' : 'Política de Privacidade'}
+          </span>
+          <span className="text-[10px] text-zinc-500">
+            {settings.language === 'en' ? 'View how we handle your data' : 'Veja como tratamos seus dados'}
+          </span>
+        </div>
+      </button>
 
     </div>
   );
