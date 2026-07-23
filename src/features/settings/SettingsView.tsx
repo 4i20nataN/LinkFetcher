@@ -11,6 +11,7 @@ import { useTranslation } from '../../core/i18n';
 import { 
   getAccentBgClass, getAccentTextClass, getAccentBorderClass
 } from '../../components/ThemeWrapper';
+import { Toggle } from '../../components/Toggle';
 
 const accentColorsList = [
   { id: 'indigo', name: 'indigo', color: 'bg-indigo-500' },
@@ -191,11 +192,12 @@ export const SettingsView: React.FC = () => {
 
             <div className="space-y-2">
               <span className="text-xs lf-text-secondary font-medium">{t('themeMode')}</span>
-              <div className="grid grid-cols-3 gap-2 p-1 rounded-xl lf-surface lf-border">
+              <div className="grid grid-cols-4 gap-2 p-1 rounded-xl lf-surface lf-border">
                 {[
                   { id: 'light', name: t('themeLight') },
                   { id: 'dark', name: t('themeDark') },
-                  { id: 'gray', name: t('themeGray') }
+                  { id: 'gray', name: t('themeGray') },
+                  { id: 'white', name: t('themeWhite') }
                 ].map((mode) => (
                   <button
                     key={mode.id}
@@ -268,17 +270,7 @@ export const SettingsView: React.FC = () => {
                   {settings.language === 'en' ? 'Keep sidebar emojis colored at all times instead of grayscale' : 'Manter emojis da barra lateral sempre coloridos em vez de preto e branco'}
                 </p>
               </div>
-              <button
-                onClick={() => updateSettings({ colorfulIcons: !settings.colorfulIcons })}
-                className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.colorfulIcons ? getAccentBgClass(settings) : 'lf-surface-raised'}`}
-              >
-                <motion.div
-                  layout
-                  className="absolute top-[2px] left-[2px] w-[16px] h-[16px] rounded-full bg-white shadow-sm"
-                  animate={{ x: settings.colorfulIcons ? 16 : 0 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                />
-              </button>
+              <Toggle value={settings.colorfulIcons} onChange={() => updateSettings({ colorfulIcons: !settings.colorfulIcons })} settings={settings} />
             </div>
 
             <div className="flex items-center justify-between p-3 rounded-xl lf-surface-40 lf-border">
@@ -291,17 +283,7 @@ export const SettingsView: React.FC = () => {
                   {settings.language === 'en' ? 'Enable "paste link" button to read from clipboard automatically' : 'Ativar botão "colar link" para ler automaticamente da área de transferência'}
                 </p>
               </div>
-              <button
-                onClick={() => updateSettings({ clipboardEnabled: !settings.clipboardEnabled })}
-                className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.clipboardEnabled ? getAccentBgClass(settings) : 'lf-surface-raised'}`}
-              >
-                <motion.div
-                  layout
-                  className="absolute top-[2px] left-[2px] w-[16px] h-[16px] rounded-full bg-white shadow-sm"
-                  animate={{ x: settings.clipboardEnabled ? 16 : 0 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                />
-              </button>
+              <Toggle value={settings.clipboardEnabled} onChange={() => updateSettings({ clipboardEnabled: !settings.clipboardEnabled })} settings={settings} />
             </div>
 
             <div className="flex items-center justify-between p-3 rounded-xl lf-surface-40 lf-border">
@@ -316,23 +298,13 @@ export const SettingsView: React.FC = () => {
                     : 'Mostrar popup de download quando um link for copiado para a área de transferência'}
                 </p>
               </div>
-              <button
-                onClick={() => {
-                  const newVal = !settings.clipboardMonitoringEnabled;
-                  updateSettings({
-                    clipboardMonitoringEnabled: newVal,
-                    clipboardFirstRunDone: true,
-                  });
-                }}
-                className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.clipboardMonitoringEnabled ? getAccentBgClass(settings) : 'lf-surface-raised'}`}
-              >
-                <motion.div
-                  layout
-                  className="absolute top-[2px] left-[2px] w-[16px] h-[16px] rounded-full bg-white shadow-sm"
-                  animate={{ x: settings.clipboardMonitoringEnabled ? 16 : 0 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                />
-              </button>
+              <Toggle value={settings.clipboardMonitoringEnabled} onChange={() => {
+                const newVal = !settings.clipboardMonitoringEnabled;
+                updateSettings({
+                  clipboardMonitoringEnabled: newVal,
+                  clipboardFirstRunDone: true,
+                });
+              }} settings={settings} />
             </div>
           </div>
 
@@ -363,17 +335,7 @@ export const SettingsView: React.FC = () => {
                   <span className="text-xs font-semibold lf-text-secondary">{t('wifiOnly')}</span>
                   <p className="text-[10px] lf-text-muted">{t('wifiOnlyDesc')}</p>
                 </div>
-                <button
-                  onClick={() => updateSettings({ wifiOnly: !settings.wifiOnly })}
-                  className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.wifiOnly ? getAccentBgClass(settings) : 'lf-surface-raised'}`}
-                >
-                  <motion.div
-                    layout
-                    className="absolute top-[2px] left-[2px] w-[16px] h-[16px] rounded-full bg-white shadow-sm"
-                    animate={{ x: settings.wifiOnly ? 16 : 0 }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                  />
-                </button>
+                <Toggle value={settings.wifiOnly} onChange={() => updateSettings({ wifiOnly: !settings.wifiOnly })} settings={settings} />
               </div>
 
               <div className="flex items-center justify-between p-3 rounded-xl lf-surface-40 lf-border">
@@ -385,17 +347,7 @@ export const SettingsView: React.FC = () => {
                     {settings.language === 'en' ? 'Starts downloading right after analyzer finishes.' : 'Inicia o download logo após a análise, sem aguardar na fila.'}
                   </p>
                 </div>
-                <button
-                  onClick={() => updateSettings({ autoDownload: !settings.autoDownload })}
-                  className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.autoDownload ? getAccentBgClass(settings) : 'lf-surface-raised'}`}
-                >
-                  <motion.div
-                    layout
-                    className="absolute top-[2px] left-[2px] w-[16px] h-[16px] rounded-full bg-white shadow-sm"
-                    animate={{ x: settings.autoDownload ? 16 : 0 }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                  />
-                </button>
+                <Toggle value={settings.autoDownload} onChange={() => updateSettings({ autoDownload: !settings.autoDownload })} settings={settings} />
               </div>
             </div>
           </div>
@@ -481,17 +433,7 @@ export const SettingsView: React.FC = () => {
                   <span className="text-xs font-semibold lf-text-secondary">{t('notifLabel')}</span>
                   <p className="text-[10px] lf-text-muted">{t('notifDesc')}</p>
                 </div>
-                <button
-                  onClick={() => updateSettings({ notifications: !settings.notifications })}
-                  className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.notifications ? getAccentBgClass(settings) : 'lf-surface-raised'}`}
-                >
-                  <motion.div
-                    layout
-                    className="absolute top-[2px] left-[2px] w-[16px] h-[16px] rounded-full bg-white shadow-sm"
-                    animate={{ x: settings.notifications ? 16 : 0 }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                  />
-                </button>
+                <Toggle value={settings.notifications} onChange={() => updateSettings({ notifications: !settings.notifications })} settings={settings} />
               </div>
 
               <div className="flex items-center justify-between p-3 rounded-xl lf-surface-40 lf-border">
@@ -499,17 +441,7 @@ export const SettingsView: React.FC = () => {
                   <span className="text-xs font-semibold lf-text-secondary">{t('updatesLabel')}</span>
                   <p className="text-[10px] lf-text-muted">{t('updatesDesc')}</p>
                 </div>
-                <button
-                  onClick={() => updateSettings({ updates: !settings.updates })}
-                  className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-300 ${settings.updates ? getAccentBgClass(settings) : 'lf-surface-raised'}`}
-                >
-                  <motion.div
-                    layout
-                    className="absolute top-[2px] left-[2px] w-[16px] h-[16px] rounded-full bg-white shadow-sm"
-                    animate={{ x: settings.updates ? 16 : 0 }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                  />
-                </button>
+                <Toggle value={settings.updates} onChange={() => updateSettings({ updates: !settings.updates })} settings={settings} />
               </div>
             </div>
           </div>

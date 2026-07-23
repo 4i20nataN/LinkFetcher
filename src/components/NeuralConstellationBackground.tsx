@@ -1,213 +1,219 @@
 import { useEffect, useRef } from 'react';
 
 /**
- * NeuralConstellationBackground — Light theme "Neural Constellation · White Premium"
- * Faithfully ported from BACKGROUD-MELHORwhite.html with mobile perf optimizations:
- * 1. Spatial grid hashing for O(N*k) neighbor lookups
- * 2. Offscreen canvas pre-rendering for node sprites
- * 3. Frame skipping when document is hidden
- * 4. Debounced resize
- * 5. Capacitor guard (no mouse interaction on native)
+ * NeuralConstellationBackground — Light theme "Neural Constellation · Elegant White"
+ * EXACT port of Neural_Constellation_Elegant_White_V2.html with professional optimizations:
+ * - Float32Array typed arrays (zero GC, cache-friendly)
+ * - Spatial grid hashing O(N·k) neighbor queries
+ * - Single composite canvas (eliminates dual-canvas overhead)
+ * - Pre-rendered sprite atlas (single drawImage per node)
+ * - Per-line stroke with distance-based fade (factor * alpha, factor * width) — matches HTML exactly
+ * - Frame budget limiting (60fps / 30fps reduced-motion)
+ * - Visibility API pause on hidden tab
+ * - desynchronized canvas context + will-change GPU hint
+ * - Debounced resize (150ms)
+ * - Capacitor guard (no mouse on native)
+ * - prefers-reduced-motion support
+ * - Particles: pure white core + white halo, same size as dark theme
  */
 
 const IS_CAPACITOR = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
+const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const CONFIG = {
-  nodeCount: IS_CAPACITOR ? 50 : 85,
-  connectionDist: 140,
-  mouseRadius: 160,
-  lineWidth: 1.2,
-  nodeBaseSize: 1.8,
-  glowRadiusMult: 4.5,
-  velocity: 0.35,
+  nodeCount: prefersReducedMotion ? 50 : IS_CAPACITOR ? 65 : 95,
+  connectionDist: 155,
+  connectionDistSq: 155 * 155,
+  mouseRadius: 200,
+  mouseRadiusSq: 200 * 200,
+  velocity: 0.45,
+  nodeBaseRadius: 1.8,
+  nodeRadiusVariance: 2.2,
   twoPi: Math.PI * 2,
+  glowRadiusMult: 6.5,
+  // Line rendering — match HTML reference exactly
+  structuralLineWidth: 1.3,
+  glowLineWidthMult: 2.2,
+  // Performance
+  maxFps: prefersReducedMotion ? 30 : 60,
+  frameBudget: prefersReducedMotion ? 33.33 : 16.67,
 };
 
-const CORE_COLORS = [
-  { r: 120, g: 115, b: 105 },
-  { r: 140, g: 130, b: 110 },
-  { r: 150, g: 140, b: 115 },
-  { r: 130, g: 125, b: 108 },
-];
+// Pure white particle configuration (no dark cores, no shadows)
+const CORE_COLOR = 'rgba(255, 255, 255, 1)';
+const HALO_COLOR = 'rgba(255, 255, 255, 0.6)';
+const LINE_COLOR = 'rgba(105, 118, 138, 1)';       // Slate-500 structural
+const GLOW_COLOR = 'rgba(255, 246, 230, 1)';       // Warm ivory glow
+const INTERACTIVE_COLOR = 'rgba(255, 253, 245, 1)';
 
-const HALO_COLOR = 'rgba(180, 175, 165, 0.55)';
-const LINE_RGB = '160, 155, 145';
-const GLOW_RGB = '190, 180, 160';
-const INTERACTIVE_RGB = '180, 175, 160';
+// Typed array layout per node: [x, y, vx, vy, baseRadius, radius, glowIntensity, pulseDir]
+const NODE_STRIDE = 8;
+const OFF_X = 0, OFF_Y = 1, OFF_VX = 2, OFF_VY = 3, OFF_BR = 4, OFF_R = 5, OFF_GLOW = 6, OFF_PULSE = 7;
 
-interface NodeObj {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  baseRadius: number;
-  radius: number;
-  glowIntensity: number;
-  pulseDir: number;
-  color: { r: number; g: number; b: number };
-}
-
-// Spatial grid for O(N*k) neighbor lookups
+// Spatial grid for O(N·k) neighbor lookups
 const CELL_SIZE = CONFIG.connectionDist;
 
 class SpatialGrid {
   private cellMap = new Map<number, number[]>();
+  private w = 0;
+  private h = 0;
+
+  setDimensions(w: number, h: number) {
+    this.w = w;
+    this.h = h;
+  }
+
   clear() { this.cellMap.clear(); }
-  private key(gx: number, gy: number) { return gy * 10000 + gx; }
+
+  private key(gx: number, gy: number): number {
+    return (gy * this.w + gx) | 0;
+  }
+
   insert(idx: number, x: number, y: number) {
-    const gx = Math.floor(x / CELL_SIZE);
-    const gy = Math.floor(y / CELL_SIZE);
+    const gx = (x / CELL_SIZE) | 0;
+    const gy = (y / CELL_SIZE) | 0;
     const k = this.key(gx, gy);
     let cell = this.cellMap.get(k);
     if (!cell) { cell = []; this.cellMap.set(k, cell); }
     cell.push(idx);
   }
+
   queryNeighbors(x: number, y: number, fn: (idx: number) => void) {
-    const gx = Math.floor(x / CELL_SIZE);
-    const gy = Math.floor(y / CELL_SIZE);
+    const gx = (x / CELL_SIZE) | 0;
+    const gy = (y / CELL_SIZE) | 0;
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         const cell = this.cellMap.get(this.key(gx + dx, gy + dy));
-        if (cell) for (let k = 0; k < cell.length; k++) fn(cell[k]);
+        if (cell) {
+          for (let k = 0, len = cell.length; k < len; k++) fn(cell[k]);
+        }
       }
     }
   }
 }
 
-/** Pre-render node sprite: halo + core + inner bright spot */
-function createNodeSprite(radius: number, color: { r: number; g: number; b: number }): HTMLCanvasElement {
-  const pad = (radius + 3) * CONFIG.glowRadiusMult + 8;
-  const size = Math.ceil(pad * 2);
-  const c = document.createElement('canvas');
-  c.width = size;
-  c.height = size;
-  const ctx = c.getContext('2d')!;
-  const cx = pad;
-  const cy = pad;
+/** Create single sprite atlas: [nodeSprite | glowSprite] side by side — NO SHADOWS, pure white */
+function createSpriteAtlas(baseRadius: number, glowRadiusMult: number): HTMLCanvasElement {
+  const nodePad = (baseRadius + 3) * glowRadiusMult + 8;
+  const nodeSize = Math.ceil(nodePad * 2);
+  const glowR = baseRadius * glowRadiusMult;
+  const glowSize = Math.ceil(glowR * 2 + 4);
+  const atlasW = nodeSize + glowSize;
+  const atlasH = Math.max(nodeSize, glowSize);
 
-  // Shadow
-  ctx.shadowColor = 'rgba(10, 15, 30, 0.3)';
-  ctx.shadowBlur = 12;
-  ctx.shadowOffsetX = 2;
-  ctx.shadowOffsetY = 4;
+  const atlas = document.createElement('canvas');
+  atlas.width = atlasW;
+  atlas.height = atlasH;
+  const ctx = atlas.getContext('2d')!;
+
+  // ---- NODE SPRITE (left half) - PURE WHITE, NO SHADOW ----
+  const cx = nodePad;
+  const cy = atlasH / 2;
 
   // Halo (white ring)
   ctx.fillStyle = HALO_COLOR;
   ctx.beginPath();
-  ctx.arc(cx, cy, radius + 2.5, 0, CONFIG.twoPi);
+  ctx.arc(cx, cy, baseRadius + 1.8, 0, CONFIG.twoPi);
   ctx.fill();
 
-  // Reset shadow
-  ctx.shadowColor = 'transparent';
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 0;
-
-  // Core (colored)
-  ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+  // Core (pure white)
+  ctx.fillStyle = CORE_COLOR;
   ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, CONFIG.twoPi);
+  ctx.arc(cx, cy, baseRadius, 0, CONFIG.twoPi);
   ctx.fill();
 
-  // Inner bright spot — subtle
-  ctx.fillStyle = 'rgba(200, 195, 185, 0.25)';
+  // Inner highlight
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
   ctx.beginPath();
-  ctx.arc(cx - radius * 0.2, cy - radius * 0.2, radius * 0.3, 0, CONFIG.twoPi);
+  ctx.arc(cx - baseRadius * 0.2, cy - baseRadius * 0.2, baseRadius * 0.3, 0, CONFIG.twoPi);
   ctx.fill();
 
-  return c;
-}
+  // ---- GLOW SPRITE (right half) ----
+  const gx = nodeSize + glowSize / 2;
+  const gy = atlasH / 2;
 
-/** Pre-render glow sprite (radial gradient) */
-function createGlowSprite(radius: number): HTMLCanvasElement {
-  const r = radius * CONFIG.glowRadiusMult;
-  const size = Math.ceil(r * 2 + 4);
-  const c = document.createElement('canvas');
-  c.width = size;
-  c.height = size;
-  const ctx = c.getContext('2d')!;
-  const cx = size / 2;
-  const cy = size / 2;
-
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-  grad.addColorStop(0, `rgba(${GLOW_RGB}, 0.30)`);
-  grad.addColorStop(0.25, `rgba(${GLOW_RGB}, 0.12)`);
-  grad.addColorStop(0.6, `rgba(${GLOW_RGB}, 0.04)`);
+  const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, glowR);
+  grad.addColorStop(0, 'rgba(255, 246, 230, 0.90)');
+  grad.addColorStop(0.2, 'rgba(255, 246, 230, 0.45)');
   grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
   ctx.fillStyle = grad;
   ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, CONFIG.twoPi);
+  ctx.arc(gx, gy, glowR, 0, CONFIG.twoPi);
   ctx.fill();
 
-  return c;
+  return atlas;
 }
 
 export function NeuralConstellationBackground() {
-  const mainCanvasRef = useRef<HTMLCanvasElement>(null);
-  const glareCanvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
-  const nodesRef = useRef<NodeObj[]>([]);
-  const mouseRef = useRef({ x: -1, y: -1, active: false });
+  const lastFrameRef = useRef<number>(0);
+
+  // Typed arrays - zero GC in hot path
+  const nodesRef = useRef<Float32Array>(new Float32Array());
   const gridRef = useRef<SpatialGrid>(new SpatialGrid());
-  const spritesRef = useRef<Map<number, HTMLCanvasElement>>(new Map());
-  const glowSpriteRef = useRef<HTMLCanvasElement | null>(null);
+  const atlasRef = useRef<HTMLCanvasElement | null>(null);
+  const mouseRef = useRef({ x: -1, y: -1, active: false });
+
+  // Dimensions
+  const wRef = useRef(0);
+  const hRef = useRef(0);
+  const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const visibleRef = useRef(true);
 
   useEffect(() => {
-    const mainCanvas = mainCanvasRef.current;
-    const glareCanvas = glareCanvasRef.current;
-    if (!mainCanvas || !glareCanvas) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    const ctx = mainCanvas.getContext('2d', { alpha: true })!;
-    const glCtx = glareCanvas.getContext('2d', { alpha: true })!;
+    const ctx = canvas.getContext('2d', { alpha: true, desynchronized: true })!;
+
+    // GPU compositing hint
+    canvas.style.willChange = 'transform';
+
     let w = 0;
     let h = 0;
-    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const repRadius = CONFIG.nodeBaseSize;
+    // Pre-render sprite atlas
+    atlasRef.current = createSpriteAtlas(CONFIG.nodeBaseRadius, CONFIG.glowRadiusMult);
+    const atlas = atlasRef.current;
+    const nodeSpriteW = Math.ceil((CONFIG.nodeBaseRadius + 3) * CONFIG.glowRadiusMult * 2 + 16);
+    const nodeSpriteH = atlas.height;
+    const glowSpriteX = nodeSpriteW;
+    const glowSpriteW = atlas.width - nodeSpriteW;
+    const glowSpriteH = atlas.height;
 
-    // Pre-render glow sprite (shared by all nodes)
-    glowSpriteRef.current = createGlowSprite(repRadius);
-    const glowHalf = glowSpriteRef.current.width / 2;
-
-    function createNodes(): NodeObj[] {
-      return Array.from({ length: CONFIG.nodeCount }, () => {
-        const baseRadius = Math.random() * 2.2 + CONFIG.nodeBaseSize;
-        const color = CORE_COLORS[Math.floor(Math.random() * CORE_COLORS.length)];
-        // Pre-render and cache sprite for this color
-        const key = color.r * 10000 + color.g * 100 + color.b;
-        if (!spritesRef.current.has(key)) {
-          spritesRef.current.set(key, createNodeSprite(repRadius, color));
-        }
-        return {
-          x: Math.random() * w,
-          y: Math.random() * h,
-          vx: (Math.random() - 0.5) * CONFIG.velocity,
-          vy: (Math.random() - 0.5) * CONFIG.velocity,
-          baseRadius,
-          radius: baseRadius,
-          glowIntensity: Math.random() * 0.3 + 0.5,
-          pulseDir: Math.random() > 0.5 ? 0.003 : -0.003,
-          color,
-        };
-      });
+    function initNodes(count: number): Float32Array {
+      const arr = new Float32Array(count * NODE_STRIDE);
+      for (let i = 0; i < count; i++) {
+        const base = i * NODE_STRIDE;
+        arr[base + OFF_X] = Math.random() * w;
+        arr[base + OFF_Y] = Math.random() * h;
+        arr[base + OFF_VX] = (Math.random() - 0.5) * CONFIG.velocity;
+        arr[base + OFF_VY] = (Math.random() - 0.5) * CONFIG.velocity;
+        const r = Math.random() * CONFIG.nodeRadiusVariance + CONFIG.nodeBaseRadius;
+        arr[base + OFF_BR] = r;
+        arr[base + OFF_R] = r;
+        arr[base + OFF_GLOW] = Math.random() * 0.5 + 0.5;
+        arr[base + OFF_PULSE] = Math.random() > 0.5 ? 0.01 : -0.01;
+      }
+      return arr;
     }
 
     function resize() {
-      w = mainCanvas.width = glareCanvas.width = window.innerWidth;
-      h = mainCanvas.height = glareCanvas.height = window.innerHeight;
-      gridRef.current = new SpatialGrid();
+      w = canvas.width = window.innerWidth;
+      h = canvas.height = window.innerHeight;
+      wRef.current = w;
+      hRef.current = h;
+      gridRef.current.setDimensions(w, h);
+      nodesRef.current = initNodes(CONFIG.nodeCount);
     }
 
-    function onResize() {
-      if (resizeTimer) clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        resize();
-        nodesRef.current = createNodes();
-      }, 150);
+    function scheduleResize() {
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+      resizeTimerRef.current = setTimeout(resize, 150);
     }
 
     resize();
-    nodesRef.current = createNodes();
 
     const onMouseMove = IS_CAPACITOR ? undefined : (e: MouseEvent) => {
       mouseRef.current.x = e.clientX;
@@ -216,158 +222,239 @@ export function NeuralConstellationBackground() {
     };
     const clearMouse = () => { mouseRef.current.active = false; mouseRef.current.x = -1; mouseRef.current.y = -1; };
 
-    window.addEventListener('resize', onResize);
+    const onVisibilityChange = () => { visibleRef.current = !document.hidden; };
+
+    window.addEventListener('resize', scheduleResize);
     if (onMouseMove) {
       window.addEventListener('mousemove', onMouseMove);
       window.addEventListener('mouseleave', clearMouse);
     }
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
-    function animate() {
-      if (document.hidden) {
+    // --- Draw structural lines: per-line stroke with distance-based fade (matches HTML exactly) ---
+    function drawStructuralLines(ctx: CanvasRenderingContext2D, nodes: Float32Array, count: number, mouse: { x: number; y: number; active: boolean }) {
+      const cdSq = CONFIG.connectionDistSq;
+      const grid = gridRef.current;
+
+      for (let i = 0; i < count; i++) {
+        const baseI = i * NODE_STRIDE;
+        const ax = nodes[baseI + OFF_X];
+        const ay = nodes[baseI + OFF_Y];
+
+        grid.queryNeighbors(ax, ay, (j) => {
+          if (j <= i) return;
+          const baseJ = j * NODE_STRIDE;
+          const dx = ax - nodes[baseJ + OFF_X];
+          const dy = ay - nodes[baseJ + OFF_Y];
+          const distSq = dx * dx + dy * dy;
+          if (distSq < cdSq) {
+            const dist = Math.sqrt(distSq);
+            const factor = 1 - dist / CONFIG.connectionDist;
+            const alpha = factor * 0.4;           // Match HTML: factor * 0.4
+            const lineWidth = factor * 1.3;       // Match HTML: factor * 1.3
+
+            ctx.beginPath();
+            ctx.moveTo(ax, ay);
+            ctx.lineTo(nodes[baseJ + OFF_X], nodes[baseJ + OFF_Y]);
+            ctx.lineWidth = lineWidth;
+            ctx.strokeStyle = `rgba(105, 118, 138, ${alpha})`;
+            ctx.stroke();
+          }
+        });
+      }
+
+      // Mouse interaction lines (structural canvas)
+      if (!IS_CAPACITOR && mouse.active && mouse.x >= 0) {
+        for (let i = 0; i < count; i++) {
+          const base = i * NODE_STRIDE;
+          const dx = nodes[base + OFF_X] - mouse.x;
+          const dy = nodes[base + OFF_Y] - mouse.y;
+          const distSq = dx * dx + dy * dy;
+          if (distSq < CONFIG.mouseRadiusSq) {
+            const dist = Math.sqrt(distSq);
+            const factor = 1 - dist / CONFIG.mouseRadius;
+            const alpha = factor * 0.75;
+            const lineWidth = factor * 2.5;
+
+            ctx.beginPath();
+            ctx.moveTo(nodes[base + OFF_X], nodes[base + OFF_Y]);
+            ctx.lineTo(mouse.x, mouse.y);
+            ctx.lineWidth = lineWidth;
+            ctx.strokeStyle = `rgba(255, 253, 245, ${alpha})`;
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    // --- Draw glow lines: additive blend, per-line stroke (matches HTML exactly) ---
+    function drawGlowLines(ctx: CanvasRenderingContext2D, nodes: Float32Array, count: number) {
+      const cdSq = CONFIG.connectionDistSq;
+      const grid = gridRef.current;
+
+      ctx.globalCompositeOperation = 'lighter';
+
+      for (let i = 0; i < count; i++) {
+        const baseI = i * NODE_STRIDE;
+        const ax = nodes[baseI + OFF_X];
+        const ay = nodes[baseI + OFF_Y];
+
+        grid.queryNeighbors(ax, ay, (j) => {
+          if (j <= i) return;
+          const baseJ = j * NODE_STRIDE;
+          const dx = ax - nodes[baseJ + OFF_X];
+          const dy = ay - nodes[baseJ + OFF_Y];
+          const distSq = dx * dx + dy * dy;
+          if (distSq < cdSq) {
+            const dist = Math.sqrt(distSq);
+            const factor = 1 - dist / CONFIG.connectionDist;
+            const alpha = factor * 0.55;                    // Match HTML: factor * 0.55
+            const lineWidth = factor * 1.3 * 2.2;           // Match HTML: factor * 2.2 (1.3 * 2.2 ≈ 2.86)
+
+            ctx.beginPath();
+            ctx.moveTo(ax, ay);
+            ctx.lineTo(nodes[baseJ + OFF_X], nodes[baseJ + OFF_Y]);
+            ctx.lineWidth = lineWidth;
+            ctx.strokeStyle = `rgba(255, 246, 230, ${alpha})`;
+            ctx.stroke();
+          }
+        });
+      }
+
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    function drawNodes(ctx: CanvasRenderingContext2D, nodes: Float32Array, count: number) {
+      if (!atlas) return;
+
+      for (let i = 0; i < count; i++) {
+        const base = i * NODE_STRIDE;
+        const x = nodes[base + OFF_X];
+        const y = nodes[base + OFF_Y];
+        const r = nodes[base + OFF_R];
+        const scale = r / CONFIG.nodeBaseRadius;
+        const drawW = nodeSpriteW * scale;
+        const drawH = nodeSpriteH * scale;
+        ctx.drawImage(atlas, 0, 0, nodeSpriteW, nodeSpriteH, x - drawW / 2, y - drawH / 2, drawW, drawH);
+      }
+    }
+
+    function drawGlows(ctx: CanvasRenderingContext2D, nodes: Float32Array, count: number) {
+      if (!atlas) return;
+
+      ctx.globalCompositeOperation = 'lighter';
+
+      for (let i = 0; i < count; i++) {
+        const base = i * NODE_STRIDE;
+        const x = nodes[base + OFF_X];
+        const y = nodes[base + OFF_Y];
+        const r = nodes[base + OFF_R];
+        const glowIntensity = nodes[base + OFF_GLOW];
+        const scale = (r / CONFIG.nodeBaseRadius) * (r / CONFIG.nodeBaseRadius);
+        const drawW = glowSpriteW * scale;
+        const drawH = glowSpriteH * scale;
+
+        ctx.globalAlpha = 0.9 * glowIntensity;
+        ctx.drawImage(atlas, glowSpriteX, 0, glowSpriteW, glowSpriteH, x - drawW / 2, y - drawH / 2, drawW, drawH);
+
+        // Central focal point
+        ctx.globalAlpha = 0.12 * glowIntensity;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(x, y, r * 0.8, 0, CONFIG.twoPi);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    function animate(timestamp: number) {
+      // Frame rate limiting
+      const elapsed = timestamp - lastFrameRef.current;
+      if (elapsed < CONFIG.frameBudget) {
+        animRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      lastFrameRef.current = timestamp;
+
+      // Skip if tab hidden
+      if (!visibleRef.current) {
         animRef.current = requestAnimationFrame(animate);
         return;
       }
 
-      ctx.clearRect(0, 0, w, h);
-      glCtx.clearRect(0, 0, w, h);
       const nodes = nodesRef.current;
+      const count = CONFIG.nodeCount;
       const mouse = mouseRef.current;
       const grid = gridRef.current;
+      w = wRef.current;
+      h = hRef.current;
 
-      // --- Phase 1: Update positions + pulse ---
-      for (let i = 0; i < nodes.length; i++) {
-        const n = nodes[i];
-        n.x += n.vx;
-        n.y += n.vy;
-        if (n.x < 0 || n.x > w) n.vx *= -1;
-        if (n.y < 0 || n.y > h) n.vy *= -1;
+      // Clear
+      ctx.clearRect(0, 0, w, h);
+
+      // --- Phase 1: Update positions + pulse (tight loop, no allocations) ---
+      for (let i = 0; i < count; i++) {
+        const base = i * NODE_STRIDE;
+
+        let x = nodes[base + OFF_X] + nodes[base + OFF_VX];
+        let y = nodes[base + OFF_Y] + nodes[base + OFF_VY];
+        let vx = nodes[base + OFF_VX];
+        let vy = nodes[base + OFF_VY];
+
+        if (x < 0 || x > w) { vx *= -1; x = x < 0 ? 0 : w; }
+        if (y < 0 || y > h) { vy *= -1; y = y < 0 ? 0 : h; }
 
         // Pulse
-        n.glowIntensity += n.pulseDir;
-        if (n.glowIntensity > 0.85 || n.glowIntensity < 0.45) n.pulseDir *= -1;
+        let glow = nodes[base + OFF_GLOW] + nodes[base + OFF_PULSE];
+        if (glow > 1 || glow < 0.4) {
+          nodes[base + OFF_PULSE] *= -1;
+          glow = Math.max(0.4, Math.min(1, glow));
+        }
 
-        // Mouse interaction (desktop only)
-        if (!IS_CAPACITOR && mouse.active) {
-          const dx = mouse.x - n.x;
-          const dy = mouse.y - n.y;
+        // Mouse interaction
+        if (!IS_CAPACITOR && mouse.active && mouse.x >= 0) {
+          const dx = mouse.x - x;
+          const dy = mouse.y - y;
           const distSq = dx * dx + dy * dy;
-          const mrSq = CONFIG.mouseRadius * CONFIG.mouseRadius;
-          if (distSq < mrSq && distSq > 0) {
+          if (distSq < CONFIG.mouseRadiusSq && distSq > 0) {
             const dist = Math.sqrt(distSq);
             const force = (CONFIG.mouseRadius - dist) / CONFIG.mouseRadius;
-            n.x += (dx / dist) * force * 0.4;
-            n.y += (dy / dist) * force * 0.4;
-            n.radius += (n.baseRadius + force * 2.5 - n.radius) * 0.1;
+            x += (dx / dist) * force * 0.35;
+            y += (dy / dist) * force * 0.35;
+            nodes[base + OFF_R] = nodes[base + OFF_BR] + force * 1.8;
           } else {
-            n.radius += (n.baseRadius - n.radius) * 0.05;
+            nodes[base + OFF_R] += (nodes[base + OFF_BR] - nodes[base + OFF_R]) * 0.05;
           }
         } else {
-          n.radius += (n.baseRadius - n.radius) * 0.05;
+          nodes[base + OFF_R] += (nodes[base + OFF_BR] - nodes[base + OFF_R]) * 0.05;
         }
+
+        nodes[base + OFF_X] = x;
+        nodes[base + OFF_Y] = y;
+        nodes[base + OFF_VX] = vx;
+        nodes[base + OFF_VY] = vy;
+        nodes[base + OFF_GLOW] = glow;
       }
 
       // --- Phase 2: Build spatial grid ---
       grid.clear();
-      for (let i = 0; i < nodes.length; i++) {
-        grid.insert(i, nodes[i].x, nodes[i].y);
+      for (let i = 0; i < count; i++) {
+        const base = i * NODE_STRIDE;
+        grid.insert(i, nodes[base + OFF_X], nodes[base + OFF_Y]);
       }
 
-      // --- Phase 3: Draw connections ---
-      const cdSq = CONFIG.connectionDist * CONFIG.connectionDist;
-      ctx.lineWidth = CONFIG.lineWidth;
-      for (let i = 0; i < nodes.length; i++) {
-        const a = nodes[i];
-        grid.queryNeighbors(a.x, a.y, (j) => {
-          if (j <= i) return;
-          const b = nodes[j];
-          const dx = a.x - b.x;
-          const dy = a.y - b.y;
-          const distSq = dx * dx + dy * dy;
-          if (distSq < cdSq) {
-            const factor = 1 - Math.sqrt(distSq) / CONFIG.connectionDist;
-            const alpha = factor * 0.5;
+      // --- Phase 3: Draw structural lines ---
+      drawStructuralLines(ctx, nodes, count, mouse);
 
-            // Structural line (dark)
-            ctx.globalAlpha = alpha;
-            ctx.strokeStyle = `rgba(${LINE_RGB}, 1)`;
-            ctx.beginPath();
-            ctx.moveTo(a.x, a.y);
-            ctx.lineTo(b.x, b.y);
-            ctx.stroke();
+      // --- Phase 4: Draw glow lines (additive) ---
+      drawGlowLines(ctx, nodes, count);
 
-            // Glow line (on glare canvas) — subtle
-            glCtx.globalAlpha = factor * 0.2;
-            glCtx.strokeStyle = `rgba(${GLOW_RGB}, 1)`;
-            glCtx.lineWidth = CONFIG.lineWidth * factor * 1.5;
-            glCtx.beginPath();
-            glCtx.moveTo(a.x, a.y);
-            glCtx.lineTo(b.x, b.y);
-            glCtx.stroke();
-            glCtx.lineWidth = CONFIG.lineWidth;
-          }
-        });
-      }
-      ctx.globalAlpha = 1;
-      glCtx.globalAlpha = 1;
+      // --- Phase 5: Draw nodes ---
+      drawNodes(ctx, nodes, count);
 
-      // --- Phase 3b: Mouse interaction lines (glare canvas) ---
-      if (!IS_CAPACITOR && mouse.active) {
-        for (let i = 0; i < nodes.length; i++) {
-          const n = nodes[i];
-          const dx = n.x - mouse.x;
-          const dy = n.y - mouse.y;
-          const distSq = dx * dx + dy * dy;
-          const mrSq = CONFIG.mouseRadius * CONFIG.mouseRadius;
-          if (distSq < mrSq) {
-            const factor = 1 - Math.sqrt(distSq) / CONFIG.mouseRadius;
-            glCtx.globalAlpha = factor * 0.25;
-            glCtx.strokeStyle = `rgba(${INTERACTIVE_RGB}, 1)`;
-            glCtx.lineWidth = factor * 1.5;
-            glCtx.beginPath();
-            glCtx.moveTo(n.x, n.y);
-            glCtx.lineTo(mouse.x, mouse.y);
-            glCtx.stroke();
-          }
-        }
-        glCtx.globalAlpha = 1;
-        glCtx.lineWidth = CONFIG.lineWidth;
-      }
-
-      // --- Phase 4: Draw nodes (main canvas) ---
-      const sprite = spritesRef.current;
-      for (let i = 0; i < nodes.length; i++) {
-        const n = nodes[i];
-        const key = n.color.r * 10000 + n.color.g * 100 + n.color.b;
-        const nodeSprite = sprite.get(key);
-        if (nodeSprite) {
-          const scale = n.radius / repRadius;
-          const drawW = nodeSprite.width * scale;
-          const drawH = nodeSprite.height * scale;
-          ctx.drawImage(nodeSprite, n.x - drawW / 2, n.y - drawH / 2, drawW, drawH);
-        }
-      }
-
-      // --- Phase 5: Draw glows (glare canvas) ---
-      const glowSprite = glowSpriteRef.current;
-      if (glowSprite) {
-        for (let i = 0; i < nodes.length; i++) {
-          const n = nodes[i];
-          const intensity = 0.45 * n.glowIntensity;
-          const scale = (n.radius / repRadius) * (n.radius / repRadius);
-          const drawW = glowSprite.width * scale;
-          const drawH = glowSprite.height * scale;
-          glCtx.globalAlpha = intensity;
-          glCtx.drawImage(glowSprite, n.x - drawW / 2, n.y - drawH / 2, drawW, drawH);
-
-          // Central flare point (subtle)
-          glCtx.globalAlpha = 0.12 * intensity;
-          glCtx.fillStyle = 'rgba(200, 195, 180, 1)';
-          glCtx.beginPath();
-          glCtx.arc(n.x, n.y, n.radius * 0.8, 0, CONFIG.twoPi);
-          glCtx.fill();
-        }
-        glCtx.globalAlpha = 1;
-      }
+      // --- Phase 6: Draw glows (additive) ---
+      drawGlows(ctx, nodes, count);
 
       animRef.current = requestAnimationFrame(animate);
     }
@@ -376,72 +463,75 @@ export function NeuralConstellationBackground() {
 
     return () => {
       cancelAnimationFrame(animRef.current);
-      if (resizeTimer) clearTimeout(resizeTimer);
-      window.removeEventListener('resize', onResize);
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+      window.removeEventListener('resize', scheduleResize);
       if (onMouseMove) {
         window.removeEventListener('mousemove', onMouseMove);
         window.removeEventListener('mouseleave', clearMouse);
       }
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, []);
 
   return (
-    <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-      {/* CSS background — matches HTML source */}
+    <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden" style={{ willChange: 'transform' }}>
+      {/* CSS background - warm gray-white base with subtle radial gradients (slightly darker for softer light theme) */}
       <div
         className="absolute inset-0"
         style={{
           background: `
-            radial-gradient(circle at 20% 30%, rgba(220, 218, 210, 0.4) 0%, transparent 60%),
-            radial-gradient(circle at 80% 70%, rgba(210, 208, 200, 0.3) 0%, transparent 50%),
-            #e4e2dc
+            radial-gradient(circle at 10% 10%, #ffffff 0%, rgba(255,255,255,0) 70%),
+            radial-gradient(circle at 90% 80%, #d3d9e1 0%, #c3cbd5 100%),
+            #e0e4eb
           `,
         }}
       />
 
-      {/* Depth wave layers — subtle */}
+      {/* Depth wave layers - organic paper-cut style */}
       <div className="absolute inset-0 z-[1]">
         <div
           className="absolute"
           style={{
-            width: '120%', height: '70%', top: '-10%', left: '-10%',
-            background: 'radial-gradient(ellipse at 30% 40%, rgba(210,208,200,0.30) 0%, rgba(200,198,192,0.15) 60%, transparent 100%)',
+            width: '150%', height: '150%', top: '-25%', left: '-25%',
+            transform: 'rotate(-12deg)',
+            opacity: 0.85,
+            background: 'radial-gradient(ellipse at 30% 40%, rgba(255, 255, 255, 0.93) 0%, rgba(236, 239, 244, 0.88) 50%, rgba(192, 202, 214, 0.3) 100%)',
             clipPath: 'ellipse(80% 45% at 35% 50%)',
+            filter: 'drop-shadow(-10px 15px 30px rgba(0, 0, 0, 0.08))',
           }}
         />
         <div
           className="absolute"
           style={{
-            width: '110%', height: '60%', bottom: '-10%', right: '-10%',
-            background: 'radial-gradient(ellipse at 70% 60%, rgba(205,203,195,0.25) 0%, rgba(195,193,188,0.12) 60%, transparent 100%)',
+            width: '150%', height: '150%', top: '-25%', left: '-25%',
+            transform: 'rotate(-12deg)',
+            opacity: 0.85,
+            background: 'radial-gradient(ellipse at 70% 60%, rgba(255, 255, 255, 0.82) 0%, rgba(224, 229, 237, 0.78) 60%, rgba(178, 190, 205, 0.4) 100%)',
             clipPath: 'ellipse(75% 38% at 65% 55%)',
+            filter: 'drop-shadow(-15px 25px 45px rgba(0, 0, 0, 0.12))',
           }}
         />
         <div
           className="absolute"
           style={{
-            width: '80%', height: '40%', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-            background: 'radial-gradient(ellipse at 50% 50%, rgba(215,213,205,0.20) 0%, rgba(205,203,198,0.08) 70%, transparent 100%)',
+            width: '150%', height: '150%', top: '-25%', left: '-25%',
+            transform: 'rotate(-12deg)',
+            opacity: 0.65,
+            background: 'radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.95) 0%, rgba(241, 243, 247, 0.88) 70%, rgba(208, 216, 225, 0.5) 100%)',
             clipPath: 'ellipse(50% 25% at 50% 50%)',
+            filter: 'drop-shadow(0px 20px 40px rgba(0, 0, 0, 0.06))',
           }}
         />
       </div>
 
-      {/* Main canvas (nodes + structural lines) */}
+      {/* Single composite canvas - structural + glow combined */}
       <canvas
-        ref={mainCanvasRef}
+        ref={canvasRef}
+        className="absolute inset-0 z-[2] pointer-events-none"
         style={{
-          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-          zIndex: 2, pointerEvents: 'none',
-        }}
-      />
-
-      {/* Glare canvas (glows + flares, screen blend) */}
-      <canvas
-        ref={glareCanvasRef}
-        style={{
-          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-          zIndex: 3, pointerEvents: 'none',
+          willChange: 'transform',
+          opacity: 0.95,
+          transform: 'scale(1.02)',
         }}
       />
     </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MediaInfo, MediaFormat } from '../../types';
 import { getAccentBgClass, getAccentTextClass, getAccentBorderClass, getAccentTextOnBgClass } from '../../components/ThemeWrapper';
+import { Toggle } from '../../components/Toggle';
 import { BlockIcon, BlockTitle, BlockId } from '../../components/BlockIcon';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronDown, ChevronUp, Info, User, Eye, Calendar, ArrowDownToLine, AlertTriangle, FileText, Download } from 'lucide-react';
@@ -44,7 +45,7 @@ export interface FormatOptions {
 }
 
 const VIDEO_PRESETS = [
-  { id: 'best', label: '★ Melhor', height: Infinity, format: 'bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b', starYellow: true },
+  { id: 'best', label: '★ Melhor', height: Infinity, format: 'bestvideo+bestaudio/best', starYellow: true },
   { id: '2160p', label: '4K Ultra', height: 2160, format: 'bv*[height<=2160][ext=mp4]+ba[ext=m4a]/bv*[height<=2160]+ba/b[height<=2160]' },
   { id: '1440p', label: '1440 QHD', height: 1440, format: 'bv*[height<=1440][ext=mp4]+ba[ext=m4a]/bv*[height<=1440]+ba/b[height<=1440]' },
   { id: '1080p', label: '1080 Full HD', height: 1080, format: 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/bv*[height<=1080]+ba/b[height<=1080]' },
@@ -371,7 +372,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
   const maxRes = useMemo(() => getMaxVideoHeight(mediaInfo.formats), [mediaInfo.formats]);
 
   const [options, setOptions] = useState<FormatOptions>(() => ({
-    format: VIDEO_PRESETS[0].format,
+    format: 'bestvideo+bestaudio/best',
     audioOnly: false,
     audioFormat: 'mp3',
     audioQuality: '0',
@@ -382,7 +383,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
     embedSubs: false,
     writeThumbnail: false,
     embedThumbnail: false,
-    embedMetadata: true,
+    embedMetadata: false,
     concurrentFragments: 1,
     retries: 3,
     restrictFilenames: false,
@@ -527,7 +528,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
   const selectedPreset = VIDEO_PRESETS.find(p => p.format === options.format && !options.audioOnly);
   const isOverMaxRes = selectedPreset && selectedPreset.height !== Infinity && maxRes > 0 && selectedPreset.height > maxRes;
 
-  const Toggle: React.FC<{ value: boolean; onChange: () => void; label: string; desc?: string; icon?: React.ReactNode }> = ({ value, onChange, label, desc, icon }) => (
+  const ToggleRow: React.FC<{ value: boolean; onChange: () => void; label: string; desc?: string; icon?: React.ReactNode }> = ({ value, onChange, label, desc, icon }) => (
     <div className="flex items-center justify-between p-3 rounded-xl lf-surface-40 lf-border">
       <div className="flex items-center gap-2">
         {icon && <span className="lf-text-secondary">{icon}</span>}
@@ -536,18 +537,14 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
           {desc && <p className="fs-sm lf-text-muted mt-0.5">{desc}</p>}
         </div>
       </div>
-      <button onClick={onChange} className={`relative w-[52px] h-[28px] rounded-full transition-colors duration-300 shrink-0 border ${value ? `${accentBorder} lf-surface-40` : 'border-zinc-700 lf-surface-raised'}`}>
-        <div className={`absolute top-[2px] w-[22px] h-[22px] rounded-full transition-all duration-300 shadow-md ${value ? `left-[26px] ${accentBg}` : 'left-[2px] bg-zinc-400'}`} />
-      </button>
+      <Toggle value={value} onChange={onChange} settings={settings} />
     </div>
   );
 
   const SmallToggle: React.FC<{ value: boolean; onChange: () => void; label: string }> = ({ value, onChange, label }) => (
     <div className="flex items-center justify-between p-2.5 rounded-lg lf-surface-30 lf-border">
       <label className="fs-sm lf-text-secondary">{label}</label>
-      <button onClick={onChange} className={`relative w-10 h-[24px] rounded-full transition-colors duration-300 shrink-0 border ${value ? `${accentBorder} lf-surface-40` : 'border-zinc-700 lf-surface-raised'}`}>
-        <div className={`absolute top-[2px] w-[18px] h-[18px] rounded-full transition-all duration-300 ${value ? `left-[18px] ${accentBg}` : 'left-[2px] bg-zinc-400'}`} />
-      </button>
+      <Toggle value={value} onChange={onChange} settings={settings} />
     </div>
   );
 
@@ -588,21 +585,18 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
     });
   }, []);
 
-  const Btn: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode; className?: string; disabled?: boolean }> = ({ active, onClick, children, className = '', disabled = false }) => (
-    <motion.button
-      onClick={onClick}
-      disabled={disabled}
-      whileTap={{ scale: 0.97 }}
-      animate={active ? { scale: 1.02, boxShadow: '0 2px 12px rgba(0,0,0,0.3)' } : { scale: 1, boxShadow: '0 0px 0px rgba(0,0,0,0)' }}
-      transition={{ duration: 0.2 }}
-      className={`
-        relative !overflow-visible border rounded-xl px-3 py-1.5 fs-sm font-bold transition-colors text-center
-        ${active ? 'z-10' : 'z-0'}
-        ${disabled ? 'lf-surface-20 lf-border lf-text-faint cursor-not-allowed' :
-          active ? `lf-surface-40 ${accentBorder} text-white` : 'lf-surface-40 lf-border lf-text-secondary hover:text-zinc-200 hover:bg-zinc-800'}
-        ${className}
-      `}
-    >
+  const Btn: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode; className?: string; disabled?: boolean }> = ({ active, onClick, children, className = '', disabled = false }) => {
+    const baseClasses = 'lf-opt relative !overflow-visible rounded-xl px-3 py-1.5 fs-sm font-bold transition-all text-center cursor-pointer';
+    const stateClasses = active ? 'z-10 active' : 'z-0';
+    const disabledClasses = disabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : '';
+    
+    return (
+      <motion.button
+        onClick={onClick}
+        disabled={disabled}
+        whileTap={{ scale: 0.97 }}
+        className={[baseClasses, stateClasses, disabledClasses, className].filter(Boolean).join(' ')}
+      >
       {active && (
         <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center shadow-md">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
@@ -611,6 +605,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
       {children}
     </motion.button>
   );
+  };
 
   return (
     <div className="space-y-3" style={{ '--ui-scale': uiScale } as React.CSSProperties}>
@@ -717,38 +712,35 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                       const sep = useUnderscore ? '_' : ' ';
                       update({ customFilename: cur ? `${cur}${sep}${val}` : val });
                     }}
-                    className="px-2 py-1 rounded-md lf-surface-raised lf-border fs-sm lf-text-secondary hover:text-white hover:border-white/10 transition-colors"
+                    className="px-2 py-1 rounded-md lf-surface-raised lf-border fs-sm lf-text-secondary transition-all duration-200"
                   >
                     {t.label}
                   </button>
                 ))}
                 <div className="flex items-center gap-1 ml-1 pl-2 border-l lf-border">
-                  <button
-                    onClick={() => {
+                  <Toggle
+                    value={useUnderscore}
+                    onChange={() => {
                       const next = !useUnderscore;
                       setUseUnderscore(next);
                       if (next && options.customFilename) {
                         update({ customFilename: options.customFilename.replace(/ /g, '_') });
                       }
                     }}
-                    className={`relative w-7 h-4 rounded-full transition-colors shrink-0 ${useUnderscore ? accentBg : 'lf-surface-raised'}`}
-                  >
-                    <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${useUnderscore ? 'left-[14px]' : 'left-0.5'}`} />
-                  </button>
+                    settings={settings}
+                  />
                   <span className="fs-sm lf-text-faint">Sem Espaco</span>
                 </div>
                 <div className="flex items-center gap-1 ml-1 pl-2 border-l lf-border">
                   <label className="fs-sm lf-text-secondary">Nome limpo (sem caracteres especiais)</label>
-                  <button onClick={() => update({ restrictFilenames: !options.restrictFilenames })} className={`relative w-7 h-4 rounded-full transition-colors shrink-0 ${options.restrictFilenames ? accentBg : 'lf-surface-raised'}`}>
-                    <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${options.restrictFilenames ? 'left-[14px]' : 'left-0.5'}`} />
-                  </button>
+                  <Toggle value={!!options.restrictFilenames} onChange={() => update({ restrictFilenames: !options.restrictFilenames })} settings={settings} />
                 </div>
               </div>
             </div>
 
             {/* ── Resolução ── */}
             <AccordionSection id="resolution" title="Resolução" blockId="resolution" isOpen={openSections.has('resolution')} onToggle={() => toggleSection('resolution')} accentBg={accentBg}>
-              <div className="px-3 pb-3 pt-2 space-y-2">
+              <div className={`px-3 pb-3 pt-2 space-y-2 ${options.audioOnly ? 'opacity-30 pointer-events-none' : ''}`}>
                 <div className="flex flex-wrap gap-2.5">
                   {VIDEO_PRESETS.map(preset => {
                     const unavailable = preset.height !== Infinity && maxRes > 0 && preset.height > maxRes;
@@ -782,7 +774,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
 
             {/* ── Formato Video + Codecs ── */}
             <AccordionSection id="video-format" title="Formatos" blockId="video-format" isOpen={openSections.has('video-format')} onToggle={() => toggleSection('video-format')} accentBg={accentBg}>
-              <div className="px-3 pb-3 pt-2 space-y-3">
+              <div className={`px-3 pb-3 pt-2 space-y-3 ${options.audioOnly ? 'opacity-30 pointer-events-none' : ''}`}>
                 <div className="flex flex-wrap gap-2.5">
                   {VIDEO_FORMATS.map(fmt => (
                     <Btn
@@ -867,14 +859,25 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             {/* ── Áudio ── */}
             <AccordionSection id="audio" title="Áudio" blockId="audio-format" isOpen={openSections.has('audio')} onToggle={() => toggleSection('audio')} accentBg={accentBg}>
               <div className="px-3 pb-3 pt-2 space-y-3">
-                <Toggle
+                <ToggleRow
                   value={options.audioOnly}
-                  onChange={() => update({ audioOnly: !options.audioOnly })}
+                  onChange={() => {
+                    const next = !options.audioOnly;
+                    const reset: Partial<FormatOptions> = { audioOnly: next };
+                    if (next) {
+                      reset.embedSubs = false;
+                      reset.videoFormat = '';
+                      reset.videoCodec = '';
+                      reset.fpsMax = 0;
+                      reset.videoOnly = false;
+                    }
+                    update(reset);
+                  }}
                   label="Extrair apenas audio"
                   desc="Baixar somente a faixa de audio"
                   icon={<BlockIcon blockId="audio-extract" />}
                 />
-                <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 ${options.audioOnly ? '' : 'opacity-30 pointer-events-none'}`}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <BlockIcon blockId="audio-format" />
@@ -908,7 +911,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             {/* ── Legendas ── */}
             <AccordionSection id="subtitles" title="Legendas" blockId="subtitles" isOpen={openSections.has('subtitles')} onToggle={() => toggleSection('subtitles')} accentBg={accentBg}>
               <div className="px-3 pb-3 pt-2 space-y-3">
-                <Toggle
+                <ToggleRow
                   value={showSubs}
                   onChange={() => {
                     const next = !showSubs;
@@ -972,7 +975,7 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
 
             {/* ── Recorte de tempo ── */}
             <AccordionSection id="trim" title="Recortar vídeo" blockId="trim" isOpen={openSections.has('trim')} onToggle={() => toggleSection('trim')} accentBg={accentBg}>
-              <div className="px-3 pb-3 pt-2 space-y-2">
+              <div className={`px-3 pb-3 pt-2 space-y-2 ${options.audioOnly ? 'opacity-30 pointer-events-none' : ''}`}>
                 {mediaInfo.durationSeconds > 0 ? (
                   <TimeRangeSlider
                     durationSeconds={mediaInfo.durationSeconds}
@@ -1028,10 +1031,28 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                     <Btn active={!options.videoOnly && !options.audioOnly} onClick={() => update({ videoOnly: false, audioOnly: false })} className="py-2.5">
                       Video + Audio
                     </Btn>
-                    <Btn active={!!options.videoOnly} onClick={() => update({ videoOnly: !options.videoOnly, audioOnly: false })} className="py-2.5">
+                    <Btn active={!!options.videoOnly} onClick={() => {
+                      const next = !options.videoOnly;
+                      const reset: Partial<FormatOptions> = { videoOnly: next, audioOnly: false };
+                      if (next) {
+                        reset.audioFormat = 'mp3';
+                        reset.audioQuality = '0';
+                      }
+                      update(reset);
+                    }} className="py-2.5">
                       So Video
                     </Btn>
-                    <Btn active={!!options.audioOnly} onClick={() => update({ audioOnly: !options.audioOnly, videoOnly: false })} className="py-2.5">
+                    <Btn active={!!options.audioOnly} onClick={() => {
+                      const next = !options.audioOnly;
+                      const reset: Partial<FormatOptions> = { audioOnly: next, videoOnly: false };
+                      if (next) {
+                        reset.embedSubs = false;
+                        reset.videoFormat = '';
+                        reset.videoCodec = '';
+                        reset.fpsMax = 0;
+                      }
+                      update(reset);
+                    }} className="py-2.5">
                       So Audio
                     </Btn>
                   </div>
@@ -1111,9 +1132,9 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             {/* ── Metadados + Thumbnail (2 colunas) ── */}
             <AccordionSection id="metadata" title="Metadados" blockId="metadata" isOpen={openSections.has('metadata')} onToggle={() => toggleSection('metadata')} accentBg={accentBg}>
               <div className="px-3 pb-3 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <Toggle value={options.embedMetadata} onChange={() => update({ embedMetadata: !options.embedMetadata })} label="Metadados" desc="Incorporar titulo, autor e outros dados" icon={<BlockIcon blockId="metadata" />} />
+                <ToggleRow value={options.embedMetadata} onChange={() => update({ embedMetadata: !options.embedMetadata })} label="Metadados" desc="Incorporar titulo, autor e outros dados" icon={<BlockIcon blockId="metadata" />} />
                 <div>
-                  <Toggle value={!!options.writeThumbnail} onChange={() => update({ writeThumbnail: !options.writeThumbnail })} label="Thumbnail" desc="Salvar imagem da miniatura" icon={<BlockIcon blockId="thumbnail" />} />
+                  <ToggleRow value={!!options.writeThumbnail} onChange={() => update({ writeThumbnail: !options.writeThumbnail })} label="Thumbnail" desc="Salvar imagem da miniatura" icon={<BlockIcon blockId="thumbnail" />} />
                   {options.writeThumbnail && (
                     <div className="mt-2">
                       <SmallToggle value={!!options.embedThumbnail} onChange={() => update({ embedThumbnail: !options.embedThumbnail })} label="Incorporar thumbnail" />

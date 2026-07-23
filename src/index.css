@@ -126,6 +126,10 @@ body {
   background: linear-gradient(rgba(var(--color-primary-rgb, 99, 102, 241), 0.015), rgba(var(--color-primary-rgb, 99, 102, 241), 0.015)), #F4F6F9 !important;
 }
 
+.white {
+  background: linear-gradient(rgba(var(--color-primary-rgb, 99, 102, 241), 0.015), rgba(var(--color-primary-rgb, 99, 102, 241), 0.015)), #F4F6F9 !important;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════════ */
 /* SEMANTIC THEME SYSTEM — Professional Layout Optimization                       */
 /* Components use: lf-surface, lf-border, lf-text, lf-text-muted, etc.           */
@@ -165,6 +169,23 @@ body {
   --lf-input-bg: rgba(255, 255, 255, 0.55);
   --lf-skeleton: rgba(230, 235, 243, 0.60);
   --lf-badge: rgba(220, 226, 236, 0.45);
+}
+
+.white {
+  --lf-surface: #FFFFFF;
+  --lf-surface-rgb: 255, 255, 255;
+  --lf-surface-raised: #F8FAFC;
+  --lf-surface-sunken: #EEF2FF;
+  --lf-border: rgba(190, 200, 215, 0.60);
+  --lf-border-strong: rgba(190, 200, 215, 0.80);
+  --lf-border-hover: rgba(190, 200, 215, 0.90);
+  --lf-text: #0F172A;
+  --lf-text-secondary: #1E293B;
+  --lf-text-muted: #475569;
+  --lf-text-faint: #64748B;
+  --lf-input-bg: #FFFFFF;
+  --lf-skeleton: #E6EBF3;
+  --lf-badge: #DCE2EC;
 }
 
 .gray-mode {
@@ -413,16 +434,23 @@ body {
   transition: all 0.2s ease;
 }
 
-.lf-opt:hover {
+.lf-opt:hover:not(.active) {
   background: rgba(var(--color-primary-rgb, 99, 102, 241), 0.04);
   border-color: rgba(var(--color-primary-rgb, 99, 102, 241), 0.15);
   color: #fff;
 }
 
 .lf-opt.active {
-  background: rgba(var(--color-primary-rgb, 99, 102, 241), 0.08);
-  border-color: var(--color-primary, #6366f1);
-  color: var(--color-primary, #6366f1);
+  background: var(--color-primary, #6366f1) !important;
+  border-color: var(--color-primary, #6366f1) !important;
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+.lf-opt.active:hover {
+  background: var(--color-primary, #6366f1) !important;
+  color: #ffffff !important;
+  filter: brightness(0.95);
 }
 
 /* Nav items — accent fill on hover, stronger on active */
@@ -463,16 +491,23 @@ input[type="checkbox"] {
   color: var(--color-primary, #6366f1);
 }
 
-.light .lf-opt:hover {
+.light .lf-opt:hover:not(.active) {
   background: rgba(var(--color-primary-rgb, 99, 102, 241), 0.05);
   border-color: rgba(var(--color-primary-rgb, 99, 102, 241), 0.20);
   color: #141821;
 }
 
 .light .lf-opt.active {
-  background: rgba(var(--color-primary-rgb, 99, 102, 241), 0.10);
-  border-color: var(--color-primary, #6366f1);
-  color: var(--color-primary, #6366f1);
+  background: var(--color-primary, #6366f1) !important;
+  border-color: var(--color-primary, #6366f1) !important;
+  color: #0F172A !important;
+  font-weight: 600;
+}
+
+.light .lf-opt.active:hover {
+  background: var(--color-primary, #6366f1) !important;
+  color: #0F172A !important;
+  filter: brightness(0.95);
 }
 
 .light .lf-nav-item:hover {
@@ -1195,3 +1230,409 @@ input[type="checkbox"] {
     box-shadow: 0 0 14px 4px rgba(77, 95, 255, 0.6);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════ */
+/* WHITE THEME — Visual Overrides                                                 */
+/* Solid white backgrounds, clean buttons, accent-driven active states            */
+/* Scoped entirely under .white — ZERO contamination to .light or dark themes     */
+/* ═══════════════════════════════════════════════════════════════════════════════ */
+
+.white {
+  background-color: transparent !important;
+  color: #141821 !important;
+}
+
+/* ── Glass Utilities — Frosted Glass (slightly more opaque than bege) ──────── */
+.white .glass-card {
+  background: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(8px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(150%) !important;
+  border: 1px solid rgba(190, 200, 215, 0.50) !important;
+  color: #141821 !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease !important;
+}
+
+.white .glass-card-hover:hover {
+  background: rgba(255, 255, 255, 0.70) !important;
+  border-color: rgba(190, 200, 215, 0.60) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+}
+
+.white .glass-sidebar {
+  background: rgba(240, 243, 248, 0.50) !important;
+  backdrop-filter: blur(8px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(150%) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.50) !important;
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.04),
+    inset -1px 0 0 rgba(255, 255, 255, 0.5) !important;
+}
+
+.white .glass-input {
+  background-color: rgba(255, 255, 255, 0.50) !important;
+  backdrop-filter: blur(6px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(6px) saturate(140%) !important;
+  border: 1px solid rgba(190, 200, 215, 0.45) !important;
+  color: #141821 !important;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+}
+
+.white .glass-pill {
+  background-color: rgba(220, 226, 236, 0.40) !important;
+  backdrop-filter: blur(6px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(6px) saturate(140%) !important;
+  border: 1px solid rgba(190, 200, 215, 0.35) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+  color: #141821 !important;
+}
+
+/* ── Inner section blocks (AccordionSection) — SOLID #F0F2F5 ─────────────── */
+.white .glass-section {
+  background-color: #F0F2F5 !important;
+  border-color: rgba(190, 200, 215, 0.5) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ── Surface utility overrides — SOLID #F0F2F5 ──────────────────────────── */
+.white .lf-surface-40,
+.white .lf-surface-30,
+.white .lf-surface-20,
+.white .lf-surface-10,
+.white .lf-surface-raised {
+  background-color: #F0F2F5 !important;
+  border-color: rgba(190, 200, 215, 0.5) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+/* ── Result container ────────────────────────────────────────────────────── */
+.white .glass-result {
+  background-color: rgba(255, 255, 255, 0.30) !important;
+  border: 1px solid rgba(190, 200, 215, 0.60) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════ */
+/* WHITE THEME — BUTTON SYSTEM                                               */
+/* ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Header button (accordion toggle) — transparent ──────────────────────── */
+.white .glass-section > button:first-child {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #141821 !important;
+}
+.white .glass-section > button:first-child:hover {
+  background-color: rgba(190, 200, 215, 0.15) !important;
+}
+
+/* ── INACTIVE CHIPS (.lf-opt) — white bg, gray border, dark text ─────────── */
+.white .glass-section .lf-opt:not(.active),
+.white .glass-card .lf-opt:not(.active) {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  color: #1E293B !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Hover on inactive chips — slightly darker border */
+.white .glass-section .lf-opt:hover:not(.active),
+.white .glass-card .lf-opt:hover:not(.active) {
+  background-color: #FFFFFF !important;
+  border-color: #CBD5E1 !important;
+  color: #0F172A !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* ── TEMPLATE BUTTONS HOVER — accent border + accent text on hover ────────── */
+.white .glass-section button.lf-surface-raised.lf-border:not(.lf-opt):not(:first-child):hover {
+  border-color: var(--color-primary) !important;
+  color: var(--color-primary) !important;
+  background-color: rgba(var(--color-primary-rgb), 0.06) !important;
+}
+
+/* ── ACTIVE CHIPS (.lf-opt.active) — SOLID primary fill, dark text ────────── */
+.white .glass-section .lf-opt.active,
+.white .glass-card .lf-opt.active {
+  background-color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  color: #0F172A !important;
+  box-shadow: none !important;
+  font-weight: 600 !important;
+}
+
+/* Hover on active chips — darken bg, keep dark text */
+.white .glass-section .lf-opt.active:hover,
+.white .glass-card .lf-opt.active:hover {
+  background-color: var(--color-primary) !important;
+  color: #0F172A !important;
+  filter: brightness(0.92) !important;
+}
+
+/* ── SettingsView (.glass-card) — neutral buttons ────────────────────────── */
+.white .glass-card button:not(.lf-opt):not([class*="bg-"]):not([role="switch"]) {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  color: #1E293B !important;
+}
+.white .glass-card button:not(.lf-opt):not([class*="bg-"]):not([role="switch"]):hover {
+  background-color: #FFFFFF !important;
+  border-color: #CBD5E1 !important;
+  color: #0F172A !important;
+}
+
+/* SettingsView buttons with accent border class (active state) */
+.white .glass-card button.border-indigo-500,
+.white .glass-card button.border-emerald-500,
+.white .glass-card button.border-amber-500,
+.white .glass-card button.border-rose-500,
+.white .glass-card button.border-violet-500,
+.white .glass-card button.border-sky-500,
+.white .glass-card button.border-teal-500,
+.white .glass-card button.border-fuchsia-500,
+.white .glass-card button.border-orange-500,
+.white .glass-card button.border-cyan-500,
+.white .glass-card button.border-lime-500,
+.white .glass-card button.border-red-500,
+.white .glass-card button.border-pink-500,
+.white .glass-card button.border-slate-400 {
+  background-color: rgba(var(--color-primary-rgb), 0.06) !important;
+  border-color: var(--color-primary) !important;
+  color: var(--color-primary) !important;
+  box-shadow: none !important;
+  font-weight: 600 !important;
+}
+
+/* Hover on active settings buttons */
+.white .glass-card button.border-indigo-500:hover,
+.white .glass-card button.border-emerald-500:hover,
+.white .glass-card button.border-amber-500:hover,
+.white .glass-card button.border-rose-500:hover,
+.white .glass-card button.border-violet-500:hover,
+.white .glass-card button.border-sky-500:hover,
+.white .glass-card button.border-teal-500:hover,
+.white .glass-card button.border-fuchsia-500:hover,
+.white .glass-card button.border-orange-500:hover,
+.white .glass-card button.border-cyan-500:hover,
+.white .glass-card button.border-lime-500:hover,
+.white .glass-card button.border-red-500:hover,
+.white .glass-card button.border-pink-500:hover,
+.white .glass-card button.border-slate-400:hover {
+  background-color: rgba(var(--color-primary-rgb), 0.10) !important;
+}
+
+/* ── Override dark-mode hover:bg-zinc-800 / hover:bg-zinc-850 ─────────────── */
+.white .glass-section button.hover\:bg-zinc-800,
+.white .glass-section button.hover\:bg-zinc-850,
+.white .lf-surface-40 button.hover\:bg-zinc-800,
+.white .lf-surface-40 button.hover\:bg-zinc-850,
+.white .lf-surface-30 button.hover\:bg-zinc-800,
+.white .lf-surface-30 button.hover\:bg-zinc-850,
+.white .lf-surface-raised button.hover\:bg-zinc-800,
+.white .lf-surface-raised button.hover\:bg-zinc-850 {
+  background-color: #FFFFFF !important;
+}
+
+/* ── Zinc variants ────────────────────────────────────────────────────────── */
+.white .bg-zinc-900\/10 {
+  background-color: rgba(255, 255, 255, 0.16) !important;
+  border-color: rgba(190, 200, 215, 0.3) !important;
+}
+.white .bg-zinc-900\/30 {
+  background-color: rgba(255, 255, 255, 0.18) !important;
+  border: 1px solid rgba(190, 200, 215, 0.35) !important;
+  backdrop-filter: blur(8px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(150%) !important;
+}
+.white .bg-zinc-900\/40 {
+  background-color: rgba(255, 255, 255, 0.20) !important;
+  border: 1px solid rgba(190, 200, 215, 0.4) !important;
+  backdrop-filter: blur(8px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(150%) !important;
+}
+.white .bg-zinc-900 {
+  background-color: rgba(255, 255, 255, 0.14) !important;
+  color: #141821 !important;
+  border: 1px solid rgba(190, 200, 215, 0.5) !important;
+  backdrop-filter: blur(8px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(150%) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+}
+.white .bg-zinc-800 {
+  background-color: rgba(230, 235, 243, 0.6) !important;
+  color: #141821 !important;
+  border: 1px solid rgba(180, 190, 205, 0.5) !important;
+  backdrop-filter: blur(8px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(150%) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+}
+.white .bg-zinc-800:hover {
+  background-color: rgba(225, 230, 240, 0.7) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+}
+.white .bg-zinc-800\/50 {
+  background-color: rgba(225, 231, 240, 0.5) !important;
+  border: 1px solid rgba(190, 200, 215, 0.4) !important;
+}
+.white .bg-zinc-800\/80 {
+  background-color: rgba(235, 239, 246, 0.65) !important;
+  border: 1px solid rgba(190, 200, 215, 0.5) !important;
+}
+.white .bg-zinc-850 {
+  background-color: rgba(225, 231, 240, 0.55) !important;
+  color: #141821 !important;
+  border: 1px solid rgba(190, 200, 215, 0.45) !important;
+  backdrop-filter: blur(8px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(150%) !important;
+}
+.white .bg-zinc-750 {
+  background-color: rgba(220, 226, 236, 0.5) !important;
+  color: #141821 !important;
+  border: 1px solid rgba(190, 200, 215, 0.4) !important;
+  backdrop-filter: blur(8px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(150%) !important;
+}
+
+/* ── Black overlay variants ──────────────────────────────────────────────── */
+.white .bg-black\/30,
+.white .bg-black\/35,
+.white .bg-black\/40 {
+  background-color: rgba(255, 255, 255, 0.10) !important;
+  backdrop-filter: blur(8px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(150%) !important;
+}
+.white .bg-black\/60 {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  backdrop-filter: blur(8px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(150%) !important;
+}
+.white .bg-black\/80 {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  backdrop-filter: blur(8px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(150%) !important;
+}
+.white .bg-black {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  color: #141821 !important;
+}
+
+/* ── Colored dark variants ───────────────────────────────────────────────── */
+.white .bg-red-950\/40 {
+  background-color: rgba(255, 210, 210, 0.3) !important;
+  border-color: rgba(255, 180, 180, 0.35) !important;
+}
+
+/* ── Borders ──────────────────────────────────────────────────────────────── */
+.white .border-white\/5 {
+  border-color: rgba(190, 200, 215, 0.35) !important;
+}
+.white .border-white\/10 {
+  border-color: rgba(190, 200, 215, 0.45) !important;
+}
+.white .border-zinc-800 {
+  border-color: rgba(180, 190, 205, 0.5) !important;
+}
+.white .border-zinc-700 {
+  border-color: rgba(180, 190, 205, 0.45) !important;
+}
+.white .border-zinc-600 {
+  border-color: rgba(190, 200, 215, 0.5) !important;
+}
+
+/* ── Text colors ──────────────────────────────────────────────────────────── */
+.white h1, .white h2, .white h3, .white h4, .white h5, .white h6,
+.white .text-white, .white .text-zinc-100, .white .text-zinc-200 {
+  color: #141821 !important;
+}
+.white p, .white span, .white label {
+  color: #2a3040;
+}
+.white .text-zinc-300 { color: #1e2535 !important; }
+.white .text-zinc-400 { color: #454d60 !important; }
+.white .text-zinc-500 { color: #6b7280 !important; }
+.white .text-zinc-600 { color: #3a4050 !important; }
+
+/* ── Tags ─────────────────────────────────────────────────────────────────── */
+.white .tag {
+  background: rgba(225, 231, 240, 0.45) !important;
+  border: 1px solid rgba(190, 200, 215, 0.4) !important;
+  color: #1e2535 !important;
+}
+.white .tag::before { opacity: 0.7; }
+.white .tag:hover {
+  background: rgba(220, 226, 236, 0.6) !important;
+  border-color: rgba(170, 182, 200, 0.5) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* ── Sidebar nav items ────────────────────────────────────────────────────── */
+.white .glass-sidebar button[class*="text-zinc-400"] {
+  background-color: rgba(190, 198, 215, 0.25) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(180, 190, 205, 0.3) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+}
+.white .glass-sidebar button[class*="text-zinc-400"]:hover {
+  background-color: rgba(185, 195, 212, 0.35) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border-color: rgba(170, 182, 200, 0.4) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+}
+.white .glass-sidebar button[class*="text-white"] {
+  background-color: rgba(185, 195, 212, 0.3) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(170, 182, 200, 0.35) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+.white ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12) !important;
+}
+.white ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2) !important;
+}
+
+/* ── Range slider thumb ───────────────────────────────────────────────────── */
+.white .range-slider::-webkit-slider-thumb {
+  background: #141821 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+}
+.white .range-slider::-moz-range-thumb {
+  background: #141821 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ── Surface hover ────────────────────────────────────────────────────────── */
+.white .lf-surface-hover:hover {
+  background-color: rgba(240, 243, 248, 0.55) !important;
+}
+
+/* ── Button utility overrides ─────────────────────────────────────────────── */
+.white .lf-btn-outline:hover {
+  background-color: rgba(240, 243, 248, 0.50) !important;
+}
+.white .lf-btn-outline.primary {
+  border-color: var(--color-primary) !important;
+  color: var(--color-primary) !important;
+}
+.white .lf-nav-item:hover {
+  background-color: rgba(240, 243, 248, 0.50) !important;
+}
+.white .lf-nav-item.active {
+  background-color: rgba(var(--color-primary-rgb), 0.08) !important;
+  border-color: var(--color-primary) !important;
+  color: var(--color-primary) !important;
+}
+.white .lf-nav-item.active svg {
+  color: var(--color-primary) !important;
+}

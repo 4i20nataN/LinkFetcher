@@ -10,7 +10,8 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
   const themeClass = {
     light: 'text-zinc-900 light',
     dark: 'text-slate-100 dark',
-    gray: 'text-slate-200 gray-mode'
+    gray: 'text-slate-200 gray-mode',
+    white: 'text-zinc-900 white'
   }[settings.themeMode];
 
   // Accent mapping helper — SKILL.md tone inclination: --primary, --primary-glow, --primary-rgb
@@ -44,15 +45,15 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
       className={`h-screen transition-colors duration-300 select-none ${themeClass} relative overflow-hidden`} 
       style={style}
     >
-      {/* Background: NeuralWhite for light, NeuralBlack for dark/gray */}
-      {settings.themeMode === 'light' ? (
+      {/* Background: NeuralWhite for light/white, NeuralBlack for dark/gray */}
+      {(settings.themeMode === 'light' || settings.themeMode === 'white') ? (
         <NeuralConstellationBackground />
       ) : (
         <NeuralBlackBackground />
       )}
 
       {/* Ambient glow — colored radials blurred behind glass elements (reference: bg-glow-container) */}
-      {settings.themeMode !== 'light' && (
+      {(settings.themeMode !== 'light' && settings.themeMode !== 'white') && (
         <div className="absolute inset-0 z-[1] pointer-events-none overflow-hidden">
           <div
             style={{

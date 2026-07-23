@@ -138,7 +138,7 @@ export const LinkAnalyzer: React.FC = () => {
   const [probeLoading, setProbeLoading] = useState(false);
   const [probeError, setProbeError] = useState<string | null>(null);
   const [formatOptions, setFormatOptions] = useState<FormatOptions>({
-    format: 'bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b',
+    format: 'bestvideo+bestaudio/best',
     audioOnly: false,
     audioFormat: 'mp3',
     audioQuality: '0',
@@ -149,7 +149,7 @@ export const LinkAnalyzer: React.FC = () => {
     embedSubs: false,
     writeThumbnail: false,
     embedThumbnail: false,
-    embedMetadata: true,
+    embedMetadata: false,
     videoOnly: false,
     sponsorblockRemove: '',
     fpsMax: 0,
@@ -206,7 +206,7 @@ export const LinkAnalyzer: React.FC = () => {
     setMediaInfo(null);
     setSelectedFormat(null);
     setFormatOptions({
-      format: 'bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b',
+      format: 'bestvideo+bestaudio/best',
       audioOnly: false,
       audioFormat: 'mp3',
       audioQuality: '0',
@@ -217,7 +217,7 @@ export const LinkAnalyzer: React.FC = () => {
       embedSubs: false,
       writeThumbnail: false,
       embedThumbnail: false,
-      embedMetadata: true,
+      embedMetadata: false,
       videoOnly: false,
       sponsorblockRemove: '',
       fpsMax: 0,
@@ -493,7 +493,7 @@ export const LinkAnalyzer: React.FC = () => {
                   setSelectedFormat(null);
                   setProbeError(null);
                   setFormatOptions({
-                    format: 'bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b',
+                    format: 'bestvideo+bestaudio/best',
                     audioOnly: false,
                     audioFormat: 'mp3',
                     audioQuality: '0',
@@ -504,7 +504,7 @@ export const LinkAnalyzer: React.FC = () => {
                     embedSubs: false,
                     writeThumbnail: false,
                     embedThumbnail: false,
-                    embedMetadata: true,
+                    embedMetadata: false,
                     videoOnly: false,
                     sponsorblockRemove: '',
                     fpsMax: 0,
@@ -810,7 +810,7 @@ export const LinkAnalyzer: React.FC = () => {
                   disabled={!selectedFormat}
                   className={`
                     w-full sm:w-auto px-6 py-3 rounded-xl text-white font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition-all
-                    ${getAccentBgClass(settings)} hover:scale-[1.02] active:scale-[0.98]
+                    ${!selectedFormat ? 'bg-zinc-600 hover:bg-zinc-600 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500'} hover:scale-[1.02] active:scale-[0.98]
                   `}
                 >
                   <Download size={18} />
