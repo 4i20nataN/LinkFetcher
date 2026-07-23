@@ -99,6 +99,7 @@ export interface DownloadItem {
   url: string;
   error?: string;
   filePath?: string;
+  cookiesFromBrowser?: string;
 }
 
 export interface FavoriteItem {
@@ -121,7 +122,7 @@ export interface DownloadLaterItem {
 }
 
 export interface AppSettings {
-  themeMode: 'light' | 'dark' | 'gray';
+  themeMode: 'light' | 'dark' | 'gray' | 'white';
   accentColor: string; // e.g., 'indigo', 'emerald', 'amber', 'rose', 'violet', 'sky', 'teal', 'fuchsia'
   iconStyle: 'emoji' | 'lucide-mono' | 'lucide-color';
   language: 'pt' | 'en';

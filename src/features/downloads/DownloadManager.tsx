@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DownloadItem, AppSettings } from '../../types';
 import { DownloadEngine } from '../../core/engine/DownloadEngine';
+import { CookieRetryPopup } from '../../components/CookieRetryPopup';
 import { 
   Play, Pause, X, Trash2, FolderOpen, Share2, RotateCcw, 
   ArrowUp, ArrowDown, ListOrdered, CheckCircle2, AlertTriangle, 
@@ -52,6 +53,7 @@ export const DownloadManager: React.FC = () => {
   const { t } = useTranslation(settings);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'paused' | 'failed_cancelled'>('all');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [cookieRetry, setCookieRetry] = useState<{ itemId: string; error: string } | null>(null);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -59,6 +61,23 @@ export const DownloadManager: React.FC = () => {
       setToastMsg(null);
     }, 2000);
   };
+
+  useEffect(() => {
+    const unsub = DownloadEngine.onCookieRetryRequest((itemId, error) => {
+      setCookieRetry({ itemId, error });
+    });
+    return unsub;
+  }, []);
+
+  const handleUseCookies = useCallback((itemId: string, browser: string) => {
+    DownloadEngine.retryWithCookies(itemId, browser);
+    setCookieRetry(null);
+    showToast(settings.language === 'en' ? 'Retrying with cookies...' : 'Retentando com cookies...');
+  }, [settings.language, showToast]);
+
+  const handleSkipCookieRetry = useCallback(() => {
+    setCookieRetry(null);
+  }, []);
 
   // Bulk queue operations
   const handlePauseAll = () => {
@@ -557,6 +576,17 @@ export const DownloadManager: React.FC = () => {
           </AnimatePresence>
         )}
       </div>
+
+      <AnimatePresence>
+        {cookieRetry && (
+          <CookieRetryPopup
+            itemId={cookieRetry.itemId}
+            error={cookieRetry.error}
+            onUseCookies={handleUseCookies}
+            onSkip={handleSkipCookieRetry}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

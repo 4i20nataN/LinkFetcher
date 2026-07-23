@@ -24,6 +24,7 @@ const YT_DLP_PLATFORMS = new Set([
 class DownloadEngineClass {
   private items: DownloadItem[] = [];
   private listeners: Set<EngineListener> = new Set();
+  private cookieRetryListeners: Set<(itemId: string, error: string) => void> = new Set();
 
   // Map download id → SSE EventSource (for real downloads)
   private eventSources = new Map<string, EventSource>();
@@ -239,6 +240,33 @@ class DownloadEngineClass {
     this.processQueue();
   }
 
+  retryWithCookies(id: string, browser: string) {
+    const item = this.items.find(i => i.id === id);
+    if (!item) return;
+    item.cookiesFromBrowser = browser;
+    item.status = 'queued';
+    item.progress = 0;
+    item.sizeDownloaded = 0;
+    item.speed = 0;
+    item.eta = 0;
+    item.error = undefined;
+    this.notify();
+    this.processQueue();
+  }
+
+  onCookieRetryRequest(listener: (itemId: string, error: string) => void): () => void {
+    this.cookieRetryListeners.add(listener);
+    return () => { this.cookieRetryListeners.delete(listener); };
+  }
+
+  private isCookieRetryable(errorMessage: string): boolean {
+    return /403|Sign in|not a bot|Please confirm|Forbidden/i.test(errorMessage);
+  }
+
+  private notifyCookieRetry(itemId: string, error: string) {
+    this.cookieRetryListeners.forEach(l => l(itemId, error));
+  }
+
   removeDownload(id: string) {
     this.cancelRealDownload(id);
     this.items = this.items.filter(i => i.id !== id);
@@ -357,6 +385,9 @@ class DownloadEngineClass {
           target.speed = 0;
           target.eta = 0;
           cleanup();
+          if (this.isCookieRetryable(payload.message || '')) {
+            this.notifyCookieRetry(target.id, target.error);
+          }
           this.notify();
           this.processQueue();
         }
@@ -376,7 +407,7 @@ class DownloadEngineClass {
         title: item.title,
         // Same fix as Capacitor: item.format.id is a raw DASH format ID (e.g. "137")
         // that selects video-only; always fall back to a complete format selector.
-        format: item.formatString || 'bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b',
+        format: item.formatString || 'bestvideo+bestaudio/best',
         outputDir: this.settings.defaultDir || undefined,
         audioOnly: isAudio,
         audioFormat: item.audioFormat || (isAudio ? 'mp3' : undefined),
@@ -401,6 +432,7 @@ class DownloadEngineClass {
         sponsorblockRemove: item.sponsorblockRemove,
         fpsMax: item.fpsMax,
         customFilename: item.customFilename,
+        cookiesFromBrowser: item.cookiesFromBrowser,
       }).catch((err: any) => {
         const target = this.items.find(i => i.id === item.id);
         if (target) {
@@ -460,6 +492,9 @@ class DownloadEngineClass {
           target.speed = 0;
           target.eta = 0;
           cleanup();
+          if (this.isCookieRetryable(payload.message || '')) {
+            this.notifyCookieRetry(target.id, target.error);
+          }
           this.notify();
           this.processQueue();
         }
@@ -485,7 +520,7 @@ class DownloadEngineClass {
           // NOTE: youtubedl-android's bundled yt-dlp may not support `bv*`/`ba*` (the `*`
           // modifier for multi-format merging was added in yt-dlp 2023.01+). Convert to the
           // older `bestvideo`/`bestaudio` equivalents which work on all yt-dlp versions.
-          format: item.formatString || 'bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b',
+          format: item.formatString || 'bestvideo+bestaudio/best',
           outputDir: this.settings.defaultDir || undefined,
           audioOnly: isAudio,
           audioFormat: item.audioFormat || (isAudio ? 'mp3' : undefined),
@@ -614,6 +649,9 @@ class DownloadEngineClass {
           target.eta = 0;
           this.eventSources.delete(item.id);
           es.close();
+          if (this.isCookieRetryable(data.message || '')) {
+            this.notifyCookieRetry(target.id, target.error);
+          }
           this.notify();
           this.processQueue();
           break;

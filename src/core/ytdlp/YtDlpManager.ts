@@ -198,7 +198,8 @@ export function spawnDownload(params: {
       .replace(/\+ba\[ext=\w+\]/g, '')
       .replace(/\+ba/g, '')
       .replace(/\/ba/g, '')
-      .replace(/\/b/g, '') || 'bv*';
+      .replace(/\/b/g, '')
+      .replace(/\/+$/, '') || 'bv*';
   }
 
   // fpsMax is handled via --format-sort after --format is pushed
@@ -215,7 +216,7 @@ export function spawnDownload(params: {
     if (params.audioQuality) args.push('--audio-quality', params.audioQuality);
   }
 
-  if (params.mergeOutputFormat) args.push('--merge-output-format', params.mergeOutputFormat);
+  if (params.mergeOutputFormat && !params.audioOnly) args.push('--merge-output-format', params.mergeOutputFormat);
 
   if (params.writeSubs) args.push('--write-subs');
   if (params.writeAutoSubs) args.push('--write-auto-subs');
@@ -248,7 +249,7 @@ export function spawnDownload(params: {
   }
 
   if (params.retries && params.retries > 0) {
-    args.push('--retries', String(params.retries));
+    args.push('--extractor-retries', String(params.retries));
   }
 
   /**
@@ -300,6 +301,7 @@ export function spawnDownload(params: {
       proc = spawn(binary, args);
 
       let lastFile = '';
+      let stderrBuffer = '';
 
       proc.stdout?.on('data', (chunk: Buffer) => {
         const raw = chunk.toString();
@@ -331,8 +333,9 @@ export function spawnDownload(params: {
       proc.stderr?.on('data', (chunk: Buffer) => {
         const text = chunk.toString();
         logDebug('[yt-dlp stderr]', text);
-        if (text.includes('ERROR') || text.includes('error')) {
-          logDebug('[yt-dlp stderr] WARNING:', text.trim());
+        stderrBuffer += text;
+        if (stderrBuffer.length > 2000) {
+          stderrBuffer = stderrBuffer.slice(-2000);
         }
       });
 
@@ -346,7 +349,7 @@ export function spawnDownload(params: {
             params.onComplete(resolvedPath);
           }, 250);
         } else {
-          params.onError(`yt-dlp exited with code ${code}`);
+          params.onError(`yt-dlp exited with code ${code}: ${stderrBuffer.trim()}`);
         }
       });
 
@@ -473,7 +476,7 @@ export async function searchVideos(options: SearchOptions): Promise<SearchResult
   return results;
 }
 
-const DEFAULT_FORMAT = 'bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b';
+const DEFAULT_FORMAT = 'bestvideo+bestaudio/best';
 
 /**
  * Build a complete yt-dlp argument array from DownloadOptions.
@@ -489,7 +492,8 @@ export function buildArgs(options: DownloadOptions): string[] {
       .replace(/\+ba\[ext=\w+\]/g, '')
       .replace(/\+ba/g, '')
       .replace(/\/ba/g, '')
-      .replace(/\/b/g, '') || 'bv*';
+      .replace(/\/b/g, '')
+      .replace(/\/+$/, '') || 'bv*';
   }
 
   if (options.fpsMax && options.fpsMax > 0 && !options.audioOnly) {
