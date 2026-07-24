@@ -687,22 +687,28 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
             {/* ── Formato Video + Codecs ── */}
             <AccordionSection id="video-format" title="Formatos" blockId="video-format" isOpen={openSections.has('video-format')} onToggle={() => toggleSection('video-format')} accentBg={accentBg}>
               <div className={`px-3 pb-3 pt-2 space-y-3 ${options.audioOnly ? 'opacity-30 pointer-events-none' : ''}`}>
-                <div className="flex flex-wrap gap-2.5">
-                  {VIDEO_FORMATS.map(fmt => (
-                    <Btn
-                      key={fmt}
-                      active={!options.audioOnly && options.videoFormat === fmt}
-                      onClick={() => {
-                        if (options.audioOnly) return;
-                        update({ videoFormat: fmt });
-                      }}
-                      className="py-2"
-                    >
-                      {fmt.toUpperCase()}
-                    </Btn>
-                  ))}
-                </div>
-                <div className="space-y-2 pt-2 mt-2 border-t lf-border">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <BlockIcon blockId="behavior" />
+                      <BlockTitle>Formato do Video</BlockTitle>
+                    </div>
+                    <div className="flex flex-wrap gap-2.5">
+                      {VIDEO_FORMATS.map(fmt => (
+                        <Btn
+                          key={fmt}
+                          active={!options.audioOnly && options.videoFormat === fmt}
+                          onClick={() => {
+                            if (options.audioOnly) return;
+                            update({ videoFormat: fmt });
+                          }}
+                          className="py-2"
+                        >
+                          {fmt.toUpperCase()}
+                        </Btn>
+                      ))}
+                    </div>
+                  </div>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <BlockIcon blockId="behavior" />
