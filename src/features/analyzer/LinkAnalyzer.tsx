@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { ProviderRegistry } from '../../core/plugins/Providers';
-import { MediaInfo, MediaFormat } from '../../types';
+import { ProviderRegistry, probePlaylistFull } from '../../core/plugins/Providers';
+import { MediaInfo, MediaFormat, PlaylistInfo } from '../../types';
 import { 
   Play, Download, Clock, Star, ExternalLink, RefreshCw, 
-  Trash2, ShieldCheck, HelpCircle, AlertCircle, Info, FileVideo, Music, Image as ImageIcon
+  Trash2, ShieldCheck, HelpCircle, AlertCircle, Info, FileVideo, Music, Image as ImageIcon,
+  ListMusic, ChevronDown, ChevronUp, Eye, Calendar, User
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from '../../core/i18n';
@@ -13,6 +14,7 @@ import {
 } from '../../components/ThemeWrapper';
 import { DownloadEngine } from '../../core/engine/DownloadEngine';
 import { FormatSelector, FormatOptions } from '../downloads/FormatSelector';
+import { isPlaylistUrl } from '../../core/ytdlp/playlistUtils';
 import { probeUrlWithAdapter } from '../../core/ytdlp/YtDlpAdapter';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 
@@ -137,6 +139,9 @@ export const LinkAnalyzer: React.FC = () => {
 
   const [probeLoading, setProbeLoading] = useState(false);
   const [probeError, setProbeError] = useState<string | null>(null);
+  const [playlistInfo, setPlaylistInfo] = useState<PlaylistInfo | null>(null);
+  const [playlistLoading, setPlaylistLoading] = useState(false);
+  const [playlistExpanded, setPlaylistExpanded] = useState(false);
   const [formatOptions, setFormatOptions] = useState<FormatOptions>({
     format: 'bestvideo+bestaudio/best',
     audioOnly: false,
@@ -144,8 +149,8 @@ export const LinkAnalyzer: React.FC = () => {
     audioQuality: '0',
     writeSubs: false,
     writeAutoSubs: false,
-    subLangs: 'en',
-    subFormat: 'srt',
+    subLangs: '',
+    subFormat: '',
     embedSubs: false,
     writeThumbnail: false,
     embedThumbnail: false,
@@ -212,8 +217,8 @@ export const LinkAnalyzer: React.FC = () => {
       audioQuality: '0',
       writeSubs: false,
       writeAutoSubs: false,
-      subLangs: 'en',
-      subFormat: 'srt',
+      subLangs: '',
+      subFormat: '',
       embedSubs: false,
       writeThumbnail: false,
       embedThumbnail: false,
@@ -225,6 +230,23 @@ export const LinkAnalyzer: React.FC = () => {
     });
     setSuccessMsg(null);
     setProbeError(null);
+    setPlaylistInfo(null);
+
+    // Check if URL is a playlist
+    if (isPlaylistUrl(targetUrl)) {
+      setPlaylistLoading(true);
+      try {
+        const playlist = await probePlaylistFull(targetUrl);
+        setPlaylistInfo(playlist);
+        setPlaylistLoading(false);
+        setLoading(false);
+        return;
+      } catch (err: any) {
+        setPlaylistLoading(false);
+        setPlaylistInfo(null);
+        // Fall through to normal analysis if playlist probe fails
+      }
+    }
 
     try {
       const provider = ProviderRegistry.getProviderForUrl(targetUrl);
@@ -372,6 +394,28 @@ export const LinkAnalyzer: React.FC = () => {
     }, 1200);
   };
 
+  const handleDownloadAllPlaylist = async () => {
+    if (!playlistInfo || playlistInfo.items.length === 0) return;
+
+    // Probe each item to get its formats, then add to queue
+    for (const item of playlistInfo.items) {
+      try {
+        const provider = ProviderRegistry.getProviderForUrl(item.url);
+        const info = await provider.analyze(item.url);
+        if (info.formats && info.formats.length > 0) {
+          DownloadEngine.addDownload(info, info.formats[0], formatOptions);
+        }
+      } catch (err) {
+        console.warn(`Failed to probe playlist item: ${item.title}`, err);
+      }
+    }
+
+    setSuccessMsg(settings.language === 'en'
+      ? `Added ${playlistInfo.items.length} items to queue`
+      : `${playlistInfo.items.length} itens adicionados a fila`);
+    setTimeout(() => setActiveTab('manager'), 1200);
+  };
+
   const handleToggleFav = () => {
     if (!mediaInfo) return;
     toggleFavorite({
@@ -404,46 +448,40 @@ export const LinkAnalyzer: React.FC = () => {
     try {
       setSuccessMsg(settings.language === 'en' ? 'Downloading thumbnail...' : 'Baixando capa...');
       
-      const filename = `thumbnail_${mediaInfo.id || 'media'}.jpg`;
-      const hasElectronBridge = typeof window !== 'undefined' && !!(window as any).electron?.invoke;
-      const isCapacitor = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
-      if (hasElectronBridge) {
-        const result = await (window as any).electron.invoke('download-file', {
-          url: mediaInfo.thumbnailUrl,
-          filename,
-        });
-        if (result?.canceled) {
-          setSuccessMsg(null);
-          return;
-        }
-      } else if (isCapacitor) {
-        // Android WebView ignores the `download` attribute on cross-origin <a> links,
-        // so fetch the bytes natively (bypasses CORS) and write them to disk.
-        const { CapacitorHttp } = await import('@capacitor/core');
-        const response = await CapacitorHttp.request({
-          url: mediaInfo.thumbnailUrl,
-          method: 'GET',
-          responseType: 'blob',
-        });
-        await Filesystem.writeFile({
-          path: `Download/${filename}`,
-          data: response.data,
-          directory: Directory.ExternalStorage,
-          recursive: true,
-        });
-      } else {
-        const proxiedUrl = `/api/proxy-download?url=${encodeURIComponent(mediaInfo.thumbnailUrl)}&filename=${encodeURIComponent(filename)}`;
-        const a = document.createElement('a');
-        a.href = proxiedUrl;
-        a.target = '_blank';
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      }
-      
-      setSuccessMsg(settings.language === 'en' ? 'Thumbnail downloaded successfully!' : 'Capa baixada com sucesso!');
-      setTimeout(() => setSuccessMsg(null), 3000);
+      // Create a synthetic MediaInfo for the thumbnail so it appears in downloads
+      const thumbnailMedia: MediaInfo = {
+        id: `thumb_${mediaInfo.id || Date.now()}`,
+        title: `Thumbnail: ${mediaInfo.title}`,
+        author: mediaInfo.author,
+        channel: mediaInfo.channel,
+        duration: '00:00',
+        durationSeconds: 0,
+        sizeEst: 'N/A',
+        formats: [{
+          id: 'thumb_best',
+          ext: 'jpg',
+          quality: 'thumbnail',
+          sizeEst: 'N/A',
+          sizeBytes: 0,
+          codec: 'jpg',
+          type: 'image',
+        }],
+        codec: 'jpg',
+        type: 'image',
+        platform: mediaInfo.platform,
+        originalUrl: mediaInfo.thumbnailUrl,
+        thumbnailUrl: mediaInfo.thumbnailUrl,
+        status: 'success',
+      };
+
+      DownloadEngine.addDownload(
+        thumbnailMedia,
+        thumbnailMedia.formats[0],
+        null
+      );
+
+      setSuccessMsg(settings.language === 'en' ? 'Thumbnail added to queue!' : 'Capa adicionada a fila!');
+      setTimeout(() => setSuccessMsg(null), 2000);
     } catch (err) {
       console.warn('Error downloading thumbnail:', err);
       setSuccessMsg(settings.language === 'en' ? 'Failed to download thumbnail' : 'Falha ao baixar capa');
@@ -499,8 +537,8 @@ export const LinkAnalyzer: React.FC = () => {
                     audioQuality: '0',
                     writeSubs: false,
                     writeAutoSubs: false,
-                    subLangs: 'en',
-                    subFormat: 'srt',
+                    subLangs: '',
+                    subFormat: '',
                     embedSubs: false,
                     writeThumbnail: false,
                     embedThumbnail: false,
@@ -674,6 +712,96 @@ export const LinkAnalyzer: React.FC = () => {
         </div>
       )}
 
+      {/* PLAYLIST LOADING STATE */}
+      {playlistLoading && (
+        <div className="p-6 rounded-3xl glass-card text-center space-y-3">
+          <div className="animate-spin w-8 h-8 border-2 border-t-transparent rounded-full mx-auto" />
+          <p className="lf-text-secondary text-sm">
+            {settings.language === 'en' ? 'Loading playlist...' : 'Carregando playlist...'}
+          </p>
+        </div>
+      )}
+
+      {/* PLAYLIST PREVIEW CARD */}
+      <AnimatePresence>
+        {playlistInfo && !playlistLoading && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="p-5 rounded-3xl glass-card shadow-2xl space-y-4"
+          >
+            {/* Playlist Header */}
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-xl bg-indigo-600/20 flex items-center justify-center shrink-0">
+                <ListMusic size={24} className="text-indigo-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-display font-bold text-zinc-100 truncate">
+                  {playlistInfo.title}
+                </h3>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-xs lf-text-secondary">
+                    {playlistInfo.items.length} {settings.language === 'en' ? 'items' : 'itens'}
+                  </span>
+                  {playlistInfo.totalDuration && playlistInfo.totalDuration > 0 && (
+                    <span className="text-xs lf-text-secondary">
+                      • {Math.floor(playlistInfo.totalDuration / 60)}min total
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Preview items (first 5) */}
+            <div className="space-y-1.5">
+              {playlistInfo.items.slice(0, playlistExpanded ? playlistInfo.items.length : 5).map((item, idx) => (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors"
+                >
+                  <span className="text-[10px] lf-text-secondary w-5 text-center shrink-0">
+                    {item.index}
+                  </span>
+                  <span className="text-xs text-zinc-300 truncate flex-1">
+                    {item.title}
+                  </span>
+                  {item.duration && (
+                    <span className="text-[10px] lf-text-secondary shrink-0">
+                      {Math.floor(item.duration / 60)}:{(item.duration % 60).toString().padStart(2, '0')}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Expand/Collapse */}
+            {playlistInfo.items.length > 5 && (
+              <button
+                onClick={() => setPlaylistExpanded(!playlistExpanded)}
+                className="w-full flex items-center justify-center gap-1 py-1.5 text-xs lf-text-secondary hover:text-zinc-300 transition-colors"
+              >
+                {playlistExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                {playlistExpanded
+                  ? settings.language === 'en' ? 'Show less' : 'Mostrar menos'
+                  : settings.language === 'en' ? `Show all ${playlistInfo.items.length}` : `Ver todos (${playlistInfo.items.length})`}
+              </button>
+            )}
+
+            {/* Download All Button */}
+            <button
+              onClick={handleDownloadAllPlaylist}
+              className={`w-full py-2.5 rounded-xl font-display font-bold text-sm transition-all ${getAccentBgClass(settings.accentColor)} hover:opacity-90 text-white shadow-lg`}
+            >
+              <span className="flex items-center justify-center gap-2">
+                <Download size={14} />
+                {settings.language === 'en' ? `Download All (${playlistInfo.items.length})` : `Baixar Todos (${playlistInfo.items.length})`}
+              </span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* RICH CONTENT CARD */}
       <AnimatePresence>
         {mediaInfo && !loading && (
@@ -723,6 +851,29 @@ export const LinkAnalyzer: React.FC = () => {
                       {mediaInfo.type === 'image' && <><ImageIcon size={10} className={getAccentTextClass(settings)} /> {settings.language === 'en' ? 'Image' : 'Imagem'}</>}
                     </span>
                   </div>
+                  {/* Metadata: views, date, formats, duration */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] lf-text-faint font-medium">
+                    {mediaInfo.channel && (
+                      <span className="flex items-center gap-1">
+                        <User size={10} />
+                        {mediaInfo.channel}
+                      </span>
+                    )}
+                    {mediaInfo.views && (
+                      <span className="flex items-center gap-1">
+                        <Eye size={10} />
+                        {mediaInfo.views}
+                      </span>
+                    )}
+                    {mediaInfo.publishDate && (
+                      <span className="flex items-center gap-1">
+                        <Calendar size={10} />
+                        {mediaInfo.publishDate}
+                      </span>
+                    )}
+                    <span>{mediaInfo.formats.length} {settings.language === 'en' ? 'formats' : 'formatos'}</span>
+                    {mediaInfo.duration && <span>{mediaInfo.duration}</span>}
+                  </div>
                 </div>
 
                 {/* Actions Toolbelt */}
@@ -754,16 +905,18 @@ export const LinkAnalyzer: React.FC = () => {
                     style={isLater ? { backgroundColor: `rgba(var(--color-primary-rgb), 0.1)`, color: 'var(--color-primary)' } : {}}
                   >
                     <Clock size={14} />
-                    {isLater ? (settings.language === 'en' ? 'In Download Later' : 'Na Fila Baixar Depois') : t('laterBtn')}
+                    {t('laterBtn')}
                   </button>
 
-                  <button
-                    onClick={handleDownloadThumbnail}
-                    className="px-3.5 py-2 rounded-xl border lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850 text-xs font-semibold flex items-center gap-2 transition-all"
-                  >
-                    <ImageIcon size={14} className={getAccentTextClass(settings)} />
-                    {settings.language === 'en' ? 'Download Thumbnail' : 'Baixar Capa'}
-                  </button>
+                  {mediaInfo.type !== 'image' && (
+                    <button
+                      onClick={handleDownloadThumbnail}
+                      className="px-3.5 py-2 rounded-xl border lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850 text-xs font-semibold flex items-center gap-2 transition-all"
+                    >
+                      <ImageIcon size={14} className={getAccentTextClass(settings)} />
+                      {settings.language === 'en' ? 'Download Thumbnail' : 'Baixar Capa'}
+                    </button>
+                  )}
 
                   <a
                     href={mediaInfo.originalUrl}

@@ -108,6 +108,28 @@ export async function probeUrlWithAdapter(options: ProbeOptions): Promise<any> {
   throw new Error('No transport available');
 }
 
+export async function probePlaylistWithAdapter(options: { url: string; cookies?: string; cookiesFromBrowser?: string; proxy?: string }): Promise<any> {
+  if (isCapacitor()) {
+    return callCapacitor<any>('probe-playlist', options);
+  }
+  if (isElectron()) {
+    return callElectron<any>('yt-dlp-probe-playlist', options);
+  }
+  if (typeof window !== 'undefined' && window.fetch) {
+    const response = await fetch('/api/probe-playlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(options)
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || 'Playlist probe failed');
+    }
+    return response.json();
+  }
+  throw new Error('No transport available');
+}
+
 export async function searchVideosWithAdapter(options: SearchOptions): Promise<SearchResult[]> {
   // Capacitor (Android): go directly to native bridge
   if (isCapacitor()) {

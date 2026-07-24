@@ -1,0 +1,234 @@
+/* ==========================================================================
+   LINKFETCHER — CLEAN LIGHT THEME BUTTON SYSTEM (BACKUP)
+   ========================================================================== */
+
+/* ── Light theme container backgrounds ── */
+.light .glass-section {
+  background-color: #F0F2F5 !important;
+  border-color: rgba(190, 200, 215, 0.5) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.light .glass-card {
+  background-color: rgba(255, 255, 255, 0.65) !important;
+  border-color: rgba(190, 200, 215, 0.5) !important;
+  backdrop-filter: blur(8px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(150%) !important;
+}
+
+.light .lf-surface-40,
+.light .lf-surface-30,
+.light .lf-surface-20,
+.light .lf-surface-10,
+.light .lf-surface-raised {
+  background-color: #F0F2F5 !important;
+  border-color: rgba(190, 200, 215, 0.5) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+/* ── Header button (accordion toggle) ── */
+.light .glass-section > button:first-child {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #141821 !important;
+}
+.light .glass-section > button:first-child:hover {
+  background-color: rgba(190, 200, 215, 0.15) !important;
+}
+
+/* ── BASE INACTIVE BUTTONS: pure white, slate border, dark text ── */
+/* FormatSelector (.glass-section) */
+.light .glass-section .Btn,
+.light .glass-section button:not(:first-child) {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  color: #1E293B !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+  border-radius: var(--radius-lg) !important;
+}
+.light .glass-section .Btn:hover,
+.light .glass-section button:not(:first-child):hover {
+  background-color: #FFFFFF !important;
+  border-color: #CBD5E1 !important;
+  color: #0F172A !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06) !important;
+}
+
+/* SettingsView (.glass-card) */
+.light .glass-card button:not([class*="bg-"]) {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  color: #1E293B !important;
+}
+.light .glass-card button:not([class*="bg-"]):hover {
+  background-color: #FFFFFF !important;
+  border-color: #CBD5E1 !important;
+  color: #0F172A !important;
+}
+
+/* Override dark-mode hover:bg-zinc-800 on action buttons */
+.light .glass-section button.hover\:bg-zinc-800,
+.light .lf-surface-40 button.hover\:bg-zinc-800,
+.light .lf-surface-30 button.hover\:bg-zinc-800,
+.light .lf-surface-raised button.hover\:bg-zinc-800 {
+  background-color: #FFFFFF !important;
+}
+
+/* ── Toggle switches (WiFi, Auto-download, etc.) ── */
+.light button[role="switch"],
+.light button[class*="rounded-full"][class*="w-10"] {
+  background-color: #E2E8F0 !important;
+  border-color: #CBD5E1 !important;
+}
+.light button[role="switch"][aria-checked="true"],
+.light button[class*="rounded-full"][class*="w-10"].lf-border {
+  background-color: var(--color-primary, #ef4444) !important;
+  border-color: var(--color-primary, #ef4444) !important;
+}
+
+/* ── ACTIVE — FormatSelector (.glass-section): SOLID RED fill, white text ── */
+.light .glass-section button.border-indigo-500,
+.light .glass-section button.border-emerald-500,
+.light .glass-section button.border-amber-500,
+.light .glass-section button.border-rose-500,
+.light .glass-section button.border-violet-500,
+.light .glass-section button.border-sky-500,
+.light .glass-section button.border-teal-500,
+.light .glass-section button.border-fuchsia-500,
+.light .glass-section button.border-orange-500,
+.light .glass-section button.border-cyan-500,
+.light .glass-section button.border-lime-500,
+.light .glass-section button.border-red-500,
+.light .glass-section button.border-pink-500,
+.light .glass-section button.border-slate-400 {
+  background-color: var(--color-primary, #ef4444) !important;
+  border-color: var(--color-primary, #ef4444) !important;
+  color: #FFFFFF !important;
+  box-shadow: none !important;
+  font-weight: 600 !important;
+}
+.light .glass-section button.border-indigo-500:hover,
+.light .glass-section button.border-emerald-500:hover,
+.light .glass-section button.border-amber-500:hover,
+.light .glass-section button.border-rose-500:hover,
+.light .glass-section button.border-violet-500:hover,
+.light .glass-section button.border-sky-500:hover,
+.light .glass-section button.border-teal-500:hover,
+.light .glass-section button.border-fuchsia-500:hover,
+.light .glass-section button.border-orange-500:hover,
+.light .glass-section button.border-cyan-500:hover,
+.light .glass-section button.border-lime-500:hover,
+.light .glass-section button.border-red-500:hover,
+.light .glass-section button.border-pink-500:hover,
+.light .glass-section button.border-slate-400:hover {
+  filter: brightness(0.92) !important;
+}
+
+/* ── ACTIVE — SettingsView (.glass-card): SUBTLE 6% fill, accent border, accent text ── */
+.light .glass-card button.border-indigo-500,
+.light .glass-card button.border-emerald-500,
+.light .glass-card button.border-amber-500,
+.light .glass-card button.border-rose-500,
+.light .glass-card button.border-violet-500,
+.light .glass-card button.border-sky-500,
+.light .glass-card button.border-teal-500,
+.light .glass-card button.border-fuchsia-500,
+.light .glass-card button.border-orange-500,
+.light .glass-card button.border-cyan-500,
+.light .glass-card button.border-lime-500,
+.light .glass-card button.border-red-500,
+.light .glass-card button.border-pink-500,
+.light .glass-card button.border-slate-400,
+.light .glass-card button.lf-border {
+  background-color: rgba(var(--color-primary-rgb, 239, 68, 68), 0.06) !important;
+  border-color: var(--color-primary, #ef4444) !important;
+  color: var(--color-primary, #ef4444) !important;
+  box-shadow: none !important;
+  font-weight: 600 !important;
+}
+.light .glass-card button.border-indigo-500:hover,
+.light .glass-card button.border-emerald-500:hover,
+.light .glass-card button.border-amber-500:hover,
+.light .glass-card button.border-rose-500:hover,
+.light .glass-card button.border-violet-500:hover,
+.light .glass-card button.border-sky-500:hover,
+.light .glass-card button.border-teal-500:hover,
+.light .glass-card button.border-fuchsia-500:hover,
+.light .glass-card button.border-orange-500:hover,
+.light .glass-card button.border-cyan-500:hover,
+.light .glass-card button.border-lime-500:hover,
+.light .glass-card button.border-red-500:hover,
+.light .glass-card button.border-pink-500:hover,
+.light .glass-card button.border-slate-400:hover,
+.light .glass-card button.lf-border:hover {
+  background-color: rgba(var(--color-primary-rgb, 239, 68, 68), 0.1) !important;
+}
+
+/* ── ANALYZER TOOLBAR (Favoritar / Baixar Depois / Baixar Capa) ── */
+/* These are direct children of the analyzer toolbar, OUTSIDE .glass-section/.glass-card */
+.light .analyzer-toolbar button,
+.light .analyzer-toolbar a {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  color: #1E293B !important;
+}
+.light .analyzer-toolbar button:hover,
+.light .analyzer-toolbar a:hover {
+  background-color: #FFFFFF !important;
+  border-color: #CBD5E1 !important;
+  color: #0F172A !important;
+}
+
+/* Favoritar (active): SOLID RED */
+.light .analyzer-toolbar button.is-favorite,
+.light .analyzer-toolbar button[aria-pressed="true"].is-favorite {
+  background-color: var(--color-primary, #ef4444) !important;
+  border-color: var(--color-primary, #ef4444) !important;
+  color: #FFFFFF !important;
+}
+
+/* Baixar Depois (active): OUTLINED + slight fill (NOT solid) */
+.light .analyzer-toolbar button.is-later,
+.light .analyzer-toolbar button[aria-pressed="true"].is-later {
+  background-color: rgba(var(--color-primary-rgb, 239, 68, 68), 0.08) !important;
+  border-color: var(--color-primary, #ef4444) !important;
+  color: var(--color-primary, #ef4444) !important;
+  box-shadow: none !important;
+}
+
+/* Baixar Capa & Link Original: NEVER active, always white */
+.light .analyzer-toolbar button:not(.is-favorite):not(.is-later),
+.light .analyzer-toolbar a {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  color: #1E293B !important;
+}
+
+/* ── SmallToggle inside sections ── */
+.light .glass-section button[class*="rounded-full"][class*="w-10"],
+.light .lf-surface-40 button[class*="rounded-full"][class*="w-10"] {
+  background-color: rgba(190, 200, 215, 0.4) !important;
+  border-color: rgba(190, 200, 215, 0.6) !important;
+}
+
+/* ── Result container ── */
+.light .glass-result {
+  background-color: rgba(255, 255, 255, 0.30) !important;
+  border: 1px solid rgba(190, 200, 215, 0.60) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* ── Black overlay variants ── */
+.light .bg-black { background-color: rgba(255, 255, 255, 0.12) !important; color: #141821 !important; }
+.light .bg-black\/30, .light .bg-black\/35, .light .bg-black\/40 {
+  background-color: rgba(255, 255, 255, 0.10) !important;
+  backdrop-filter: blur(8px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(150%) !important;
+}
+.light .bg-black\/60 { background-color: rgba(255, 255, 255, 0.12) !important; backdrop-filter: blur(8px) saturate(150%) !important; }
+.light .bg-black\/80 { background-color: rgba(255, 255, 255, 0.15) !important; backdrop-filter: blur(8px) saturate(150%) !important; }

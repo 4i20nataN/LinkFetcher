@@ -1,6 +1,6 @@
-import { MediaInfo, PlatformId, MediaFormat, MediaType, SearchResult } from '../../types';
+import { MediaInfo, PlatformId, MediaFormat, MediaType, SearchResult, PlaylistInfo, PlaylistItem } from '../../types';
 import { MediaProvider } from './MediaProvider';
-import { probeUrlWithAdapter } from '../ytdlp/YtDlpAdapter';
+import { probeUrlWithAdapter, probePlaylistWithAdapter } from '../ytdlp/YtDlpAdapter';
 
 // Helper to generate a random number within a range
 const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -654,4 +654,40 @@ export function mockSearchYouTube(query: string): SearchResult[] {
       description: `${t.title} - ${t.author}`,
     };
   });
+}
+
+/**
+ * Probe a playlist URL and return structured PlaylistInfo with items.
+ * Used by LinkAnalyzer to display playlist preview before download.
+ */
+export async function probePlaylistFull(
+  url: string,
+  options?: { cookies?: string; cookiesFromBrowser?: string; proxy?: string }
+): Promise<PlaylistInfo> {
+  const result = await probePlaylistWithAdapter({ url, ...options });
+
+  // Detect platform from URL using provider registry
+  const provider = ProviderRegistry.getProviderForUrl(url);
+  const platform = (provider as any).platform as PlatformId || 'generic';
+
+  const items: PlaylistItem[] = (result.entries || []).map((entry, idx) => ({
+    id: (entry.id as string) || `pl_${idx}`,
+    title: (entry.title as string) || `Item ${idx + 1}`,
+    url: (entry.url as string) || (entry.webpage_url as string) || url,
+    thumbnailUrl: (entry.thumbnail as string) || '',
+    duration: (entry.duration as number) || undefined,
+    index: (entry.playlist_index as number) || idx + 1,
+  }));
+
+  return {
+    id: `playlist_${Date.now()}`,
+    title: result.title || 'Playlist',
+    description: undefined,
+    thumbnailUrl: items[0]?.thumbnailUrl || '',
+    itemCount: result.playlist_count || items.length,
+    totalDuration: items.reduce((sum, item) => sum + (item.duration || 0), 0) || undefined,
+    platform,
+    url,
+    items,
+  };
 }

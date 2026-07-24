@@ -207,6 +207,16 @@ ipcMain.handle('shell:openPath', async (_event, targetPath) => {
 
 ipcMain.handle('shell:openExternal', async (_event, url) => shell.openExternal(url));
 
+// ── File stat (real file size after download + merge) ────────────────────────
+ipcMain.handle('fs:stat', async (_event, filePath) => {
+  try {
+    const stat = await fs.promises.stat(filePath);
+    return { size: stat.size };
+  } catch {
+    return { size: 0 };
+  }
+});
+
 ipcMain.handle('download-file', async (_event, { url, filename }) => {
   if (!url) throw new Error('No URL provided');
   const defaultName = filename || 'thumbnail.jpg';
@@ -352,6 +362,21 @@ ipcMain.handle('yt-dlp-probe', async (_event, args) => {
   }
 });
 
+ipcMain.handle('yt-dlp-probe-playlist', async (_event, args) => {
+  const { probePlaylist } = await import('../src/core/ytdlp/YtDlpManager.ts');
+  process.env.YTDLP_PATH = resolveYtDlpPath();
+  process.env.FFMPEG_PATH = resolveFfmpegPath();
+  logDebug('[electron:probe-playlist] url', args.url);
+  try {
+    const result = await probePlaylist(args.url, args);
+    logDebug('[electron:probe-playlist] success', result.entries?.length || 0, 'items');
+    return result;
+  } catch (error) {
+    console.error('[electron:probe-playlist] failed', error);
+    throw error;
+  }
+});
+
 ipcMain.handle('yt-dlp-search', async (_event, args) => {
   const { searchVideos } = await import('../src/core/ytdlp/YtDlpManager.ts');
   process.env.YTDLP_PATH = resolveYtDlpPath();
@@ -412,6 +437,10 @@ ipcMain.handle('yt-dlp-download', async (_event, params) => {
       sponsorblockRemove: params.sponsorblockRemove,
       fpsMax: params.fpsMax,
       customFilename: params.customFilename,
+      cookiesFromBrowser: params.cookiesFromBrowser,
+      normalizeAudio: params.normalizeAudio,
+      videoSharpen: params.videoSharpen,
+      videoCodec: params.videoCodec,
       onProgress: (data) => {
         mainWindow?.webContents.send('yt-dlp-progress', { id: params.id, type: 'progress', ...data });
       },

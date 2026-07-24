@@ -88,6 +88,9 @@ export interface DownloadItem {
   videoFormat?: string;
   videoCodec?: string;
   customFormat?: string;
+  normalizeAudio?: boolean;
+  videoSharpen?: 'none' | 'light' | 'normal' | 'strong';
+  imageSource?: 'user-link' | 'thumbnail';
   sizeTotal: number;
   sizeDownloaded: number;
   progress: number;
@@ -100,6 +103,7 @@ export interface DownloadItem {
   error?: string;
   filePath?: string;
   cookiesFromBrowser?: string;
+  finalArgs?: string[];
 }
 
 export interface FavoriteItem {
@@ -145,6 +149,27 @@ export interface ProbeOptions {
   cookies?: string;
   cookiesFromBrowser?: string;
   proxy?: string;
+}
+
+export interface PlaylistItem {
+  id: string;
+  title: string;
+  url: string;
+  thumbnailUrl: string;
+  duration?: number;
+  index: number;
+}
+
+export interface PlaylistInfo {
+  id: string;
+  title: string;
+  description?: string;
+  thumbnailUrl: string;
+  itemCount: number;
+  totalDuration?: number;
+  platform: PlatformId;
+  url: string;
+  items: PlaylistItem[];
 }
 
 export interface SearchOptions {
@@ -208,4 +233,13 @@ export interface DownloadOptions {
   ffmpegLocation?: string;
   // Rate limiting
   bandLimit?: number; // KB/s, 0 = unlimited
+  // Post-processors
+  normalizeAudio?: boolean;
+  videoSharpen?: 'none' | 'light' | 'normal' | 'strong';
+  // Advanced download
+  concurrentFragments?: number;
+  retries?: number;
+  customFilename?: string;
+  videoFormat?: string;
+  videoCodec?: string;
 }

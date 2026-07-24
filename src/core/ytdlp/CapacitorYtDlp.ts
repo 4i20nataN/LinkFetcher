@@ -1,4 +1,5 @@
 import { registerPlugin, PluginListenerHandle } from '@capacitor/core';
+import { Filesystem } from '@capacitor/filesystem';
 
 export interface EnsureBinariesResult {
   ready: boolean;
@@ -65,6 +66,8 @@ export interface DownloadParams {
   videoFormat?: string;
   videoCodec?: string;
   customFormat?: string;
+  normalizeAudio?: boolean;
+  videoSharpen?: 'none' | 'light' | 'normal' | 'strong';
 }
 
 export interface DownloadResult {
@@ -111,6 +114,8 @@ export interface YtDlpPlugin {
   cancel(options: { id: string }): Promise<void>;
   openFile(options: { filePath: string }): Promise<{ success: boolean }>;
   getStatus(): Promise<{ ready: boolean; platform: string }>;
+  /** Probe a playlist with --flat-playlist to get items without downloading. */
+  probePlaylist?(options: { url: string }): Promise<{ entries: Array<Record<string, unknown>>; playlist_count?: number; title?: string }>;
   /** Auto-update: checa a última release no GitHub (mesmo repo pinado do Electron). */
   checkUpdate(): Promise<CheckUpdateResult>;
   /** Auto-update: baixa o APK da release para o cache do app e verifica SHA-256 (se checksumsUrl for fornecido). */
@@ -129,6 +134,25 @@ export interface YtDlpPlugin {
     eventName: 'update:available',
     listener: (event: { version: string; apkUrl: string; checksumsUrl: string }) => void
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
+}
+
+/**
+ * Get real file size via Capacitor Filesystem stat (post-FFmpeg merge).
+ * Works on Android/iOS without native plugin changes.
+ */
+export async function getFileInfo(filePath: string): Promise<{ size: number }> {
+  try {
+    // Extract just the filename from the full path for Filesystem API
+    const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || '';
+    const dir = filePath.includes('/') 
+      ? filePath.substring(0, filePath.lastIndexOf('/'))
+      : filePath.substring(0, filePath.lastIndexOf('\\'));
+    
+    const stat = await Filesystem.stat({ path: fileName, directory: dir as any });
+    return { size: stat.size };
+  } catch {
+    return { size: 0 };
+  }
 }
 
 const _rawPlugin = registerPlugin<YtDlpPlugin>('YtDlp');

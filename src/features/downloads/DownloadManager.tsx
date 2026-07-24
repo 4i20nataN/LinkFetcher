@@ -3,11 +3,13 @@ import { useApp } from '../../context/AppContext';
 import { DownloadItem, AppSettings } from '../../types';
 import { DownloadEngine } from '../../core/engine/DownloadEngine';
 import { CookieRetryPopup } from '../../components/CookieRetryPopup';
+import { buildArgsPreview } from '../../core/ytdlp/buildArgsPreview';
 import { 
   Play, Pause, X, Trash2, FolderOpen, Share2, RotateCcw, 
   ArrowUp, ArrowDown, ListOrdered, CheckCircle2, AlertTriangle, 
   Clock, TrendingUp, HelpCircle, ShieldCheck, ChevronRight,
-  Subtitles, Scissors, Shield, Tag
+  Subtitles, Scissors, Shield, Tag, Code, Music, Disc, Hash, Image as ImageIconLucide,
+  Youtube, Tv, Instagram, Facebook, Twitter, MessageSquare, Twitch, Video, Globe
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from '../../core/i18n';
@@ -15,6 +17,23 @@ import {
   getAccentBgClass, getAccentTextClass, getAccentBorderClass 
 } from '../../components/ThemeWrapper';
 import { ProviderRegistry } from '../../core/plugins/Providers';
+import type { PlatformId } from '../../types';
+
+const platformIconMap: Record<PlatformId, React.ComponentType<any>> = {
+  youtube: Youtube,
+  tiktok: Tv,
+  instagram: Instagram,
+  facebook: Facebook,
+  x: Twitter,
+  reddit: MessageSquare,
+  soundcloud: Music,
+  spotify: Disc,
+  twitch: Twitch,
+  pinterest: ImageIconLucide,
+  threads: Hash,
+  vimeo: Video,
+  generic: Globe,
+};
 
 // Helper to format bytes to human readable sizes
 const formatBytes = (bytes: number, decimals = 1) => {
@@ -51,9 +70,11 @@ const formatEta = (seconds: number) => {
 export const DownloadManager: React.FC = () => {
   const { settings, downloads } = useApp();
   const { t } = useTranslation(settings);
-  const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'paused' | 'failed_cancelled'>('all');
+  const [mediaFilter, setMediaFilter] = useState<'all' | 'audio' | 'video' | 'image' | 'playlist'>('all');
+  const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set());
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [cookieRetry, setCookieRetry] = useState<{ itemId: string; error: string } | null>(null);
+  const [commandPreview, setCommandPreview] = useState<DownloadItem | null>(null);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -107,9 +128,27 @@ export const DownloadManager: React.FC = () => {
     showToast(settings.language === 'en' ? 'Download queue cancelled' : 'Fila de downloads cancelada');
   };
 
-  const handleClearFinished = () => {
-    DownloadEngine.clearHistory();
-    showToast(settings.language === 'en' ? 'Finished history cleared' : 'Histórico concluído limpo');
+  const handleClearStatusFilters = () => {
+    setStatusFilters(new Set());
+  };
+
+  // Media type detection for filtering
+  const getMediaType = (item: DownloadItem): string => {
+    if (item.audioOnly) return 'audio';
+    if (item.format.type === 'audio') return 'audio';
+    if (item.format.type === 'image') return 'image';
+    if (item.url.includes('list=')) return 'playlist';
+    return 'video';
+  };
+
+  // Toggle status filter (multi-select OR)
+  const toggleStatus = (status: string) => {
+    setStatusFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(status)) next.delete(status);
+      else next.add(status);
+      return next;
+    });
   };
 
   // Reordering helpers
@@ -176,13 +215,16 @@ export const DownloadManager: React.FC = () => {
     ? Math.floor(downloadingOrQueued.reduce((sum, d) => sum + d.progress, 0) / downloadingOrQueued.length)
     : 0;
 
-  // Filter list matching active category
+  // Filter list: media type (AND) + status (OR)
   const filteredDownloads = downloads.filter(item => {
-    if (filter === 'all') return true;
-    if (filter === 'active') return ['downloading', 'queued'].includes(item.status);
-    if (filter === 'completed') return item.status === 'completed';
-    if (filter === 'paused') return item.status === 'paused';
-    if (filter === 'failed_cancelled') return ['failed', 'cancelled'].includes(item.status);
+    // Media type filter (AND)
+    if (mediaFilter !== 'all') {
+      if (getMediaType(item) !== mediaFilter) return false;
+    }
+    // Status filter (OR) — if none active, show all
+    if (statusFilters.size > 0) {
+      if (!statusFilters.has(item.status)) return false;
+    }
     return true;
   });
 
@@ -282,60 +324,92 @@ export const DownloadManager: React.FC = () => {
         </motion.div>
       )}
 
-      {/* Categories Switch Tabs */}
-      <div className="flex flex-wrap gap-1.5 p-1 rounded-xl lf-surface/60 border lf-border">
-        {[
-          { id: 'all', label: settings.language === 'en' ? 'All' : 'Todos' },
-          { id: 'active', label: settings.language === 'en' ? 'Active' : 'Em Andamento' },
-          { id: 'completed', label: settings.language === 'en' ? 'Completed' : 'Concluídos' },
-          { id: 'paused', label: settings.language === 'en' ? 'Paused' : 'Pausados' },
-          { id: 'failed_cancelled', label: settings.language === 'en' ? 'Failed / Cancelled' : 'Falhas e Cancelados' }
-        ].map((tab) => {
-          const isActive = filter === tab.id;
-          const count = tab.id === 'all' 
-            ? downloads.length 
-            : tab.id === 'active' 
-              ? downloadingOrQueued.length 
-              : tab.id === 'completed' 
-                ? downloads.filter(d => d.status === 'completed').length
-                : tab.id === 'paused'
-                  ? downloads.filter(d => d.status === 'paused').length
-                  : downloads.filter(d => ['failed', 'cancelled'].includes(d.status)).length;
+      {/* Media Type Tabs + Status Chips */}
+      <div className="space-y-2">
+        {/* Row 1: Media type tabs (underline style, full width) */}
+        <div className="flex items-center gap-1 border-b lf-border">
+          {[
+            { id: 'all', label: settings.language === 'en' ? 'All' : 'Todos', icon: null },
+            { id: 'audio', label: 'Audio', icon: '🔊' },
+            { id: 'video', label: 'Video', icon: '🎞️' },
+            { id: 'image', label: 'Imagem', icon: '🖼️' },
+            { id: 'playlist', label: 'Playlists', icon: '📋' },
+          ].map((tab) => {
+            const isActive = mediaFilter === tab.id;
+            const count = tab.id === 'all'
+              ? downloads.length
+              : downloads.filter(d => getMediaType(d) === tab.id).length;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setMediaFilter(tab.id as any)}
+                className={`
+                  flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold transition-all relative
+                  ${isActive ? getAccentTextClass(settings) : 'lf-text-muted hover:text-zinc-300'}
+                `}
+              >
+                <span>{tab.icon && `${tab.icon} `}{tab.label}</span>
+                {count > 0 && (
+                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-bold ${isActive ? 'bg-white/15' : 'bg-white/5 lf-text-muted'}`}>
+                    {count}
+                  </span>
+                )}
+                {isActive && (
+                  <motion.div
+                    layoutId="active-media-tab"
+                    className={`absolute bottom-0 left-0 right-0 h-0.5 ${getAccentBgClass(settings).split(' ')[0]}`}
+                    transition={{ duration: 0.2 }}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
 
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setFilter(tab.id as any)}
-              className={`
-                px-4 py-2 rounded-lg text-xs font-semibold transition-all relative flex items-center gap-1.5
-                ${isActive ? 'text-white' : 'lf-text-muted hover:text-zinc-300'}
-              `}
-            >
-              {isActive && (
-                <motion.div
-                  layoutId="active-manager-tab"
-                  className="absolute inset-0 lf-surface rounded-lg border lf-border"
-                  transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                />
-              )}
-              <span className="relative z-10">{tab.label}</span>
-              {count > 0 && (
-                <span className={`relative z-10 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${isActive ? 'bg-white/15 text-zinc-100' : 'bg-white/5 lf-text-muted'}`}>
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
+        {/* Row 2: Status filter chips (discrete) */}
+        <div className="flex flex-wrap items-center gap-1 px-1">
+          <span className="text-[9px] lf-text-muted font-medium mr-0.5">
+            {settings.language === 'en' ? 'Status:' : 'Filtros:'}
+          </span>
+          {[
+            { id: 'downloading', label: settings.language === 'en' ? 'Downloading' : 'Baixando', icon: <TrendingUp size={9} /> },
+            { id: 'queued', label: settings.language === 'en' ? 'Queued' : 'Fila', icon: <Clock size={9} /> },
+            { id: 'completed', label: settings.language === 'en' ? 'Done' : 'Prontos', icon: <CheckCircle2 size={9} /> },
+            { id: 'paused', label: settings.language === 'en' ? 'Paused' : 'Pausados', icon: <Pause size={9} /> },
+            { id: 'failed', label: settings.language === 'en' ? 'Failed' : 'Falhas', icon: <AlertTriangle size={9} /> },
+            { id: 'cancelled', label: settings.language === 'en' ? 'Cancelled' : 'Cancelados', icon: <X size={9} /> },
+          ].map((chip) => {
+            const isActive = statusFilters.has(chip.id);
+            const count = downloads.filter(d => d.status === chip.id).length;
+            return (
+              <button
+                key={chip.id}
+                onClick={() => toggleStatus(chip.id)}
+                className={`
+                  px-2 py-0.5 rounded text-[9px] font-medium transition-all flex items-center gap-0.5
+                  ${isActive ? 'bg-white/10 lf-text-secondary border border-white/10' : 'lf-text-muted hover:text-zinc-400 border border-transparent'}
+                `}
+              >
+                {chip.icon}
+                {chip.label}
+                {count > 0 && <span className="ml-0.5 text-[7px] opacity-50">{count}</span>}
+              </button>
+            );
+          })}
 
-        {downloads.some(d => d.status === 'completed') && filter === 'completed' && (
-          <button 
-            onClick={handleClearFinished}
-            className="ml-auto px-3 py-1 rounded-lg lf-text-muted hover:text-zinc-300 text-[10px] font-bold transition-colors"
-          >
-            {t('clearCompleted')}
-          </button>
-        )}
+          {/* Clear status filters button */}
+          {statusFilters.size > 0 && (
+            <>
+              <div className="w-px h-3 bg-white/10 mx-0.5" />
+              <button
+                onClick={handleClearStatusFilters}
+                className="px-2 py-0.5 rounded text-[9px] lf-text-muted hover:text-zinc-300 font-medium transition-colors"
+              >
+                {settings.language === 'en' ? 'Clear' : 'Limpar'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Queue items list */}
@@ -387,11 +461,6 @@ export const DownloadManager: React.FC = () => {
                       loading="lazy"
                       decoding="async"
                     />
-                    {platform && (
-                      <span className={`absolute top-1.5 left-1.5 p-1 rounded-md text-[8px] font-bold ${platform.color} shadow-lg`}>
-                        {platform.name}
-                      </span>
-                    )}
                     <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-md text-[8px] font-mono lf-text-secondary">
                       {item.format.quality}
                     </span>
@@ -403,17 +472,34 @@ export const DownloadManager: React.FC = () => {
                       <h4 className="font-semibold text-xs text-white truncate pr-4" title={item.title}>
                         {item.title}
                       </h4>
-                      <span className="text-[10px] lf-text-muted font-mono font-medium shrink-0">
-                        {item.format.ext.toUpperCase()} • {formatBytes(item.sizeTotal)}
-                      </span>
                     </div>
 
                     {/* Feature tags row */}
                     <div className="flex flex-wrap gap-1">
-                      {/* Platform badge */}
-                      {platform && (
-                        <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold ${platform.color}`}>
-                          {platform.name}
+                      {/* Platform badge with Lucide icon */}
+                      {platform && (() => {
+                        const PlatformIcon = platformIconMap[item.platform];
+                        return (
+                          <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold ${platform.color}`}>
+                            {PlatformIcon && <PlatformIcon size={8} />}
+                            {platform.name}
+                          </span>
+                        );
+                      })()}
+                      {/* Format ext chip */}
+                      {item.format.ext && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-white/10 lf-text-secondary border border-white/10">
+                          {item.format.ext.toUpperCase()}
+                        </span>
+                      )}
+                      {/* Image source badge */}
+                      {item.imageSource && (
+                        <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-semibold border ${
+                          item.imageSource === 'user-link'
+                            ? 'bg-pink-900/60 text-pink-300 border-pink-800/40'
+                            : 'bg-zinc-700/60 text-zinc-400 border-zinc-600/40'
+                        }`}>
+                          {item.imageSource === 'user-link' ? '🔗 Imagem URL' : '🖼️ Thumbnail'}
                         </span>
                       )}
                       {/* Subtitles */}
@@ -442,6 +528,9 @@ export const DownloadManager: React.FC = () => {
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-semibold bg-emerald-900/60 text-emerald-300 border border-emerald-800/40">
                           <Tag size={8} />
                           {(item.audioFormat || 'mp3').toUpperCase()}
+                          {item.audioQuality && item.audioQuality !== '0' && (
+                            <span className="opacity-70">{item.audioQuality}</span>
+                          )}
                         </span>
                       )}
                     </div>
@@ -460,7 +549,10 @@ export const DownloadManager: React.FC = () => {
                       {/* Sub progress metrics */}
                       <div className="flex justify-between items-center text-[10px] lf-text-muted font-medium font-mono">
                         <span className="lf-text-secondary">
-                          {formatBytes(item.sizeDownloaded)} / {formatBytes(item.sizeTotal)} ({item.progress}%)
+                          {item.sizeTotal > 0
+                            ? `${formatBytes(item.sizeDownloaded)} / ${formatBytes(item.sizeTotal)} (${item.progress}%)`
+                            : `${formatBytes(item.sizeDownloaded)} (${item.progress}%)`
+                          }
                         </span>
                         
                         <div className="flex gap-3">
@@ -555,6 +647,14 @@ export const DownloadManager: React.FC = () => {
                     )}
 
                     <button
+                      onClick={() => setCommandPreview(item)}
+                      className="p-2.5 rounded-lg lf-surface-raised hover:bg-zinc-800 lf-text-secondary hover:text-zinc-200 transition-colors"
+                      title={settings.language === 'en' ? 'View Command' : 'Ver Comando'}
+                    >
+                      <Code size={13} />
+                    </button>
+
+                    <button
                       onClick={() => handleShare(item)}
                       className="p-2.5 rounded-lg lf-surface-raised hover:bg-zinc-800 lf-text-secondary hover:text-zinc-200 transition-colors"
                       title={settings.language === 'en' ? 'Share Link' : 'Compartilhar Link'}
@@ -585,6 +685,91 @@ export const DownloadManager: React.FC = () => {
             onUseCookies={handleUseCookies}
             onSkip={handleSkipCookieRetry}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {commandPreview && (
+          <motion.div
+            className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setCommandPreview(null)}
+          >
+            <motion.div
+              className="w-full max-w-2xl bg-zinc-900 border border-zinc-700/50 rounded-2xl shadow-2xl overflow-hidden"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-700/50">
+                <div className="flex items-center gap-2.5">
+                  <Code size={16} className="text-zinc-400" />
+                  <h3 className="text-sm font-semibold text-zinc-100">
+                    {settings.language === 'en' ? 'Download Command' : 'Comando de Download'}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setCommandPreview(null)}
+                  className="p-1.5 rounded-lg hover:bg-zinc-700/50 text-zinc-400 hover:text-zinc-200 transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-2">
+                  {settings.language === 'en' ? 'Title' : 'Titulo'}
+                </p>
+                <p className="text-xs text-zinc-300 mb-4 truncate">{commandPreview.title}</p>
+
+                <p className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-2">
+                  yt-dlp
+                </p>
+                <pre className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 overflow-x-auto text-[12px] leading-relaxed font-mono text-emerald-400 whitespace-pre-wrap break-all">
+                  {(() => {
+                    const args = buildArgsPreview(commandPreview);
+                    const lines: string[] = ['yt-dlp \\'];
+                    for (let i = 0; i < args.length; i++) {
+                      const arg = args[i];
+                      if (i === args.length - 1) {
+                        lines.push(`  "${arg}"`);
+                      } else if (arg.startsWith('-')) {
+                        const next = args[i + 1];
+                        if (next && !next.startsWith('-')) {
+                          lines.push(`  ${arg} "${next}" \\`);
+                          i++;
+                        } else {
+                          lines.push(`  ${arg} \\`);
+                        }
+                      } else {
+                        lines.push(`  "${arg}" \\`);
+                      }
+                    }
+                    return lines.join('\n');
+                  })()}
+                </pre>
+              </div>
+
+              <div className="px-5 py-3 border-t border-zinc-700/50 flex justify-end">
+                <button
+                  onClick={() => {
+                    const args = buildArgsPreview(commandPreview);
+                    const cmd = 'yt-dlp ' + args.map(a => `"${a}"`).join(' ');
+                    navigator.clipboard.writeText(cmd).then(() => {
+                      showToast(settings.language === 'en' ? 'Command copied!' : 'Comando copiado!');
+                    });
+                  }}
+                  className="px-4 py-2 text-xs font-medium rounded-lg bg-zinc-700 hover:bg-zinc-600 text-zinc-200 transition-colors"
+                >
+                  {settings.language === 'en' ? 'Copy Command' : 'Copiar Comando'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

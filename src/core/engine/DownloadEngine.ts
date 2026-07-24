@@ -137,9 +137,10 @@ class DownloadEngineClass {
       audio: 6 * 1024 * 1024,
       image: 2 * 1024 * 1024,
     };
-    const sizeTotal = format.sizeBytes > 0
-      ? format.sizeBytes
-      : (defaultSizeByType[format.type] || 15 * 1024 * 1024);
+
+    // Use probe size if available; real file size will be updated via OS-native
+    // stat after download + FFmpeg merge completes (see complete handlers below).
+    const sizeTotal = format.sizeBytes > 0 ? format.sizeBytes : 0;
 
     const newItem: DownloadItem = {
       id: `dl_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
@@ -171,6 +172,12 @@ class DownloadEngineClass {
       fpsMax: formatOptions?.fpsMax,
       bandLimit: formatOptions?.bandLimit,
       customFilename: formatOptions?.customFilename,
+      normalizeAudio: formatOptions?.normalizeAudio,
+      videoSharpen: formatOptions?.videoSharpen,
+      cookiesFromBrowser: formatOptions?.cookiesFromBrowser,
+      imageSource: (format.type === 'image' && /\.(jpe?g|png|gif|webp|bmp|tiff?|svg|heic|avif)(\?|$)/i.test(media.originalUrl))
+        ? 'user-link'
+        : undefined,
       sizeTotal,
       sizeDownloaded: 0,
       progress: 0,
@@ -264,6 +271,10 @@ class DownloadEngineClass {
   }
 
   private notifyCookieRetry(itemId: string, error: string) {
+    // --cookies-from-browser does NOT work on Android — sandboxing prevents
+    // access to other apps' cookie stores. Skip the popup entirely there.
+    const isCapacitor = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
+    if (isCapacitor) return;
     this.cookieRetryListeners.forEach(l => l(itemId, error));
   }
 
@@ -364,14 +375,27 @@ class DownloadEngineClass {
 
         if (payload.type === 'complete') {
           target.progress = 100;
-          target.sizeDownloaded = target.sizeTotal;
           target.status = 'completed';
           target.speed = 0;
           target.eta = 0;
           target.finishedAt = new Date().toISOString();
           if (payload.filePath) {
             target.filePath = payload.filePath;
+            // Get real file size via OS-native stat (post-FFmpeg merge)
+            (window as any).electron.invoke('fs:stat', payload.filePath).then((stat: { size: number }) => {
+              if (stat && stat.size > 0) {
+                target.sizeTotal = stat.size;
+                target.sizeDownloaded = stat.size;
+                this.notify();
+              } else {
+                console.warn('[DownloadEngine] fs:stat returned size 0 for:', payload.filePath);
+              }
+            }).catch((err: any) => {
+              console.warn('[DownloadEngine] fs:stat failed for:', payload.filePath, err);
+            });
             this.openFileLocation(payload.filePath);
+          } else {
+            console.warn('[DownloadEngine] complete event missing filePath for item:', item.id);
           }
           cleanup();
           this.notifyCompletion(item);
@@ -433,6 +457,9 @@ class DownloadEngineClass {
         fpsMax: item.fpsMax,
         customFilename: item.customFilename,
         cookiesFromBrowser: item.cookiesFromBrowser,
+        normalizeAudio: item.normalizeAudio,
+        videoSharpen: item.videoSharpen,
+        videoCodec: item.videoCodec,
       }).catch((err: any) => {
         const target = this.items.find(i => i.id === item.id);
         if (target) {
@@ -471,13 +498,22 @@ class DownloadEngineClass {
 
         if (payload.type === 'complete') {
           target.progress = 100;
-          target.sizeDownloaded = target.sizeTotal;
           target.status = 'completed';
           target.speed = 0;
           target.eta = 0;
           target.finishedAt = new Date().toISOString();
           if (payload.filePath) {
             target.filePath = payload.filePath;
+            // Get real file size via Capacitor Filesystem stat (post-FFmpeg merge)
+            import('../ytdlp/CapacitorYtDlp').then(({ getFileInfo }) => {
+              return getFileInfo(payload.filePath);
+            }).then((info: { size: number }) => {
+              if (info?.size > 0) {
+                target.sizeTotal = info.size;
+                target.sizeDownloaded = info.size;
+                this.notify();
+              }
+            }).catch(() => {});
             this.openFileLocation(payload.filePath);
           }
           cleanup();
@@ -691,6 +727,7 @@ class DownloadEngineClass {
     // For direct files / images: use the proxy-download endpoint
     const cleanTitle = item.title.replace(/[<>:"/\\|?*\x00-\x1f]/g, '').substring(0, 80);
     const ext = item.format.ext;
+    const target = this.items.find(i => i.id === item.id);
 
     let sourceUrl = item.url;
 
@@ -701,6 +738,7 @@ class DownloadEngineClass {
         const blob = await response.blob();
         if (item.format.type === 'image') {
           await this.convertAndDownloadImageBlob(blob, ext, `${cleanTitle}.${ext}`);
+          // No filePath from data URI path, markCompleted will try stat if available
         } else {
           this.downloadBlob(blob, `${cleanTitle}.${ext}`);
         }
@@ -727,6 +765,7 @@ class DownloadEngineClass {
             dir: this.settings.defaultDir || undefined,
           });
           if (result?.filePath) {
+            target.filePath = result.filePath;
             this.markCompleted(item);
             return;
           }
@@ -774,7 +813,8 @@ class DownloadEngineClass {
             blob = await resp.blob();
           }
         }
-        await this.convertAndDownloadImageBlob(blob, ext, `${cleanTitle}.${ext}`);
+        const convertedPath = await this.convertAndDownloadImageBlob(blob, ext, `${cleanTitle}.${ext}`);
+        if (convertedPath && target) target.filePath = convertedPath;
         this.markCompleted(item);
       } catch (e: any) {
         this.markFailed(item, 'Falha ao baixar imagem');
@@ -792,12 +832,14 @@ class DownloadEngineClass {
         const response = await CapacitorHttp.request({ url: sourceUrl, method: 'GET', responseType: 'blob' });
         // Directory.External = app-scoped external dir, no permission needed on any API level.
         // Directory.ExternalStorage (root /sdcard) is blocked on API 29+ without legacy permission.
+        const capFilePath = `Download/${cleanTitle}.${ext}`;
         await Filesystem.writeFile({
-          path: `Download/${cleanTitle}.${ext}`,
+          path: capFilePath,
           data: response.data,
           directory: Directory.External,
           recursive: true,
         });
+        target.filePath = capFilePath;
         this.markCompleted(item);
       } catch (e: any) {
         this.markFailed(item, 'Falha ao baixar arquivo');
@@ -835,6 +877,21 @@ class DownloadEngineClass {
     target.speed = 0;
     target.eta = 0;
     target.finishedAt = new Date().toISOString();
+
+    // Stat file to get real size if filePath is available
+    if (target.filePath) {
+      const hasElectronBridge = typeof window !== 'undefined' && !!(window as any).electron?.invoke;
+      if (hasElectronBridge) {
+        (window as any).electron.invoke('fs:stat', target.filePath).then((stat: { size: number }) => {
+          if (stat && stat.size > 0) {
+            target.sizeTotal = stat.size;
+            target.sizeDownloaded = stat.size;
+            this.notify();
+          }
+        }).catch(() => {});
+      }
+    }
+
     this.notifyCompletion(item);
     this.notify();
     this.processQueue();
@@ -899,7 +956,7 @@ class DownloadEngineClass {
     if (!result?.filePath) throw new Error('Save failed');
   }
 
-  private async convertAndDownloadImageBlob(blob: Blob, targetExt: string, filename: string) {
+  private async convertAndDownloadImageBlob(blob: Blob, targetExt: string, filename: string): Promise<string | undefined> {
     try {
       const objectUrl = URL.createObjectURL(blob);
       const img = new Image();
@@ -941,7 +998,7 @@ class DownloadEngineClass {
             filename,
             dir: this.settings.defaultDir || undefined,
           });
-          if (result?.filePath) return;
+          if (result?.filePath) return result.filePath;
         } catch (err) {
           console.warn('[Engine] Electron IPC save failed, falling back to browser:', err);
         }
@@ -956,7 +1013,7 @@ class DownloadEngineClass {
             directory: Directory.External,
             recursive: true,
           });
-          return;
+          return `Download/${filename}`;
         } catch (err) {
           console.warn('[Engine] Capacitor Filesystem save failed, falling back:', err);
         }

@@ -33,6 +33,7 @@ function resolveDownloadedFilePath(candidatePath: string, outputDir: string): st
     if (!candidate) continue;
     try {
       if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+        logDebug(`[resolveFilePath] found candidate: ${candidate}`);
         return candidate;
       }
     } catch {
@@ -48,12 +49,16 @@ function resolveDownloadedFilePath(candidatePath: string, outputDir: string): st
         .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
 
       const latestMatch = files.find(filePath => /\.(mp4|webm|mkv|mp3|m4a|wav|ogg|jpg|jpeg|png|gif|webp)$/i.test(filePath));
-      if (latestMatch) return latestMatch;
+      if (latestMatch) {
+        logDebug(`[resolveFilePath] fallback to latest file: ${latestMatch}`);
+        return latestMatch;
+      }
     } catch {
       // Fall back to the original candidate if scanning fails.
     }
   }
 
+  logDebug(`[resolveFilePath] no match, returning: ${normalizedCandidates[0] || ''}`);
   return normalizedCandidates[0] || '';
 }
 
@@ -172,6 +177,11 @@ export function spawnDownload(params: {
   sponsorblockRemove?: string;
   fpsMax?: number;
   customFilename?: string;
+  cookiesFromBrowser?: string;
+  normalizeAudio?: boolean;
+  videoSharpen?: 'none' | 'light' | 'normal' | 'strong';
+  videoCodec?: string;
+  onArgs?: (args: string[]) => void;
   onProgress: (data: { percent: number; speed: string; eta: string; filename?: string }) => void;
   onComplete: (filePath: string) => void;
   onError: (err: string) => void;
@@ -184,10 +194,11 @@ export function spawnDownload(params: {
   const args = [
     '--no-playlist',
     '--no-warnings',
-    '--newline',
-    '--progress',
     '--no-mtime',
     '--windows-filenames',
+    '--progress',
+    '--newline',
+    '--progress-template', 'download:%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s',
   ];
 
   // Build final format string by applying transformations
@@ -252,6 +263,28 @@ export function spawnDownload(params: {
     args.push('--extractor-retries', String(params.retries));
   }
 
+  if (params.cookiesFromBrowser) {
+    args.push('--cookies-from-browser', params.cookiesFromBrowser);
+  }
+
+  // Video codec via --format-sort (e.g. vcodec:h264, vcodec:av1)
+  if (params.videoCodec) {
+    args.push('--format-sort', `vcodec:${params.videoCodec}`);
+  }
+
+  // FFmpeg post-processor args
+  const ffmpegPpaArgs: string[] = [];
+  if (params.normalizeAudio) {
+    ffmpegPpaArgs.push('-af', 'loudnorm=I=-16:TP=-1.5:LRA=11');
+  }
+  if (params.videoSharpen && params.videoSharpen !== 'none') {
+    const sharpMap = { light: '3:3:0.5', normal: '5:5:1.0', strong: '7:7:1.5' };
+    ffmpegPpaArgs.push('-vf', `unsharp=${sharpMap[params.videoSharpen]}`);
+  }
+  if (ffmpegPpaArgs.length > 0) {
+    args.push('--ppa', `ffmpeg:${ffmpegPpaArgs.join(' ')}`);
+  }
+
   /**
    * Sanitiza o nome de arquivo personalizado removendo caracteres proibidos
    * no Windows/Linux. Converte padrões comuns em alternativas seguras:
@@ -292,6 +325,8 @@ export function spawnDownload(params: {
 
   logDebug('[yt-dlp spawnDownload] FINAL ARGS:', JSON.stringify(args, null, 2));
 
+  if (params.onArgs) params.onArgs([...args]);
+
   let proc: ReturnType<typeof spawn> | null = null;
   let killed = false;
 
@@ -308,13 +343,17 @@ export function spawnDownload(params: {
         logDebug('[yt-dlp stdout]', raw);
         const lines = raw.split('\n');
         for (const line of lines) {
-          const progressMatch = line.match(/\[download\]\s+([\d.]+)%\s+of\s+[\d.]+\S+\s+at\s+([\d.]+\S+)\/s\s+ETA\s+(\S+)/);
-          if (progressMatch) {
-            params.onProgress({
-              percent: parseFloat(progressMatch[1]),
-              speed: progressMatch[2],
-              eta: progressMatch[3],
-            });
+          // Structured progress: "download: 42.3%| 5.20MiB/s|00:15"
+          if (line.startsWith('download:')) {
+            const payload = line.slice(9).split('|');
+            if (payload.length >= 3) {
+              params.onProgress({
+                percent: parseFloat(payload[0]) || 0,
+                speed: payload[1].trim(),
+                eta: payload[2].trim(),
+              });
+            }
+            continue;
           }
           const destMatch = line.match(/\[(?:download|Merger)\] Destination:\s*(.+)/) ||
                             line.match(/\[download\] (.+\.\S+) has already been downloaded/);
@@ -568,4 +607,60 @@ export function buildArgs(options: DownloadOptions): string[] {
   args.push(options.url);
 
   return args;
+}
+
+// Re-export from pure utility file (browser-compatible)
+export { isPlaylistUrl } from './playlistUtils';
+
+/**
+ * Probe a playlist URL using yt-dlp --flat-playlist to get metadata
+ * without downloading individual videos.
+ */
+export async function probePlaylist(
+  url: string,
+  options?: { cookies?: string; cookiesFromBrowser?: string; proxy?: string }
+): Promise<{ entries: Array<Record<string, unknown>>; playlist_count?: number; title?: string }> {
+  const args = [
+    '--flat-playlist',
+    '--dump-json',
+    '--no-download',
+    '--ignore-errors',
+  ];
+
+  if (options?.cookies) args.push('--cookies', options.cookies);
+  if (options?.cookiesFromBrowser) args.push('--cookies-from-browser', options.cookiesFromBrowser);
+  if (options?.proxy) args.push('--proxy', options.proxy);
+
+  args.push(url);
+
+  const result = await executeYtDlp(args);
+
+  if (result.exitCode !== 0) {
+    throw new Error(`Playlist probe failed: ${result.stderr}`);
+  }
+
+  // --flat-playlist --dump-json returns one JSON per line (NDJSON)
+  const lines = result.stdout.trim().split('\n').filter(l => l.trim());
+  const entries: Array<Record<string, unknown>> = [];
+  let playlistMeta: Record<string, unknown> = {};
+
+  for (const line of lines) {
+    try {
+      const obj = JSON.parse(line);
+      // First line often has playlist-level metadata
+      if (obj._type === 'playlist' || obj.playlist_count) {
+        playlistMeta = obj;
+      } else {
+        entries.push(obj);
+      }
+    } catch {
+      // skip unparseable lines
+    }
+  }
+
+  return {
+    entries,
+    playlist_count: (playlistMeta.playlist_count as number) || entries.length || undefined,
+    title: (playlistMeta.title as string) || (entries[0] as any)?.playlist || undefined,
+  };
 }

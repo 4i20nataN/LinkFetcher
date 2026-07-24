@@ -5,7 +5,7 @@ import { getAccentBgClass, getAccentTextClass, getAccentBorderClass, getAccentTe
 import { Toggle } from '../../components/Toggle';
 import { BlockIcon, BlockTitle, BlockId } from '../../components/BlockIcon';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronDown, ChevronUp, Info, User, Eye, Calendar, ArrowDownToLine, AlertTriangle, FileText, Download } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info, ArrowDownToLine, AlertTriangle, FileText, Download } from 'lucide-react';
 import { AUDIO_QUALITY_PRESETS } from './constants';
 
 interface FormatSelectorProps {
@@ -42,6 +42,9 @@ export interface FormatOptions {
   videoFormat?: string; // 'mp4', 'mkv', 'webm', 'avi', 'flv', 'mov', 'ts'
   customFilename?: string;
   descFormat?: 'txt' | 'md' | 'none';
+  normalizeAudio?: boolean;
+  videoSharpen?: 'none' | 'light' | 'normal' | 'strong';
+  cookiesFromBrowser?: string;
 }
 
 const VIDEO_PRESETS = [
@@ -378,14 +381,14 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
     audioQuality: '0',
     writeSubs: false,
     writeAutoSubs: false,
-    subLangs: 'en',
-    subFormat: 'srt',
+    subLangs: '',
+    subFormat: '',
     embedSubs: false,
     writeThumbnail: false,
     embedThumbnail: false,
     embedMetadata: false,
-    concurrentFragments: 1,
-    retries: 3,
+    concurrentFragments: 0,
+    retries: 0,
     restrictFilenames: false,
     noOverwrites: false,
     keepVideo: false,
@@ -643,100 +646,9 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
         </div>
       </div>
 
-      <div className="flex items-start gap-3 p-3 rounded-xl lf-surface-40 lf-border">
-        <div className="w-16 h-16 rounded-lg overflow-hidden lf-border lf-surface shrink-0">
-          <img src={mediaInfo.thumbnailUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
-        </div>
-        <div className="min-w-0 flex-1 space-y-1">
-          <p className="fs-sm font-semibold text-white truncate">{mediaInfo.title}</p>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 fs-sm lf-text-muted">
-            {mediaInfo.channel && (
-              <span className="flex items-center gap-1">
-                <User size={10} />
-                {mediaInfo.channel}
-              </span>
-            )}
-            {mediaInfo.views && (
-              <span className="flex items-center gap-1">
-                <Eye size={10} />
-                {mediaInfo.views}
-              </span>
-            )}
-            {mediaInfo.publishDate && (
-              <span className="flex items-center gap-1">
-                <Calendar size={10} />
-                {fmtDate(mediaInfo.publishDate)}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-3 fs-sm lf-text-muted font-mono">
-            <span>{mediaInfo.formats.length} formatos</span>
-            {mediaInfo.duration && <span>{mediaInfo.duration}</span>}
-          </div>
-        </div>
-      </div>
-
       <AnimatePresence mode="wait">
         {activeTab === 'media' && (
           <motion.div key="media" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ type: 'spring', stiffness: 400, damping: 28 }} className="space-y-4">
-
-            {/* ── Nome do Arquivo + Nome Limpo ── */}
-            <div className="p-3 rounded-xl lf-surface-40 lf-border space-y-2">
-              <div className="flex items-center gap-2">
-                <BlockIcon blockId="behavior" />
-                <BlockTitle>Nome do Arquivo</BlockTitle>
-              </div>
-              <input
-                type="text"
-                value={options.customFilename || ''}
-                onChange={e => {
-                  let val = e.target.value;
-                  if (useUnderscore) val = val.replace(/ /g, '_');
-                  update({ customFilename: val });
-                }}
-                placeholder="Se vazio, usa o titulo original do video"
-                className="w-full px-3 py-2 rounded-lg lf-surface-raised lf-border fs-lg text-white placeholder-zinc-500 focus:outline-none focus:border-white/15 transition-colors font-mono"
-              />
-              <div className="flex flex-wrap items-center gap-2.5">
-                {[
-                  { resolved: mediaInfo.title || 'video', label: 'Titulo' },
-                  { resolved: mediaInfo.channel || 'canal', label: 'Canal' },
-                  { resolved: fmtDate(mediaInfo.publishDate || '', true), label: 'Data' },
-                  { resolved: fmtDuration(mediaInfo.duration || ''), label: 'Duracao' },
-                ].filter(t => t.resolved).map(t => (
-                  <button
-                    key={t.label}
-                    onClick={() => {
-                      const cur = options.customFilename || '';
-                      const val = useUnderscore ? t.resolved.replace(/ /g, '_') : t.resolved;
-                      const sep = useUnderscore ? '_' : ' ';
-                      update({ customFilename: cur ? `${cur}${sep}${val}` : val });
-                    }}
-                    className="px-2 py-1 rounded-md lf-surface-raised lf-border fs-sm lf-text-secondary transition-all duration-200"
-                  >
-                    {t.label}
-                  </button>
-                ))}
-                <div className="flex items-center gap-1 ml-1 pl-2 border-l lf-border">
-                  <Toggle
-                    value={useUnderscore}
-                    onChange={() => {
-                      const next = !useUnderscore;
-                      setUseUnderscore(next);
-                      if (next && options.customFilename) {
-                        update({ customFilename: options.customFilename.replace(/ /g, '_') });
-                      }
-                    }}
-                    settings={settings}
-                  />
-                  <span className="fs-sm lf-text-faint">Sem Espaco</span>
-                </div>
-                <div className="flex items-center gap-1 ml-1 pl-2 border-l lf-border">
-                  <label className="fs-sm lf-text-secondary">Nome limpo (sem caracteres especiais)</label>
-                  <Toggle value={!!options.restrictFilenames} onChange={() => update({ restrictFilenames: !options.restrictFilenames })} settings={settings} />
-                </div>
-              </div>
-            </div>
 
             {/* ── Resolução ── */}
             <AccordionSection id="resolution" title="Resolução" blockId="resolution" isOpen={openSections.has('resolution')} onToggle={() => toggleSection('resolution')} accentBg={accentBg}>
@@ -825,36 +737,6 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
               </div>
             </AccordionSection>
 
-            {/* ── Descrição ── */}
-            {mediaInfo.description && (
-              <AccordionSection id="description" title="Descrição" blockId="metadata" isOpen={openSections.has('description')} onToggle={() => toggleSection('description')} accentBg={accentBg}>
-                <div className="px-3 pb-3 pt-2 space-y-2">
-                  <div className={`relative fs-sm lf-text-secondary leading-relaxed whitespace-pre-line ${descExpanded ? '' : 'line-clamp-5'}`}>
-                    {mediaInfo.description}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setDescExpanded(!descExpanded)}
-                      className="fs-xs lf-text-muted hover:text-zinc-300 transition-colors flex items-center gap-1"
-                    >
-                      {descExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                      {descExpanded ? 'Recolher' : 'Ver completa'}
-                    </button>
-                    <div className="flex items-center gap-1.5 ml-auto">
-                      <Btn active={options.descFormat === 'none'} onClick={() => update({ descFormat: 'none' })} className="py-1 px-2 text-[10px]">
-                        Nao incluir
-                      </Btn>
-                      <Btn active={options.descFormat === 'txt'} onClick={() => update({ descFormat: 'txt' })} className="py-1 px-2 text-[10px]">
-                        <FileText size={10} className="inline mr-1" />.txt
-                      </Btn>
-                      <Btn active={options.descFormat === 'md'} onClick={() => update({ descFormat: 'md' })} className="py-1 px-2 text-[10px]">
-                        <Download size={10} className="inline mr-1" />.md
-                      </Btn>
-                    </div>
-                  </div>
-                </div>
-              </AccordionSection>
-            )}
 
             {/* ── Áudio ── */}
             <AccordionSection id="audio" title="Áudio" blockId="audio-format" isOpen={openSections.has('audio')} onToggle={() => toggleSection('audio')} accentBg={accentBg}>
@@ -908,6 +790,37 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
               </div>
             </AccordionSection>
 
+            {/* ── Descrição ── */}
+            {mediaInfo.description && (
+              <AccordionSection id="description" title="Descrição" blockId="metadata" isOpen={openSections.has('description')} onToggle={() => toggleSection('description')} accentBg={accentBg}>
+                <div className="px-3 pb-3 pt-2 space-y-2">
+                  <div className={`relative fs-sm lf-text-secondary leading-relaxed whitespace-pre-line ${descExpanded ? '' : 'line-clamp-5'}`}>
+                    {mediaInfo.description}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setDescExpanded(!descExpanded)}
+                      className="fs-xs lf-text-muted hover:text-zinc-300 transition-colors flex items-center gap-1"
+                    >
+                      {descExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      {descExpanded ? 'Recolher' : 'Ver completa'}
+                    </button>
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      <Btn active={options.descFormat === 'none'} onClick={() => update({ descFormat: 'none' })} className="py-1 px-2 text-[10px]">
+                        Nao incluir
+                      </Btn>
+                      <Btn active={options.descFormat === 'txt'} onClick={() => update({ descFormat: 'txt' })} className="py-1 px-2 text-[10px]">
+                        <FileText size={10} className="inline mr-1" />.txt
+                      </Btn>
+                      <Btn active={options.descFormat === 'md'} onClick={() => update({ descFormat: 'md' })} className="py-1 px-2 text-[10px]">
+                        <Download size={10} className="inline mr-1" />.md
+                      </Btn>
+                    </div>
+                  </div>
+                </div>
+              </AccordionSection>
+            )}
+
             {/* ── Legendas ── */}
             <AccordionSection id="subtitles" title="Legendas" blockId="subtitles" isOpen={openSections.has('subtitles')} onToggle={() => toggleSection('subtitles')} accentBg={accentBg}>
               <div className="px-3 pb-3 pt-2 space-y-3">
@@ -950,6 +863,64 @@ export function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, form
                 )}
               </div>
             </AccordionSection>
+
+            {/* ── Nome do Arquivo + Nome Limpo ── */}
+            <div className="p-3 rounded-xl lf-surface-40 lf-border space-y-2">
+              <div className="flex items-center gap-2">
+                <BlockIcon blockId="behavior" />
+                <BlockTitle>Nome do Arquivo</BlockTitle>
+              </div>
+              <input
+                type="text"
+                value={options.customFilename || ''}
+                onChange={e => {
+                  let val = e.target.value;
+                  if (useUnderscore) val = val.replace(/ /g, '_');
+                  update({ customFilename: val });
+                }}
+                placeholder="Se vazio, usa o titulo original do video"
+                className="w-full px-3 py-2 rounded-lg lf-surface-raised lf-border fs-lg text-white placeholder-zinc-500 focus:outline-none focus:border-white/15 transition-colors font-mono"
+              />
+              <div className="flex flex-wrap items-center gap-2.5">
+                {[
+                  { resolved: mediaInfo.title || 'video', label: 'Titulo' },
+                  { resolved: mediaInfo.channel || 'canal', label: 'Canal' },
+                  { resolved: fmtDate(mediaInfo.publishDate || '', true), label: 'Data' },
+                  { resolved: fmtDuration(mediaInfo.duration || ''), label: 'Duracao' },
+                ].filter(t => t.resolved).map(t => (
+                  <button
+                    key={t.label}
+                    onClick={() => {
+                      const cur = options.customFilename || '';
+                      const val = useUnderscore ? t.resolved.replace(/ /g, '_') : t.resolved;
+                      const sep = useUnderscore ? '_' : ' ';
+                      update({ customFilename: cur ? `${cur}${sep}${val}` : val });
+                    }}
+                    className="px-2 py-1 rounded-md lf-surface-raised lf-border fs-sm lf-text-secondary transition-all duration-200"
+                  >
+                    {t.label}
+                  </button>
+                ))}
+                <div className="flex items-center gap-1 ml-1 pl-2 border-l lf-border">
+                  <Toggle
+                    value={useUnderscore}
+                    onChange={() => {
+                      const next = !useUnderscore;
+                      setUseUnderscore(next);
+                      if (next && options.customFilename) {
+                        update({ customFilename: options.customFilename.replace(/ /g, '_') });
+                      }
+                    }}
+                    settings={settings}
+                  />
+                  <span className="fs-sm lf-text-faint">Sem Espaco</span>
+                </div>
+                <div className="flex items-center gap-1 ml-1 pl-2 border-l lf-border">
+                  <label className="fs-sm lf-text-secondary">Nome limpo (sem caracteres especiais)</label>
+                  <Toggle value={!!options.restrictFilenames} onChange={() => update({ restrictFilenames: !options.restrictFilenames })} settings={settings} />
+                </div>
+              </div>
+            </div>
           </motion.div>
         )}
 
