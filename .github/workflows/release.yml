@@ -103,6 +103,9 @@ jobs:
       - name: Instalar Dependências do Frontend
         run: npm ci
 
+      - name: Sincronizar plugin Android (canônico → gen)
+        run: npm run android:sync
+
       - name: Restaurar keystore de release
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}

@@ -14,6 +14,7 @@
     "build:frontend": "vite build",
     "test": "vitest run",
     "bump": "node scripts/bump-version.mjs",
+    "android:sync": "node scripts/sync-android-plugin.mjs",
     "tauri": "tauri",
     "lint": "tsc --noEmit"
   },
