@@ -1,5 +1,13 @@
 import { DownloadItem, MediaInfo, MediaFormat, AppSettings, PlatformId } from '../../types';
 import type { FormatOptions } from '../../features/downloads/FormatOptions';
+import {
+  formatActivityMessage,
+  parseIpcNumber,
+  progressEventSignature,
+  shouldNotifyProgress,
+  smoothSpeed,
+  withRateLimitHint,
+} from './progress';
 
 type EngineListener = (items: DownloadItem[]) => void;
 
@@ -12,30 +20,6 @@ function extractQualityHeight(qualityLabel: string): string {  if (qualityLabel.
   if (qualityLabel.includes('360')) return '360';
   if (qualityLabel.includes('240')) return '240';
   return '1080'; // safe default
-}
-
-// 429 = YouTube limitou o ritmo do IP (transitório): orienta espera em vez
-// de retry imediato em loop. Puro UI, sem tocar no argv canônico.
-function withRateLimitHint(msg: string, lang: string): string {
-  if (/429|too many requests/i.test(msg) && !/429.*aguarde|wait.*429/i.test(msg)) {
-    return lang === 'en'
-      ? `${msg} · YouTube rate-limited this IP (429): wait a few minutes and retry`
-      : `${msg} · YouTube limitou o ritmo (429): aguarde alguns minutos e tente de novo`;
-  }
-  return msg;
-}
-
-// Texto da atividade sem % (fragmento/retry/aviso do extrator): prova de
-// vida enquanto o yt-dlp não imprime progresso — sem isso a UI congela em
-// 0% e parece bugada num stall real. Limpa no próximo progresso.
-function formatActivityMessage(data: any, lang: string): string {
-  const en = lang === 'en';
-  if (data.kind === 'fragment' && typeof data.current === 'number' && typeof data.total === 'number') {
-    return en ? `Fragment ${data.current}/${data.total}` : `Fragmento ${data.current}/${data.total}`;
-  }
-  if (data.kind === 'retry') return en ? 'Retrying…' : 'Tentando de novo…';
-  if (typeof data.text === 'string' && data.text) return data.text;
-  return en ? 'Working…' : 'Trabalhando…';
 }
 
 // Platforms that support real yt-dlp extraction
@@ -515,11 +499,7 @@ class DownloadEngineClass {
       // Handler de progresso unificado (suporta listen do Tauri desktop e CustomEvent no Android)
       const handleProgressData = (data: any) => {
         if (!data || data.id !== item.id) return;
-        const sig = [
-          data.type, data.percent, data.downloaded, data.total,
-          data.speed, data.eta, data.filePath, data.message, data.kind,
-          data.current, data.text,
-        ].join('|');
+        const sig = progressEventSignature(data);
         if (this.lastEventSig.get(item.id) === sig) return;
         this.lastEventSig.set(item.id, sig);
         this.lastEventAt.set(item.id, Date.now());
@@ -729,9 +709,8 @@ class DownloadEngineClass {
     const item = this.items.find(i => i.id === id);
     if (!item || item.status !== 'downloading') return;
     item.progress = typeof data.percent === 'number' ? data.percent : (parseFloat(data.percent) || 0);
-    const rawSpeed = parseFloat(data.speed) || 0;
-    item.speed = rawSpeed <= 0 || item.speed <= 0 ? rawSpeed : item.speed + 0.4 * (rawSpeed - item.speed);
-    item.eta = parseFloat(data.eta) || 0;
+    item.speed = smoothSpeed(item.speed, parseIpcNumber(data.speed));
+    item.eta = parseIpcNumber(data.eta);
     item.activity = undefined;
     if (data.downloaded && data.downloaded > 0) {
       item.sizeDownloaded = data.downloaded;
@@ -740,11 +719,8 @@ class DownloadEngineClass {
       item.sizeTotal = data.total;
     }
     const now = Date.now();
-    // No Android a lista re-renderiza cards animados (motion) a cada
-    // notify: 500ms é indistinguível no olho e corta os renders pela
-    // metade; desktop mantém 250ms.
-    const throttleMs = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent) ? 500 : 250;
-    if (now - (this.lastProgressNotify.get(item.id) ?? 0) >= throttleMs) {
+    const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
+    if (shouldNotifyProgress(now, this.lastProgressNotify.get(item.id) ?? 0, isAndroid)) {
       this.lastProgressNotify.set(item.id, now);
       this.touch(item.id);
       this.notify(false);

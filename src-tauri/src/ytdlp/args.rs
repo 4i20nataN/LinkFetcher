@@ -317,10 +317,7 @@ pub fn sanitize_filename(name: &str, strict: bool) -> String {
 fn video_only_format(format: &str) -> String {
     let mut f = format.to_owned();
     // `\+ba\[ext=\w+\]` → ''
-    loop {
-        let Some(start) = f.find("+ba[ext=") else {
-            break;
-        };
+    while let Some(start) = f.find("+ba[ext=") {
         let rest = &f[start + "+ba[ext=".len()..];
         let word_len = rest
             .chars()

@@ -26,6 +26,12 @@ import { isPlaylistUrl } from '../../core/ytdlp/playlistUtils';
 import { adapterErrorMessage } from '../../core/ytdlp/YtDlpAdapter';
 import { PlatformBadge } from '../../components/PlatformBadge';
 
+// yt-dlp entrega `upload_date` como `YYYYMMDD` (ex. `20090923`):
+// exibe como `DD/MM/YYYY`. Qualquer outro formato passa intacto.
+function formatUploadDate(d: string): string {
+  return /^\d{8}$/.test(d) ? `${d.slice(6, 8)}/${d.slice(4, 6)}/${d.slice(0, 4)}` : d;
+}
+
 const PLATFORM_ICONS: Record<string, LucideIcon> = {
   youtube: Play,
   tiktok: Music,
@@ -388,7 +394,7 @@ export const LinkAnalyzer: React.FC = () => {
       const safeTitle = title.replace(/[<>:"/\\|?*]/g, '_').substring(0, 80);
       let content = '';
       let filename = '';
-      const fmtDate = (d: string) => /^\d{8}$/.test(d) ? `${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}` : d;
+      const fmtDate = formatUploadDate;
       if (fmt === 'md') {
         content = `# ${title}\n\n`;
         if (mediaInfo.channel) content += `**Canal:** ${mediaInfo.channel}\n`;
@@ -1018,7 +1024,7 @@ export const LinkAnalyzer: React.FC = () => {
                     {mediaInfo.publishDate && (
                       <span className="flex items-center gap-1 px-2">
                         {settings.iconStyle === 'emoji' ? <span>📅</span> : <Calendar size={10} className="text-amber-400" />}
-                        <span className="lf-text-secondary">{mediaInfo.publishDate}</span>
+                        <span className="lf-text-secondary">{formatUploadDate(mediaInfo.publishDate)}</span>
                       </span>
                     )}
                     <span className="text-zinc-700">|</span>

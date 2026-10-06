@@ -1,0 +1,47 @@
+name: 'PR Check (lint + testes + build)'
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  frontend:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run lint
+
+      - name: Testes unitários
+        run: npm test
+
+      - name: Build frontend
+        run: npm run build:frontend
+
+  rust:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Instalar Rust + clippy
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Clippy (desktop)
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings

@@ -162,7 +162,7 @@ export default function UpdateBanner() {
         {/* State: Checking (apenas visível se triggered) */}
         {stage === 'checking' && (
           <div className="flex items-center gap-3 px-4 py-3 rounded-xl lf-surface border lf-border backdrop-blur-md">
-            <Loader2 size={16} className="animate-spin text-indigo-400" />
+            <Loader2 size={16} className="animate-spin text-emerald-400" />
             <span className="text-sm lf-text-secondary">{t('updChecking')}</span>
           </div>
         )}
@@ -172,24 +172,24 @@ export default function UpdateBanner() {
           <AnimatedCard
             animateKey="update-available-modal"
             variant={scaleIn}
-            className="relative overflow-hidden rounded-2xl border border-indigo-500/30 bg-gradient-to-b from-indigo-500/10 via-indigo-950/20 to-transparent backdrop-blur-xl shadow-2xl shadow-indigo-500/10 p-5"
+            className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-b from-emerald-500/10 via-emerald-950/20 to-transparent backdrop-blur-xl shadow-2xl shadow-emerald-500/10 p-5"
           >
             {/* Linha de brilho superior */}
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-400 to-transparent" />
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent" />
 
             <div className="flex flex-col gap-4">
               {/* Header do popup */}
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0 shadow-inner">
-                    <Sparkles size={20} className="text-indigo-400 animate-pulse" />
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0 shadow-inner">
+                    <Sparkles size={20} className="text-emerald-400 animate-pulse" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2.5 flex-wrap">
                       <h3 className="text-base font-bold text-white tracking-tight">
                         {t('updAvailable')}
                       </h3>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-indigo-500/25 text-indigo-300 border border-indigo-500/30">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-emerald-500/25 text-emerald-300 border border-emerald-500/30">
                         v{updateInfo.version}
                       </span>
                     </div>
@@ -220,7 +220,7 @@ export default function UpdateBanner() {
                 <div className="rounded-xl bg-black/40 border border-white/5 p-3.5 text-xs text-zinc-200">
                   <div
                     onClick={() => setShowNotes(!showNotes)}
-                    className="flex items-center justify-between cursor-pointer select-none font-semibold text-indigo-300 mb-1.5"
+                    className="flex items-center justify-between cursor-pointer select-none font-semibold text-emerald-300 mb-1.5"
                   >
                     <span className="flex items-center gap-1.5">
                       <FileText size={14} />
@@ -251,7 +251,7 @@ export default function UpdateBanner() {
 
                 <AnimatedButton
                   onClick={handleUpdateAndRestart}
-                  className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-600 hover:brightness-110 shadow-lg shadow-indigo-500/25 transition-all cursor-pointer"
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 hover:brightness-110 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
                 >
                   <Download size={14} />
                   {t('updInstall')}
@@ -263,10 +263,10 @@ export default function UpdateBanner() {
 
         {/* State: Downloading com barra de progresso elegante */}
         {stage === 'downloading' && (
-          <div className="relative overflow-hidden rounded-2xl border border-indigo-500/30 bg-gradient-to-b from-indigo-950/40 to-black/60 backdrop-blur-xl p-5 shadow-2xl">
+          <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-b from-emerald-950/40 to-black/60 backdrop-blur-xl p-5 shadow-2xl">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
-                <Loader2 size={18} className="animate-spin text-indigo-400" />
+                <Loader2 size={18} className="animate-spin text-emerald-400" />
                 <div>
                   <h4 className="text-sm font-semibold text-white">
                     {t('updDownloading')}
@@ -277,7 +277,7 @@ export default function UpdateBanner() {
                 </div>
               </div>
               <div className="text-right">
-                <span className="text-sm font-mono font-bold text-indigo-400">{progress}%</span>
+                <span className="text-sm font-mono font-bold text-emerald-400">{progress}%</span>
                 {totalBytes > 0 && (
                   <p className="text-[11px] font-mono text-zinc-400">
                     {formatBytes(receivedBytes)} / {formatBytes(totalBytes)}
@@ -289,7 +289,7 @@ export default function UpdateBanner() {
             {/* Barra de progresso */}
             <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden relative">
               <div
-                className="bg-gradient-to-r from-indigo-500 to-emerald-400 h-full transition-all duration-300 rounded-full"
+                className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-full transition-all duration-300 rounded-full"
                 style={{ width: `${progress}%` }}
               />
             </div>

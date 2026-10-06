@@ -344,32 +344,27 @@ async fn download_streamed(
     let mut received: u64 = received_start;
     let mut last_percent: u8 = u8::MAX;
     emit_progress(app, "progress", file, received, total, None, None);
-    loop {
-        match resp.chunk().await.map_err(|e| format!("download {file}: {e}"))? {
-            Some(bytes) => {
-                received += bytes.len() as u64;
-                if received > MAX_BYTES {
-                    drop(out);
-                    let _ = std::fs::remove_file(part);
-                    return Err(format!("download {file}: acima do limite"));
-                }
-                if let Some(h) = hasher.as_deref_mut() {
-                    h.update(&bytes);
-                }
-                out.write_all(&bytes)
-                    .await
-                    .map_err(|e| e.to_string())?;
-                let percent = if total > 0 {
-                    (received as u128 * 100 / total as u128).min(100) as u8
-                } else {
-                    0
-                };
-                if percent != last_percent {
-                    last_percent = percent;
-                    emit_progress(app, "progress", file, received, total, None, None);
-                }
-            }
-            None => break,
+    while let Some(bytes) = resp.chunk().await.map_err(|e| format!("download {file}: {e}"))? {
+        received += bytes.len() as u64;
+        if received > MAX_BYTES {
+            drop(out);
+            let _ = std::fs::remove_file(part);
+            return Err(format!("download {file}: acima do limite"));
+        }
+        if let Some(h) = hasher.as_deref_mut() {
+            h.update(&bytes);
+        }
+        out.write_all(&bytes)
+            .await
+            .map_err(|e| e.to_string())?;
+        let percent = if total > 0 {
+            (received as u128 * 100 / total as u128).min(100) as u8
+        } else {
+            0
+        };
+        if percent != last_percent {
+            last_percent = percent;
+            emit_progress(app, "progress", file, received, total, None, None);
         }
     }
     out.flush().await.map_err(|e| e.to_string())?;
@@ -715,15 +710,13 @@ async fn ensure_ffmpeg(client: &reqwest::Client, app: &AppHandle) -> Result<Path
     make_executable(&tmp)?;
     make_executable(&probe_tmp)?;
     emit_progress(app, "progress", "ffmpeg", received, received, Some("Testando ffmpeg…"), None);
-    smoke(&tmp, "ffmpeg").await.map_err(|e| {
+    smoke(&tmp, "ffmpeg").await.inspect_err(|_e| {
         let _ = std::fs::remove_file(&tmp);
         let _ = std::fs::remove_file(&probe_tmp);
-        e
     })?;
-    smoke(&probe_tmp, "ffprobe").await.map_err(|e| {
+    smoke(&probe_tmp, "ffprobe").await.inspect_err(|_e| {
         let _ = std::fs::remove_file(&tmp);
         let _ = std::fs::remove_file(&probe_tmp);
-        e
     })?;
     std::fs::rename(&tmp, &dest).map_err(|e| e.to_string())?;
     std::fs::rename(&probe_tmp, &probe_dest).map_err(|e| e.to_string())?;

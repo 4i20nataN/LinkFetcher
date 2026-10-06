@@ -126,7 +126,7 @@ pub async fn fs_open_path(_app: AppHandle, target_path: String) -> Result<(), St
             #[cfg(target_os = "linux")]
             {
                 use std::process::Command;
-                Command::new("xdg-open").arg(&normalized).spawn().map_err(|e| e.to_string())?;
+                Command::new("xdg-open").arg(normalized).spawn().map_err(|e| e.to_string())?;
             }
             #[cfg(target_os = "windows")]
             {
@@ -226,7 +226,7 @@ pub async fn fs_save_description(
     content: String,
 ) -> Result<serde_json::Value, String> {
     let downloads = app.path().download_dir().map_err(|e| format!("{:?}", e))?;
-    Ok(write_description_file(&downloads, &filename, &content)?)
+    write_description_file(&downloads, &filename, &content)
 }
 
 /// No Android: mesma lógica, na pasta do app (Kotlin).
@@ -248,7 +248,7 @@ fn write_description_file(
     content: &str,
 ) -> Result<serde_json::Value, String> {
     let safe = filename.trim().trim_matches(|c| c == '\'' || c == '"');
-    let safe = safe.replace(|c: char| matches!(c, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*'), "_");
+    let safe = safe.replace(['<', '>', ':', '"', '/', '\\', '|', '?', '*'], "_");
     let mut file_path = downloads.join(&safe);
     if file_path.exists() {
         let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("").to_string();
@@ -406,7 +406,7 @@ fn clean_error_message(stderr_output: &str) -> String {
     }
 
     let kept: Vec<&str> = stderr_output
-        .split(|c| c == '\n' || c == '\r')
+        .split(['\n', '\r'])
         .map(str::trim)
         .filter(|l| !is_progress_noise(l))
         .collect();
@@ -424,10 +424,8 @@ fn clean_error_message(stderr_output: &str) -> String {
         // Tudo era ruído (ex. ffmpeg morto no meio do corte): mostra o último
         // segmento significativo em vez da mega-linha de progresso crua.
         msg = stderr_output
-            .split(|c| c == '\n' || c == '\r')
-            .map(str::trim)
-            .filter(|l| !l.is_empty())
-            .last()
+            .split(['\n', '\r'])
+            .map(str::trim).rfind(|l| !l.is_empty())
             .unwrap_or("erro desconhecido")
             .to_owned();
     }
@@ -1595,7 +1593,7 @@ pub fn parse_merge(line: &str) -> Option<String> {
 /// ignorando artefatos temporários (`.part`, `.ytdl`, `.cuttmp.*`, `-Frag*`).
 pub fn latest_downloaded_file(output_dir: &Path) -> Option<String> {
     let entries = match std::fs::read_dir(output_dir) {
-        Ok(r) => r.flatten().filter_map(|e| Some(e.path())).collect::<Vec<PathBuf>>(),
+        Ok(r) => r.flatten().map(|e| e.path()).collect::<Vec<PathBuf>>(),
         Err(_) => return None,
     };
     let mut latest: Option<(SystemTime, PathBuf)> = None;
@@ -1606,8 +1604,8 @@ pub fn latest_downloaded_file(output_dir: &Path) -> Option<String> {
             }
         }
         let m = match e.metadata() { Ok(m)=>m, Err(_)=>continue };
-        if let Some(t) = m.modified().ok() {
-            if latest.as_ref().map_or(true, |(lt,_)| t > *lt) {
+        if let Ok(t) = m.modified() {
+            if latest.as_ref().is_none_or(|(lt,_)| t > *lt) {
                 latest = Some((t, e));
             }
         }
