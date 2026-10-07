@@ -170,8 +170,8 @@ export const BinarySetupOverlay: React.FC<{ onReady: () => void }> = ({ onReady 
             </div>
             <div className="h-2 rounded-full lf-surface-raised overflow-hidden border lf-border">
               <div
-                className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-300 rounded-full"
-                style={{ width: `${st.percent}%` }}
+                className="h-full w-full origin-left bg-gradient-to-r from-indigo-500 to-emerald-400 transition-transform duration-300 rounded-full"
+                style={{ transform: `scaleX(${(st.percent / 100).toFixed(4)})` }}
               />
             </div>
             <div className="flex justify-between items-center text-[11px] lf-text-muted">

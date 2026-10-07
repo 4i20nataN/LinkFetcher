@@ -106,8 +106,8 @@ export function PlaylistCard({
               <div className="space-y-2">
                 <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-current opacity-80"
-                    style={{ width: `${Math.round((enqueueProgress.done / Math.max(1, enqueueProgress.total)) * 100)}%` }}
+                    className="h-full w-full origin-left rounded-full bg-current opacity-80"
+                    style={{ transform: `scaleX(${(enqueueProgress.done / Math.max(1, enqueueProgress.total)).toFixed(4)})` }}
                   />
                 </div>
                 <div className="flex items-center justify-between gap-2">

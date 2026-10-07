@@ -817,32 +817,34 @@ pub async fn ytdlp_download(
     let download_id = params.id.clone();
     let mut captured_filepath: Option<String> = None;
     let mut subtitle_written = false;
+    // Teto de emissão na fonte: yt-dlp cospe linhas de progresso até ~10x/s
+    // e cada `app.emit` atravessa o IPC + JSON + handler JS. O frontend já
+    // throttla o notify, mas o custo do evento existe de todo jeito — emite
+    // no máximo a cada 500ms e só quando o % inteiro andou (igual ao teto do
+    // Kotlin no Android; mesma informação, fração do tráfego).
+    let mut last_emit = std::time::Instant::now()
+        .checked_sub(std::time::Duration::from_secs(1))
+        .unwrap_or_else(std::time::Instant::now);
+    let mut last_pct = u8::MAX;
 
     while let Some(line) = stdout_rx.recv().await {
         let trimmed = line.trim();
         if let Some(prog) = parse_progress(trimmed) {
-            let progress_event = serde_json::json!({
-                "id": download_id,
-                "type": "progress",
-                "percent": prog.percent,
-                "speed": prog.speed.to_string(),
-                "eta": prog.eta.to_string(),
-                "downloaded": prog.downloaded,
-                "total": prog.total,
-            });
-            let _ = app.emit("yt-dlp-progress", &progress_event);
-            let _ = app.emit(
-                "binary-download",
-                serde_json::json!({
-                    "stage": "progress",
-                    "file": "yt-dlp",
-                    "received": prog.downloaded,
+            let pct = prog.percent.clamp(0.0, 100.0) as u8;
+            if pct != last_pct && last_emit.elapsed() >= std::time::Duration::from_millis(500) {
+                last_pct = pct;
+                last_emit = std::time::Instant::now();
+                let progress_event = serde_json::json!({
+                    "id": download_id,
+                    "type": "progress",
+                    "percent": prog.percent,
+                    "speed": prog.speed.to_string(),
+                    "eta": prog.eta.to_string(),
+                    "downloaded": prog.downloaded,
                     "total": prog.total,
-                    "percent": prog.percent as u8,
-                    "speed": prog.speed,
-                    "eta": prog.eta,
-                }),
-            );
+                });
+                let _ = app.emit("yt-dlp-progress", &progress_event);
+            }
         } else if let Some(dest) = parse_destination(trimmed) {
             eprintln!("[ytdlp_download] captured destination: {}", dest);
             remember_download_path(&download_id, &dest);

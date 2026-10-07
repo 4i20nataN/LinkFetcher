@@ -289,8 +289,8 @@ export default function UpdateBanner() {
             {/* Barra de progresso */}
             <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden relative">
               <div
-                className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-full transition-all duration-300 rounded-full"
-                style={{ width: `${progress}%` }}
+                className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-full w-full origin-left transition-transform duration-300 rounded-full"
+                style={{ transform: `scaleX(${(progress / 100).toFixed(4)})` }}
               />
             </div>
           </div>

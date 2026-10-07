@@ -179,12 +179,12 @@ export const DownloadCard = React.memo(function DownloadCard({
                           <div className="h-full w-1/4 rounded-full lf-indeterminate-bar" />
                         ) : (
                           <div
-                            /* Sem transition na largura: atualiza 4x/s e interpolar em loop
-                               repinta sem parar no raster por software. */
-                            className={`h-full rounded-full transition-colors duration-300 ${
+                            /* scaleX em vez de width: largura anima layout a
+                               cada tick (2x/s por card); transform só pinta. */
+                            className={`h-full w-full origin-left rounded-full transition-colors duration-300 ${
                               isCompleted ? 'bg-emerald-500' : isFailed ? 'bg-rose-500' : isPaused ? 'bg-amber-500' : getAccentBgClass(settings).split(' ')[0]
                             }`}
-                            style={{ width: `${item.progress}%` }}
+                            style={{ transform: `scaleX(${(item.progress / 100).toFixed(4)})` }}
                           />
                         )}
                       </div>
