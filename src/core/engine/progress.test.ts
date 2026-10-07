@@ -98,15 +98,15 @@ describe('smoothSpeed', () => {
 });
 
 describe('throttle de notify', () => {
-  it('Android 500ms, desktop 250ms', () => {
+  it('500ms nas duas plataformas (corta reconciliação pela metade)', () => {
     expect(progressThrottleMs(true)).toBe(500);
-    expect(progressThrottleMs(false)).toBe(250);
+    expect(progressThrottleMs(false)).toBe(500);
   });
 
   it('respeita o limite (borda inclusive notifica)', () => {
     expect(shouldNotifyProgress(1000, 500, true)).toBe(true);
     expect(shouldNotifyProgress(999, 500, true)).toBe(false);
-    expect(shouldNotifyProgress(749, 500, false)).toBe(false);
+    expect(shouldNotifyProgress(999, 500, false)).toBe(false);
   });
 });
 

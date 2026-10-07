@@ -60,11 +60,12 @@ export function smoothSpeed(prev: number, raw: number): number {
   return prev + 0.4 * (raw - prev);
 }
 
-/** Throttle de notify por tick de progresso: no Android a lista re-renderiza
- *  cards animados (motion) a cada notify — 500ms é indistinguível no olho e
- *  corta os renders pela metade; desktop mantém 250ms. */
-export function progressThrottleMs(isAndroid: boolean): number {
-  return isAndroid ? 500 : 250;
+/** Throttle de notify por tick de progresso: cada notify reconcilia a lista
+ *  inteira no React — 500ms é indistinguível no olho e corta o trabalho de
+ *  render pela metade em relação aos 250ms anteriores (o gargalo do lag com
+ *  downloads ativos no raster por software). */
+export function progressThrottleMs(_isAndroid: boolean): number {
+  return 500;
 }
 
 export function shouldNotifyProgress(now: number, last: number, isAndroid: boolean): boolean {

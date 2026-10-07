@@ -10,6 +10,7 @@
 import React from 'react';
 import { AnimatePresence, m } from 'motion/react';
 import { accordionExpand, transitions, tween } from './variants';
+import { RENDER_PROFILE } from '../core/perf/renderProfile';
 
 interface AnimatedAccordionProps {
   isOpen: boolean;
@@ -18,6 +19,9 @@ interface AnimatedAccordionProps {
 }
 
 export function AnimatedAccordion({ isOpen, children, className }: AnimatedAccordionProps) {
+  // Perfil efficient (raster por software): animar `height` recalcula o
+  // layout a cada frame do spring — abre instantâneo, sem tranco.
+  const instant = RENDER_PROFILE === 'efficient';
   return (
     <AnimatePresence initial={false}>
       {isOpen && (
@@ -26,10 +30,14 @@ export function AnimatedAccordion({ isOpen, children, className }: AnimatedAccor
           initial="hidden"
           animate="visible"
           exit="exit"
-          transition={{
-            height: transitions.accordionHeight,
-            opacity: transitions.accordionOpacity,
-          }}
+          transition={
+            instant
+              ? { height: { duration: 0 }, opacity: { duration: 0 } }
+              : {
+                  height: transitions.accordionHeight,
+                  opacity: transitions.accordionOpacity,
+                }
+          }
           className={className}
         >
           {children}

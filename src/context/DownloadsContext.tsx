@@ -3,10 +3,10 @@
  * Consumed by 2 components (DownloadManager, Sidebar).
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import type { DownloadItem } from '../types';
 import { DownloadEngine } from '../core/engine/DownloadEngine';
-import { StorageService } from '../core/storage/Storage';
+import { useSettings } from './SettingsContext';
 import { isAndroid } from '../core/ytdlp/YtDlpAdapter';
 
 interface DownloadsContextType {
@@ -21,6 +21,13 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // restaurado) e duplicar aviso no mesmo item.
   const seenIds = useRef<Set<string> | null>(null);
 
+  const { settings } = useSettings();
+  // Settings via ref: o handler roda a cada tick de progresso (2x/s) e ler
+  // `localStorage + JSON.parse` ali congela a main thread aos poucos.
+  // Settings muda raramente — o ref acompanha sem re-assinar o listener.
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+
   useEffect(() => {
     const handleUpdate = (items: DownloadItem[]) => {
       setDownloads(items);
@@ -28,8 +35,8 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         seenIds.current = new Set(items.map(i => i.id));
         return;
       }
-      const settings = StorageService.getSettings();
-      if (settings.notifications === false) {
+      const s = settingsRef.current;
+      if (s.notifications === false) {
         for (const i of items) seenIds.current.add(i.id);
         return;
       }
@@ -39,7 +46,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         for (const i of items) seenIds.current.add(i.id);
         return;
       }
-      const en = settings.language === 'en';
+      const en = s.language === 'en';
       for (const item of items) {
         if (seenIds.current.has(item.id)) continue;
         seenIds.current.add(item.id);

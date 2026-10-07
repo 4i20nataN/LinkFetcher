@@ -1053,6 +1053,17 @@ input[type="checkbox"] {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.30) !important;
 }
 
+/* `transition-all` em 49 lugares transiciona sombra/borda/fundo a cada hover:
+   no raster por software cada frame repinta. Só cores (barato) — o spin de
+   loading continua, mas o `pulse` infinito (trabalho contínuo sem informação)
+   desliga. Chromium (full) mantém tudo como authored. */
+.efficient .transition-all {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke !important;
+}
+.efficient .animate-pulse {
+  animation: none !important;
+}
+
 /* Contenção de paint: seções fora da tela pulam render/paint no scroll.
    Só em blocos estáticos (sem medição de altura/animação de saída). */
 .cv-auto {
