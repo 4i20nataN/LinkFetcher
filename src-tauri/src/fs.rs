@@ -818,26 +818,33 @@ pub async fn ytdlp_download(
     let mut captured_filepath: Option<String> = None;
     let mut subtitle_written = false;
     // Teto de emissão na fonte: yt-dlp cospe linhas de progresso até ~10x/s
-    // e cada `app.emit` atravessa o IPC + JSON + handler JS. O frontend já
-    // throttla o notify, mas o custo do evento existe de todo jeito — emite
-    // no máximo a cada 500ms e só quando algo andou (% OU bytes: em recorte
-    // o % fica cravado no 0 por minutos enquanto os bytes correm — travar
-    // só no % congelaria bytes/velocidade junto).
+    // e cada `app.emit` atravessa o IPC + JSON + handler JS. Emite no máximo
+    // a cada 250ms e só quando ALGO mudou (%, bytes, velocidade ou ETA): em
+    // início de download o % fica cravado no 0.0 por minutos enquanto a
+    // velocidade dança — travar só em %/bytes congelava a tela junto (foi o
+    // bug do recorte parado em "0 Bytes"). O frontend throttla o notify em
+    // 500ms e dedupa assinaturas iguais, então o tráfego efetivo continua
+    // baixo sem perder vivacidade.
     let mut last_emit = std::time::Instant::now()
         .checked_sub(std::time::Duration::from_secs(1))
         .unwrap_or_else(std::time::Instant::now);
-    let mut last_pct = u8::MAX;
-    let mut last_downloaded = u64::MAX;
+    let mut last_sig = String::new();
 
     while let Some(line) = stdout_rx.recv().await {
         let trimmed = line.trim();
         if let Some(prog) = parse_progress(trimmed) {
-            let pct = prog.percent.clamp(0.0, 100.0) as u8;
-            if (pct != last_pct || prog.downloaded != last_downloaded)
-                && last_emit.elapsed() >= std::time::Duration::from_millis(500)
+            let sig = format!(
+                "{}|{}|{}|{}|{}",
+                prog.percent.clamp(0.0, 100.0) as u8,
+                prog.downloaded,
+                prog.speed,
+                prog.eta,
+                prog.total,
+            );
+            if sig != last_sig
+                && last_emit.elapsed() >= std::time::Duration::from_millis(250)
             {
-                last_pct = pct;
-                last_downloaded = prog.downloaded;
+                last_sig = sig;
                 last_emit = std::time::Instant::now();
                 let progress_event = serde_json::json!({
                     "id": download_id,
