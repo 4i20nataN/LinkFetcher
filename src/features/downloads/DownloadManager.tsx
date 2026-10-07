@@ -15,7 +15,7 @@ import {
   getAccentBgClass, getAccentTextClass
 } from '../../components/ThemeWrapper';
 import { getMediaType, formatSpeed } from './manager/downloadFormat';
-import { DownloadCard } from './manager/DownloadCard';
+import { DownloadList } from './manager/DownloadList';
 import { CommandPreview } from './manager/CommandPreview';
 
 
@@ -335,58 +335,20 @@ export const DownloadManager: React.FC = () => {
           )}
         </div>
       </div>
-
-      {/* Queue items list */}
-      <div className="space-y-3.5">
-        {filteredDownloads.length === 0 ? (
-          /* Empty State */
-          <div className="p-12 text-center rounded-2xl lf-surface/10 border border-dashed lf-border flex flex-col items-center justify-center space-y-3">
-            <div className="p-3 rounded-2xl lf-surface/60 lf-text-muted">
-              {settings.iconStyle === 'emoji' ? <span className="text-2xl">⏳</span> : <Clock size={28} className={getAccentTextClass(settings)} />}
-            </div>
-            <div>
-              <h4 className="font-semibold text-sm lf-text-secondary">{settings.language === 'en' ? 'No downloads found' : 'Nenhum download encontrado'}</h4>
-              <p className="text-xs lf-text-muted mt-1">
-                {settings.language === 'en' ? 'Your filtered download list is currently empty.' : 'Sua lista de downloads filtrada está vazia no momento.'}
-              </p>
-            </div>
-          </div>
-        ) : (
-          /* Downloads Grid and List */
-          <>
-          <AnimatedList initial={false}>
-                       {filteredDownloads.slice(0, visibleCount).map((item) => {
-              const queuePos = queuedIds.indexOf(item.id);
-              return (
-                <DownloadCard
-                  key={item.id}
-                  item={item}
-                  settings={settings}
-                  t={t}
-                  queuePos={queuePos}
-                  queuedTotal={queuedIds.length}
-                  onMoveUp={handleMoveUp}
-                  onMoveDown={handleMoveDown}
-                  onOpenFolder={handleOpenFolder}
-                  onShare={handleShare}
-                  onPreview={setCommandPreview}
-                />
-              );
-            })}
-          </AnimatedList>
-          {filteredDownloads.length > visibleCount && (
-            <button
-              onClick={() => setVisibleCount(c => c + LIST_PAGE)}
-              className="w-full py-2.5 rounded-xl lf-surface-40 border lf-border lf-text-secondary hover:text-white text-xs font-semibold transition-colors"
-            >
-              {settings.language === 'en'
-                ? `Show more (${filteredDownloads.length - visibleCount} remaining)`
-                : `Mostrar mais (${filteredDownloads.length - visibleCount} restantes)`}
-            </button>
-          )}
-          </>
-        )}
-      </div>
+      {/* Queue items list (memo por assinatura: ticks não reconciliam) */}
+      <DownloadList
+        items={filteredDownloads}
+        visibleCount={visibleCount}
+        onShowMore={() => setVisibleCount(c => c + LIST_PAGE)}
+        settings={settings}
+        t={t}
+        queuedIds={queuedIds}
+        onMoveUp={handleMoveUp}
+        onMoveDown={handleMoveDown}
+        onOpenFolder={handleOpenFolder}
+        onShare={handleShare}
+        onPreview={setCommandPreview}
+      />
 
       <AnimatedList>
         {commandPreview && (

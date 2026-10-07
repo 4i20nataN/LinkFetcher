@@ -8,19 +8,18 @@ import { DownloadItem, type AppSettings } from '../../../types';
 import { DownloadEngine } from '../../../core/engine/DownloadEngine';
 import {
   Play, Pause, Trash2, FolderOpen, Share2, RotateCcw,
-  ArrowUp, ArrowDown, CheckCircle2, AlertTriangle,
-  Clock, TrendingUp,
+  ArrowUp, ArrowDown,
   Subtitles, Scissors, Shield, Tag, Code
 } from 'lucide-react';
 import { AnimatedCard } from '../../../animation/AnimatedCard';
 import { slideExitLeft } from '../../../animation/variants';
 import { useTranslation } from '../../../core/i18n';
 import {
-  getAccentBgClass, getAccentTextClass
+  getAccentTextClass
 } from '../../../components/ThemeWrapper';
 import { ProviderRegistry } from '../../../core/plugins/Providers';
 import { PlatformBadge } from '../../../components/PlatformBadge';
-import { formatBytes, formatSpeed, formatEta } from './downloadFormat';
+import { LiveDownloadStats } from './LiveDownloadStats';
 
 // Recorte (download_sections): o backend baixa o arquivo CHEIO pelo yt-dlp
 // nativo (progresso real, resume) e corta local com ffmpeg (`-c copy`) ao
@@ -48,17 +47,10 @@ export const DownloadCard = React.memo(function DownloadCard({
   onMoveUp, onMoveDown, onOpenFolder, onShare, onPreview,
 }: DownloadCardProps) {
               const platform = ProviderRegistry.getPlatformConfig(item.platform);
-              const isQueued = item.status === 'queued';
               const isDownloading = item.status === 'downloading';
               const isPaused = item.status === 'paused';
               const isCompleted = item.status === 'completed';
               const isFailed = ['failed', 'cancelled'].includes(item.status);
-              // Recorte sem % real (stdout mudo) → indeterminado + bytes vivos.
-              // O total exibido seria do arquivo cheio: omitir p/ não induzir.
-              const isCutSilent = isDownloading && !!item.downloadSections && !(item.progress > 0);
-              // Intervalo do trecho (`*01:00-02:00` → `01:00-02:00`) p/ rotular
-              // o total como original completo durante o download.
-              const cutRange = (item.downloadSections || '').replace(/^\*/, '');
               // Posição na fila real (só-queued): setas desabilitadas nos extremos.
 
               return (
@@ -164,93 +156,7 @@ export const DownloadCard = React.memo(function DownloadCard({
                       )}
                     </div>
 
-                    {/* Progress tracking bar */}
-                    <div className="space-y-1">
-                      <div
-                        className="relative w-full h-1.5 rounded-full bg-white/5 overflow-hidden"
-                        role="progressbar"
-                        aria-valuenow={item.progress}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-label={`Download progress: ${item.progress}%`}
-                      >
-                        {isCutSilent ? (
-                          /* Recorte: sem % real → indeterminado + bytes vivos */
-                          <div className="h-full w-1/4 rounded-full lf-indeterminate-bar" />
-                        ) : (
-                          <div
-                            /* scaleX em vez de width: largura anima layout a
-                               cada tick (2x/s por card); transform só pinta. */
-                            className={`h-full w-full origin-left rounded-full transition-colors duration-300 ${
-                              isCompleted ? 'bg-emerald-500' : isFailed ? 'bg-rose-500' : isPaused ? 'bg-amber-500' : getAccentBgClass(settings).split(' ')[0]
-                            }`}
-                            style={{ transform: `scaleX(${(item.progress / 100).toFixed(4)})` }}
-                          />
-                        )}
-                      </div>
-
-                      {/* Sub progress metrics */}
-                      <div className="flex justify-between items-center gap-3 text-[10px] lf-text-muted font-medium font-mono">
-                        <span
-                          className="lf-text-secondary shrink-0"
-                          title={isDownloading && cutRange
-                            ? (settings.language === 'en'
-                              ? `Full video total — section ${cutRange} is extracted at the end`
-                              : `Total do vídeo completo — o trecho ${cutRange} é extraído ao final`)
-                            : undefined}
-                        >
-                          {isCutSilent
-                            ? `${formatBytes(item.sizeDownloaded)} ${settings.language === 'en' ? 'downloaded' : 'baixados'}`
-                            : (item.sizeTotal > 0
-                              ? `${formatBytes(item.sizeDownloaded)} / ${formatBytes(item.sizeTotal)} (${item.progress}%)${isDownloading && cutRange ? ` · ${cutRange}` : ''}`
-                              : `${formatBytes(item.sizeDownloaded)} (${item.progress}%)`
-                            )
-                          }
-                        </span>
-
-                        <div className="flex gap-3 shrink-0">
-                          {isDownloading && (item.activity ? (
-                            <span className="lf-text-secondary animate-pulse" title={item.activity}>
-                              {item.activity}
-                            </span>
-                          ) : isCutSilent ? (
-                            <span className="lf-text-secondary animate-pulse">
-                              {item.processing
-                                ? (settings.language === 'en' ? 'Processing cut…' : 'Processando corte…')
-                                : (settings.language === 'en' ? 'Downloading slice…' : 'Baixando trecho…')}
-                            </span>
-                          ) : (
-                            <>
-                              <span className="flex items-center gap-0.5">
-                                {settings.iconStyle === 'emoji' ? <span>📊</span> : <TrendingUp size={10} className={getAccentTextClass(settings)} />}
-                                {formatSpeed(item.speed)}
-                              </span>
-                              <span className="flex items-center gap-0.5">
-                                {settings.iconStyle === 'emoji' ? <span>⏳</span> : <Clock size={10} className={getAccentTextClass(settings)} />}
-                                {formatEta(item.eta)}
-                              </span>
-                            </>
-                          ))}
-                          {isQueued && <span className="lf-text-muted animate-pulse">{settings.language === 'en' ? 'Waiting in queue...' : 'Aguardando na fila...'}</span>}
-                          {isPaused && <span className="text-amber-500">{settings.language === 'en' ? 'Paused' : 'Pausado'}</span>}
-                          {isCompleted && <span className="text-emerald-500 flex items-center gap-0.5"><CheckCircle2 size={10} /> {settings.language === 'en' ? 'Completed' : 'Concluído'}</span>}
-                          {isFailed && <span className="text-rose-500 flex items-center gap-0.5"><AlertTriangle size={10} /> {settings.language === 'en' ? 'Failed' : 'Falhou'}</span>}
-                        </div>
-                      </div>
-                      {/* Erro em linha própria, largura total: dentro da row de
-                          métricas ele era esmagado entre bytes e status. */}
-                      {isFailed && item.error && (
-                        <div className="text-[11px] text-rose-400/80 mt-1 break-words line-clamp-3" title={item.error}>
-                          {item.error}
-                        </div>
-                      )}
-                      {/* Aviso não-fatal: vídeo íntegro, acessório pendente (legendas) */}
-                      {isCompleted && item.subWarning && (
-                        <div className="text-[11px] text-amber-400/80 mt-1 break-words line-clamp-3" title={item.subWarning}>
-                          {item.subWarning}
-                        </div>
-                      )}
-                    </div>
+                    <LiveDownloadStats item={item} settings={settings} />
                   </div>
 
                   {/* Quick controls Toolbelt block */}
@@ -343,9 +249,65 @@ export const DownloadCard = React.memo(function DownloadCard({
                   </div>
         </AnimatedCard>
               );
-}, (prev, next) =>
-  prev.item === next.item &&
-  prev.settings === next.settings &&
-  prev.queuePos === next.queuePos &&
-  prev.queuedTotal === next.queuedTotal
-);
+}, (prev, next) => {
+  // Comparador de caminho quente: ignora os números que mudam a cada tick
+  // (progress/sizeDownloaded/speed/eta) — o LiveDownloadStats os escreve
+  // direto no DOM sem render. Todo o resto re-renderiza normalmente.
+  // Exceção: cruzamento 0→>0 troca indeterminado→barra (ramificação).
+  if (prev.settings !== next.settings) return false;
+  if (prev.queuePos !== next.queuePos || prev.queuedTotal !== next.queuedTotal) return false;
+  return isCardStaticEqual(prev.item, next.item);
+});
+
+function isCardStaticEqual(a: DownloadItem, b: DownloadItem): boolean {
+  if (a === b) return true;
+  if ((a.progress <= 0) !== (b.progress <= 0)) return false;
+  return (
+    a.id === b.id &&
+    a.title === b.title &&
+    a.thumbnailUrl === b.thumbnailUrl &&
+    a.platform === b.platform &&
+    a.format === b.format &&
+    a.formatString === b.formatString &&
+    a.audioOnly === b.audioOnly &&
+    a.audioFormat === b.audioFormat &&
+    a.audioQuality === b.audioQuality &&
+    a.writeSubs === b.writeSubs &&
+    a.writeAutoSubs === b.writeAutoSubs &&
+    a.subLangs === b.subLangs &&
+    a.subFormat === b.subFormat &&
+    a.embedSubs === b.embedSubs &&
+    a.writeThumbnail === b.writeThumbnail &&
+    a.embedThumbnail === b.embedThumbnail &&
+    a.embedMetadata === b.embedMetadata &&
+    a.mergeOutputFormat === b.mergeOutputFormat &&
+    a.restrictFilenames === b.restrictFilenames &&
+    a.noOverwrites === b.noOverwrites &&
+    a.keepVideo === b.keepVideo &&
+    a.concurrentFragments === b.concurrentFragments &&
+    a.retries === b.retries &&
+    a.downloadSections === b.downloadSections &&
+    a.videoOnly === b.videoOnly &&
+    a.sponsorblockRemove === b.sponsorblockRemove &&
+    a.fpsMax === b.fpsMax &&
+    a.bandLimit === b.bandLimit &&
+    a.customFilename === b.customFilename &&
+    a.videoFormat === b.videoFormat &&
+    a.videoCodec === b.videoCodec &&
+    a.normalizeAudio === b.normalizeAudio &&
+    a.videoSharpen === b.videoSharpen &&
+    a.imageSource === b.imageSource &&
+    a.sizeTotal === b.sizeTotal &&
+    a.durationSeconds === b.durationSeconds &&
+    a.status === b.status &&
+    a.processing === b.processing &&
+    a.activity === b.activity &&
+    a.addedAt === b.addedAt &&
+    a.finishedAt === b.finishedAt &&
+    a.url === b.url &&
+    a.error === b.error &&
+    a.subWarning === b.subWarning &&
+    a.filePath === b.filePath &&
+    a.finalArgs === b.finalArgs
+  );
+}
