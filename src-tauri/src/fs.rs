@@ -820,19 +820,24 @@ pub async fn ytdlp_download(
     // Teto de emissão na fonte: yt-dlp cospe linhas de progresso até ~10x/s
     // e cada `app.emit` atravessa o IPC + JSON + handler JS. O frontend já
     // throttla o notify, mas o custo do evento existe de todo jeito — emite
-    // no máximo a cada 500ms e só quando o % inteiro andou (igual ao teto do
-    // Kotlin no Android; mesma informação, fração do tráfego).
+    // no máximo a cada 500ms e só quando algo andou (% OU bytes: em recorte
+    // o % fica cravado no 0 por minutos enquanto os bytes correm — travar
+    // só no % congelaria bytes/velocidade junto).
     let mut last_emit = std::time::Instant::now()
         .checked_sub(std::time::Duration::from_secs(1))
         .unwrap_or_else(std::time::Instant::now);
     let mut last_pct = u8::MAX;
+    let mut last_downloaded = u64::MAX;
 
     while let Some(line) = stdout_rx.recv().await {
         let trimmed = line.trim();
         if let Some(prog) = parse_progress(trimmed) {
             let pct = prog.percent.clamp(0.0, 100.0) as u8;
-            if pct != last_pct && last_emit.elapsed() >= std::time::Duration::from_millis(500) {
+            if (pct != last_pct || prog.downloaded != last_downloaded)
+                && last_emit.elapsed() >= std::time::Duration::from_millis(500)
+            {
                 last_pct = pct;
+                last_downloaded = prog.downloaded;
                 last_emit = std::time::Instant::now();
                 let progress_event = serde_json::json!({
                     "id": download_id,
