@@ -13,6 +13,7 @@
     "tauri:dev": "npx @tauri-apps/cli@2 dev",
     "build:frontend": "vite build",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "bump": "node scripts/bump-version.mjs",
     "android:sync": "node scripts/sync-android-plugin.mjs",
     "tauri": "tauri",
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@emotion/is-prop-valid": "^1.4.0",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.1.14",
     "@tauri-apps/cli": "~2.11.5",
     "@types/node": "^22.14.0",

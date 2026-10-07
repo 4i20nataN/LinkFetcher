@@ -36,3 +36,8 @@ tmp/
 AGENTS.md
 CONTRIBUTING.md
 docs/
+
+# Playwright (artefatos locais da bateria E2E)
+test-results/
+playwright-report/
+playwright/.cache/

@@ -27,7 +27,7 @@ export interface DownloadListProps {
   onPreview: (item: DownloadItem) => void;
 }
 
-function listSignature(items: DownloadItem[]): string {
+export function listSignature(items: DownloadItem[]): string {
   return items.map((i) => `${i.id}:${i.status}`).join('|');
 }
 

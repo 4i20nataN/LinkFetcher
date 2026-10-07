@@ -29,6 +29,11 @@ jobs:
       - name: Testes unitários
         run: npm test
 
+      - name: Smoke E2E (Chromium headless)
+        run: |
+          npx playwright install --with-deps chromium || npx playwright install chromium
+          npm run test:e2e
+
       - name: Plugin Android sincronizado (canônico → gen)
         run: node scripts/sync-android-plugin.mjs --check
 

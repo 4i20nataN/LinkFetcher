@@ -259,7 +259,7 @@ export const DownloadCard = React.memo(function DownloadCard({
   return isCardStaticEqual(prev.item, next.item);
 });
 
-function isCardStaticEqual(a: DownloadItem, b: DownloadItem): boolean {
+export function isCardStaticEqual(a: DownloadItem, b: DownloadItem): boolean {
   if (a === b) return true;
   if ((a.progress <= 0) !== (b.progress <= 0)) return false;
   return (
