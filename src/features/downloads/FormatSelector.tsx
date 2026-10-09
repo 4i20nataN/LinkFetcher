@@ -378,7 +378,7 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
     <div className="space-y-3" style={{ '--ui-scale': uiScale } as React.CSSProperties}>
       {/* Download rápido: vídeo 1080p60 mp4 (merge copy) / MP3 máxima */}
       <p className="font-bold text-white text-center text-base pt-4 mb-3">
-        {settings.language === 'en' ? '⚡ Free Download' : '⚡ Download Gratuito'}
+        {settings.language === 'en' ? '📥 Free Download' : '📥 Download Gratuito'}
       </p>
       <div className="grid grid-cols-2 gap-2 pb-3">
         <button
