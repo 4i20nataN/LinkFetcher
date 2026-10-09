@@ -11,8 +11,10 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/linkfetcher}"
 APP_USER="${APP_USER:-linkfetcher}"
-: "${DOMAIN:?informe DOMAIN=seu.dominio (ex. DuckDNS gratuito)}"
-: "${ACME_EMAIL:?informe ACME_EMAIL=email p/ o Let's Encrypt}"
+# Sem `${VAR:?...}` aqui: apóstrofo (Let's Encrypt) dentro de `:?` é erro
+# de sintaxe no bash — guarda explícita em vez disso.
+if [ -z "${DOMAIN:-}" ]; then echo "informe DOMAIN=seu.dominio (ex. DuckDNS gratuito)" >&2; exit 1; fi
+if [ -z "${ACME_EMAIL:-}" ]; then echo "informe ACME_EMAIL=email p/ o Let's Encrypt" >&2; exit 1; fi
 REPO_URL="${REPO_URL:-}"
 
 echo "== pacotes =="
@@ -48,7 +50,7 @@ cd "$APP_DIR/server" && sudo -u "$APP_USER" npm install --omit=dev --no-audit --
 
 if [ ! -f "$APP_DIR/server/.env" ]; then
   echo "ERRO: crie $APP_DIR/server/.env a partir de server/.env.example (segredos MP + JWK) e rode de novo." >&2
-  echo "  (o JWK vai com aspas simples: LICENSE_PRIVATE_JWK='\$(node scripts/export-jwk.mjs)')" >&2
+  echo '  (o JWK vai com aspas simples. Gere com: node scripts/export-jwk.mjs)' >&2
   exit 1
 fi
 sudo -u "$APP_USER" mkdir -p "$APP_DIR/server/data"
