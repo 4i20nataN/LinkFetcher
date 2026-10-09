@@ -1,7 +1,8 @@
 // Cliente mínimo da API de pagamentos do Mercado Pago (fetch nativo).
 // Docs: developers → Checkout Transparente → Pix (POST /v1/payments com
 // payment_method_id=pix devolve qr_code + qr_code_base64).
-const API = 'https://api.mercadopago.com';
+// MP_API_BASE existe p/ teste local com stub (produção = api.mercadopago.com).
+const API = process.env.MP_API_BASE || 'https://api.mercadopago.com';
 
 function token() {
   const t = process.env.MP_ACCESS_TOKEN || '';

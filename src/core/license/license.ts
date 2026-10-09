@@ -26,7 +26,7 @@ const MAX_NAME_BYTES = 24;
  * `node scripts/mint-key.mjs --init`. Vazio = licenciamento desativado
  * (toda chave é recusada com 'unconfigured').
  */
-export const LICENSE_PUBLIC_SPKI_B64 = '';
+export const LICENSE_PUBLIC_SPKI_B64 = 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAED6j4atytCMPzQFuBR4P4WUW3Yg900jpomLxugBjt4+KuIe3O55uSK9z+BS/8EAJYqqSVJPR8NgxXE5a430j0/g==';
 
 export interface LicenseCheck {
   valid: boolean;

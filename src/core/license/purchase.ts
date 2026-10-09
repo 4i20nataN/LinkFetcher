@@ -87,7 +87,7 @@ export function validPhone(s: string): boolean {
   return d.length >= 10 && d.length <= 13;
 }
 
-/** Máscara BR progressiva: (46) 99917-4002. Tolera 55 na frente. */
+/** Máscara BR progressiva: (11) 98765-4321. Tolera 55 na frente. */
 export function maskPhoneBR(s: string): string {
   let n = onlyDigits(s).slice(0, 13);
   if (n.length > 11 && n.startsWith('55')) n = n.slice(2);

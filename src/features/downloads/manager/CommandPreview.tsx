@@ -1,4 +1,5 @@
 // Modal de preview do comando yt-dlp (extraído do DownloadManager).
+import { createPortal } from 'react-dom';
 import { DownloadItem, type AppSettings } from '../../../types';
 import { buildArgsPreview } from '../../../core/ytdlp/buildArgsPreview';
 import { X, Code } from 'lucide-react';
@@ -14,7 +15,9 @@ export interface CommandPreviewProps {
 }
 
 export function CommandPreview({ item: commandPreview, settings, onClose, showToast }: CommandPreviewProps) {
-  return (
+  // Portal no body (mesmo motivo do DeleteConfirm): `fixed` sob ancestral
+  // animado ancora no meio da lista.
+  return createPortal((
     <AnimatedCard
       variant={fadeIn}
       className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
@@ -98,5 +101,5 @@ export function CommandPreview({ item: commandPreview, settings, onClose, showTo
         </div>
           </AnimatedCard>
       </AnimatedCard>
-  );
+  ), document.body);
 }

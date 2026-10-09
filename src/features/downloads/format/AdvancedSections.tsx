@@ -116,7 +116,7 @@ export function OutputSection({ ctx }: Ctx) {
             </Btn>
           </div>
         </div>
-        <div className="space-y-2">
+        <div className={`space-y-2 ${options.audioOnly ? 'opacity-30 pointer-events-none' : ''}`}>
           <div className="flex items-center gap-2">
             <BlockIcon blockId="fps" />
             <BlockTitle>{t('fmtFpsMax')}</BlockTitle>

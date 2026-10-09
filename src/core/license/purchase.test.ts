@@ -17,22 +17,22 @@ describe('pix BR Code', () => {
   });
 
   it('contato tipado: máscara BR e validação', () => {
-    expect(maskPhoneBR('46999174002')).toBe('(46) 99917-4002');
-    expect(maskPhoneBR('4635631000')).toBe('(46) 3563-1000');
-    expect(maskPhoneBR('5546999174002')).toBe('(46) 99917-4002');
-    expect(validPhone('46999174002')).toBe(true);
+    expect(maskPhoneBR('11987654321')).toBe('(11) 98765-4321');
+    expect(maskPhoneBR('1132131000')).toBe('(11) 3213-1000');
+    expect(maskPhoneBR('5511987654321')).toBe('(11) 98765-4321');
+    expect(validPhone('11987654321')).toBe(true);
     expect(validPhone('123')).toBe(false);
     expect(validEmail('natan@exemplo.com')).toBe(true);
     expect(validEmail('natan@')).toBe(false);
   });
 
   it('link do WhatsApp embute o contato', () => {
-    expect(validContact('46999174002')).toBe(true);
-    expect(validContact('+55 46 99917-4002')).toBe(true);
+    expect(validContact('11987654321')).toBe(true);
+    expect(validContact('+55 11 98765-4321')).toBe(true);
     expect(validContact('natan@exemplo.com')).toBe(true);
     expect(validContact('abc')).toBe(false);
     expect(validContact('123')).toBe(false);
-    expect(whatsappBuyLink('46999174002')).toContain(encodeURIComponent('46999174002'));
+    expect(whatsappBuyLink('11987654321')).toContain(encodeURIComponent('11987654321'));
   });
 
   it('sanitiza nome/cidade (sem acento, teto de tamanho)', () => {

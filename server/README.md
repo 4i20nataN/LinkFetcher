@@ -29,3 +29,15 @@ acima e rebuild. Com vazio, o app usa só a compra manual (QR próprio).
 - Pagamento revalidado no MP (fonte da verdade); valor tem que ser EXATO
 - Chave entregue só ao contato da compra; idempotente por pagamento
 - Testes: `node --test server/server.test.mjs`
+
+## Teste local (sem gastar nada)
+1. `node scripts/mint-key.mjs --init` (pública no app, privada no .env)
+2. `cp server/.env.example server/.env` (preencha; MP_* pode ser fictício p/ UI)
+3. `node server/server.mjs` → `curl localhost:8787/api/health` → `{"ok":true}`
+4. No app: `LICENSE_SERVER_URL='http://localhost:8787'` (`src/core/license/autoBuy.ts`)
+   e rode — o botão de Pix automático aparece (gerar cobra o MP de verdade,
+   então sem token válido ele erra — esperado)
+5. Webhook de verdade sem VPS: `cloudflared tunnel --url http://localhost:8787`
+   → URL https pública → use em `BASE_URL`, no webhook do MP e no app.
+   Com token de TESTE do MP + simulador de webhook do dashboard dá pra
+   percorrer o ciclo inteiro sem mover dinheiro.

@@ -17,6 +17,7 @@ import { randomUUID } from 'node:crypto';
 import { createPixPayment, getPayment } from './mp.mjs';
 import { verifySignature, extractPaymentId } from './webhook.mjs';
 import { mintKeyFor } from './mint.mjs';
+import { sendKeyEmail } from './email.mjs';
 import { loadAll, saveAll } from './store.mjs';
 
 const PORT = Number(process.env.PORT || 8787);
@@ -67,6 +68,12 @@ async function settleCheckout(db, checkout) {
   checkout.status = 'paid';
   checkout.paidAt = new Date().toISOString();
   checkout.updatedAt = checkout.paidAt;
+  // Entrega automática: e-mail vai com a chave (WhatsApp cobre via poll no
+  // próprio aparelho). Falha aqui não quebra a venda (poll entrega).
+  if (/@/.test(checkout.email || '')) {
+    const r = await sendKeyEmail({ to: checkout.email, key: checkout.key, days: PLAN_DAYS });
+    checkout.emailSent = r.sent;
+  }
   return checkout;
 }
 

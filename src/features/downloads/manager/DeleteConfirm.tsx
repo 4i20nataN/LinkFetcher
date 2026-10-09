@@ -3,6 +3,7 @@
 // processo nativo de verdade + remove da lista + limpa .part). Finalizado
 // só confirma a remoção do registro — o arquivo em disco nunca é apagado.
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { DownloadItem, type AppSettings } from '../../../types';
 import { DownloadEngine } from '../../../core/engine/DownloadEngine';
 import { Pause, Play, X, Trash2 } from 'lucide-react';
@@ -39,7 +40,9 @@ export function DeleteConfirm({ item, settings, onClose, showToast }: DeleteConf
         ? (langEn ? 'Paused' : 'Pausado')
         : st;
 
-  return (
+  // Portal no body: ancestral com transform/filter (cards animados) sequestra
+  // o `fixed` e o modal ancora no meio da lista em vez da tela.
+  return createPortal((
     <div
       className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
       onClick={onClose}
@@ -112,5 +115,5 @@ export function DeleteConfirm({ item, settings, onClose, showToast }: DeleteConf
         </div>
       </AnimatedCard>
     </div>
-  );
+  ), document.body);
 }

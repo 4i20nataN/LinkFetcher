@@ -589,6 +589,22 @@ fn should_retry_without_subs(
     params.subs_fallback.is_none() && asked && err_lower.contains("subtitle") && code.is_some()
 }
 
+/// Elegível ao retry com cliente android: a mídia deu 403 (YouTube recusou
+/// as URLs dos clientes default `visionos,web` p/ este IP — extração OK,
+/// download 403) e ainda não tentou. O cliente android recebe URLs de outro
+/// pool, que passam (testado: mesmo vídeo 403 → 100%). Uma única tentativa
+/// (sem recursão infinita); kill por pausa/cancel nunca entra aqui
+/// (`code() == None` no unix).
+fn should_retry_with_android_client(
+    params: &crate::ytdlp::args::DownloadParams,
+    err_lower: &str,
+    code: Option<i32>,
+) -> bool {
+    params.client_fallback.is_none()
+        && code.is_some()
+        && (err_lower.contains("403") || err_lower.contains("forbidden"))
+}
+
 /// Apaga as variantes temporárias de um caminho-base (`base.part`,
 /// `base.ytdl`, `base.cutmp.*`, fragmentos `-Frag*` etc). Nunca apaga o
 /// arquivo final — exceto se o próprio base já for um artefato (ex.
@@ -1064,6 +1080,17 @@ pub async fn ytdlp_download(
                 eprintln!("[ytdlp_download] subs falharam; repetindo sem legendas");
                 let mut retry_params = params;
                 retry_params.subs_fallback = Some(err_msg);
+                return Box::pin(ytdlp_download(app.clone(), None, Some(retry_params), None)).await;
+            }
+
+            // 403 na mídia com clientes default = pool de URLs bloqueado p/
+            // este IP (extração passou, download 403). Uma única re-execução
+            // com o cliente android recebe URLs de outro pool e salva o
+            // download (testado); o `.part` é reaproveitado (resume).
+            if should_retry_with_android_client(&params, &err_msg.to_lowercase(), status.code()) {
+                eprintln!("[ytdlp_download] 403 na mídia; repetindo com player_client=android");
+                let mut retry_params = params;
+                retry_params.client_fallback = Some("android".to_owned());
                 return Box::pin(ytdlp_download(app.clone(), None, Some(retry_params), None)).await;
             }
 
@@ -2046,6 +2073,39 @@ mod tests {
         assert!(!should_retry_without_subs(
             &second,
             "unable to download video subtitles for 'en'",
+            Some(1),
+        ));
+    }
+
+    #[test]
+    fn android_retry_eligibility() {
+        use crate::ytdlp::args::DownloadParams;
+        // 403 na mídia + saída natural + 1ª vez → elegível.
+        assert!(should_retry_with_android_client(
+            &DownloadParams::default(),
+            "unable to download video data: http error 403: forbidden",
+            Some(1),
+        ));
+        // Erro sem 403 (ex. 429 de legenda) → não.
+        assert!(!should_retry_with_android_client(
+            &DownloadParams::default(),
+            "unable to download video subtitles for 'en': http error 429",
+            Some(1),
+        ));
+        // Kill (sem código) → não.
+        assert!(!should_retry_with_android_client(
+            &DownloadParams::default(),
+            "unable to download video data: http error 403",
+            None,
+        ));
+        // Segunda vez (já com fallback) → não (evita loop).
+        let second = DownloadParams {
+            client_fallback: Some("android".into()),
+            ..Default::default()
+        };
+        assert!(!should_retry_with_android_client(
+            &second,
+            "unable to download video data: http error 403",
             Some(1),
         ));
     }

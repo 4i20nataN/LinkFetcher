@@ -45,6 +45,11 @@ pub struct DownloadParams {
     /// acessório 429 não pode anular o vídeo) e o `complete` carrega o aviso.
     #[serde(default)]
     pub subs_fallback: Option<String>,
+    /// Interno (nunca vem do frontend): player client alternativo após 403
+    /// na mídia (ex. `android`). Quando Some, o download re-executa com
+    /// `--extractor-args youtube:player_client=<valor>`.
+    #[serde(default)]
+    pub client_fallback: Option<String>,
     #[serde(default)]
     pub write_thumbnail: Option<bool>,
     #[serde(default)]
@@ -436,6 +441,15 @@ pub fn build_args(
     args.push("--format".to_owned());
     args.push(final_format);
 
+    // Fallback de cliente (403 na mídia): segunda tentativa extrai as URLs
+    // de outro pool (`android`), que o YouTube não bloqueou. Só existe no
+    // retry interno — a 1ª tentativa sempre usa os defaults (`visionos,web`,
+    // formatos máximos).
+    if let Some(c) = non_empty(&params.client_fallback) {
+        args.push("--extractor-args".to_owned());
+        args.push(format!("youtube:player_client={c}"));
+    }
+
     if is_true(&params.audio_only) {
         args.push("--extract-audio".to_owned());
         if let Some(f) = non_empty(&params.audio_format) {
@@ -724,6 +738,22 @@ mod tests {
         };
         let a2 = build_args(&p2, &dir(), None);
         assert!(!a2.iter().any(|x| x.starts_with("aext:")), "{joined}");
+    }
+
+    #[test]
+    fn client_fallback_emits_extractor_args_once() {
+        // Sem fallback: 1ª tentativa usa os defaults (sem --extractor-args).
+        let p0 = DownloadParams { url: "https://x/y".into(), ..Default::default() };
+        let a0 = build_args(&p0, &dir(), None);
+        assert!(!a0.iter().any(|x| x == "--extractor-args"), "{a0:?}");
+        // Com fallback: retry carrega o player client alternativo.
+        let p1 = DownloadParams {
+            url: "https://x/y".into(),
+            client_fallback: Some("android".into()),
+            ..Default::default()
+        };
+        let joined = build_args(&p1, &dir(), None).join(" ");
+        assert!(joined.contains("--extractor-args youtube:player_client=android"), "{joined}");
     }
 
     #[test]

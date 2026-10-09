@@ -1,10 +1,11 @@
 // Modal de ativação PRO: colar a chave → verifica assinatura → salva.
 // Quando já ativo, mostra status + botão de remover. Sem backdoors.
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext';
 import { verifyLicenseKey, isLicenseActive } from './license';
 import { getLicense, saveLicense, clearLicense, useLicense } from './licenseStore';
-import { PRO_PLAN, buildPixPayload, whatsappBuyLink, validPhone, validEmail, maskPhoneBR, onlyDigits } from './purchase';
+import { PRO_PLAN, buildPixPayload, validPhone, validEmail, maskPhoneBR, onlyDigits } from './purchase';
 import { autoBuyEnabled, createAutoCheckout, fetchAutoKey, type AutoCheckout } from './autoBuy';
 import QRCode from 'qrcode';
 import { KeyRound, X, Lock, Trash2, Copy, Check } from 'lucide-react';
@@ -45,10 +46,9 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
   const [autoError, setAutoError] = useState<string | null>(null);
   const [contact, setContact] = useState('');
   const [ctype, setCtype] = useState<'wa' | 'mail'>('wa');
-  const [contactSet, setContactSet] = useState<string | null>(null);
-  const typedOk = ctype === 'wa' ? validPhone(contact) : validEmail(contact);
-  const contactLabel = contactSet ? (ctype === 'wa' ? maskPhoneBR(contactSet) : contactSet) : '';
-  const contactOk = contactSet !== null;
+  const contactOk = ctype === 'wa' ? validPhone(contact) : validEmail(contact);
+  // QR só brota após o clique em Comprar PRO (com contato válido).
+  const [buyIntent, setBuyIntent] = useState(false);
   // Campo da chave libera após contato confirmado (é pra onde a chave vai).
   const keyUnlocked = contactOk;
   const pixPayload = !(active && lic) && view === 'buy' ? buildPixPayload() : '';
@@ -140,10 +140,11 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
+  // Portal no body: `fixed` sob ancestral animado ancora fora da tela.
+  return createPortal((
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-full max-w-sm p-5 rounded-2xl lf-surface-raised lf-border-strong space-y-4"
+        className="w-full max-w-sm p-5 rounded-2xl bg-zinc-900/90 backdrop-blur-md border border-zinc-700/50 shadow-2xl space-y-4 max-h-[85dvh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
@@ -177,12 +178,47 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
           </div>
         ) : view === 'buy' ? (
           <div className="space-y-3">
-            <p className="text-center font-bold text-white fs-sm">
-              {PRO_PLAN.label} — R$ {PRO_PLAN.price.toFixed(2).replace('.', ',')}
-              <span className="block lf-text-muted font-normal">
+            <div className="text-center">
+              <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 tracking-widest">PRO</span>
+              <p className="mt-1 text-2xl font-bold text-white">
+                R$ {PRO_PLAN.price.toFixed(2).replace('.', ',')}
+                <span className="text-sm font-normal lf-text-muted">/mês</span>
+              </p>
+              <p className="fs-sm lf-text-muted">
                 {isEn ? `${PRO_PLAN.days} days of Custom Download` : `${PRO_PLAN.days} dias de Download Personalizado`}
-              </span>
-            </p>
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {(isEn
+                ? ['Up to 4K', 'Every codec', 'Trims and subtitles', 'SponsorBlock']
+                : ['Até 4K', 'Codecs e formatos', 'Cortes e legendas', 'SponsorBlock']
+              ).map(b => (
+                <div key={b} className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15 fs-sm lf-text-secondary">
+                  <Check size={12} className="text-emerald-400 shrink-0" />
+                  <span className="truncate">{b}</span>
+                </div>
+              ))}
+            </div>
+            {(() => {
+              const steps = [
+                { label: isEn ? 'Contact' : 'Contato', done: contactOk, on: !contactOk },
+                { label: 'Pix', done: false, on: contactOk },
+                { label: isEn ? 'Key' : 'Chave', done: false, on: key.trim().length > 0 },
+              ];
+              return (
+                <div className="flex items-center gap-1 px-1">
+                  {steps.map((s, i) => (
+                    <div key={s.label} className="flex-1 flex items-center gap-1 min-w-0">
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${s.done ? 'bg-emerald-500 text-white' : s.on ? 'border border-emerald-500 text-emerald-400' : 'border border-zinc-700 text-zinc-600'}`}>
+                        {s.done ? <Check size={11} /> : (i + 1)}
+                      </span>
+                      <span className={`fs-sm truncate ${s.done || s.on ? 'text-zinc-200' : 'lf-text-muted'}`}>{s.label}</span>
+                      {i < steps.length - 1 && <span className="flex-1 h-px bg-zinc-700/60 min-w-2" />}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
             {autoBuyEnabled() && (
               <button
                 onClick={() => { setView('auto'); setAutoError(null); }}
@@ -191,25 +227,13 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
                 {isEn ? '⚡ Pix with instant release' : '⚡ Pix com liberação na hora'}
               </button>
             )}
-            <div className="flex justify-center">
-              <div className="p-2.5 rounded-xl bg-white">
-                {qr ? <img src={qr} alt="QR Pix" className="w-44 h-44" /> : <div className="w-44 h-44" />}
-              </div>
-            </div>
-            <button
-              onClick={copyPix}
-              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl lf-surface-40 lf-border lf-text-secondary hover:text-white fs-sm font-semibold transition-colors"
-            >
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-              {copied ? (isEn ? 'Copied!' : 'Copiado!') : (isEn ? 'Copy Pix code' : 'Copiar código Pix')}
-            </button>
             <div className="grid grid-cols-2 gap-2">
               {(['wa', 'mail'] as const).map(t => {
                 const on = ctype === t;
                 return (
                   <button
                     key={t}
-                    onClick={() => { setCtype(t); setContact(''); setContactSet(null); }}
+                    onClick={() => { setCtype(t); setContact(''); setBuyIntent(false); }}
                     className={`flex items-center justify-center gap-2 py-2 rounded-xl border fs-sm font-bold transition-all ${on ? 'border-emerald-500 bg-emerald-500/10 text-white' : 'lf-border lf-surface-40 lf-text-muted hover:text-zinc-200'}`}
                   >
                     <span className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${on ? 'border-emerald-400' : 'border-zinc-600'}`}>
@@ -220,51 +244,51 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
                 );
               })}
             </div>
-            {contactSet ? (
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 fs-sm text-emerald-300">
-                <Check size={14} className="shrink-0" />
-                <span className="flex-1 truncate">{contactLabel}</span>
+            <div>
+              <input
+                value={ctype === 'wa' ? maskPhoneBR(contact) : contact}
+                onChange={e => { setContact(ctype === 'wa' ? onlyDigits(e.target.value).slice(0, 13) : e.target.value); setBuyIntent(false); }}
+                inputMode={ctype === 'wa' ? 'tel' : 'email'}
+                autoComplete="off"
+                placeholder={ctype === 'wa' ? '(XX) XXXXX-XXXX' : 'voce@email.com'}
+                className="w-full p-2.5 rounded-xl lf-surface-40 lf-border text-sm text-white placeholder:text-zinc-600 focus:outline-none"
+              />
+              {contact.trim() && !contactOk && (
+                <p className="fs-sm text-red-400 mt-1">
+                  {ctype === 'wa'
+                    ? (isEn ? 'Enter a valid WhatsApp (DDD + number).' : 'Digite um WhatsApp válido (DDD + número).')
+                    : (isEn ? 'Enter a valid email.' : 'Digite um e-mail válido.')}
+                </p>
+              )}
+            </div>
+            {!buyIntent ? (
+              <button
+                onClick={() => { if (contactOk) setBuyIntent(true); }}
+                disabled={!contactOk}
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white font-bold fs-sm transition-all"
+              >
+                {isEn ? 'Buy PRO' : 'Comprar PRO'}
+              </button>
+            ) : contactOk ? (
+              <>
+                <div className="flex justify-center">
+                  <div className="p-2.5 rounded-xl bg-white">
+                    {qr ? <img src={qr} alt="QR Pix" className="w-44 h-44" /> : <div className="w-44 h-44" />}
+                  </div>
+                </div>
                 <button
-                  onClick={() => { setContactSet(null); }}
-                  className="fs-sm lf-text-muted hover:text-zinc-200 underline"
+                  onClick={copyPix}
+                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl lf-surface-40 lf-border lf-text-secondary hover:text-white fs-sm font-semibold transition-colors"
                 >
-                  {isEn ? 'change' : 'trocar'}
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
+                  {copied ? (isEn ? 'Copied!' : 'Copiado!') : (isEn ? 'Copy Pix code' : 'Copiar código Pix')}
                 </button>
-              </div>
+              </>
             ) : (
-              <div className="flex gap-2">
-                <input
-                  value={ctype === 'wa' ? maskPhoneBR(contact) : contact}
-                  onChange={e => setContact(ctype === 'wa' ? onlyDigits(e.target.value).slice(0, 13) : e.target.value)}
-                  inputMode={ctype === 'wa' ? 'tel' : 'email'}
-                  autoComplete="off"
-                  placeholder={ctype === 'wa' ? '(46) 99917-4002' : 'voce@email.com'}
-                  className="flex-1 min-w-0 p-2.5 rounded-xl lf-surface-40 lf-border text-sm text-white placeholder:text-zinc-600 focus:outline-none"
-                />
-                <button
-                  onClick={() => { if (typedOk) setContactSet(ctype === 'wa' ? onlyDigits(contact) : contact.trim().toLowerCase()); }}
-                  disabled={!typedOk}
-                  className="px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white fs-sm font-bold transition-all"
-                >
-                  {isEn ? 'Confirm' : 'Confirmar'}
-                </button>
-              </div>
-            )}
-            {contact.trim() && !typedOk && !contactSet && (
-              <p className="fs-sm text-red-400">
-                {ctype === 'wa'
-                  ? (isEn ? 'Enter a valid WhatsApp (DDD + number).' : 'Digite um WhatsApp válido (DDD + número).')
-                  : (isEn ? 'Enter a valid email.' : 'Digite um e-mail válido.')}
+              <p className="text-center fs-sm lf-text-muted">
+                {isEn ? 'Enter your contact above to generate the Pix.' : 'Informe seu contato acima para gerar o Pix.'}
               </p>
             )}
-            <a
-              href={whatsappBuyLink(contactSet ? contactLabel : undefined)}
-              target="_blank"
-              rel="noreferrer"
-              className="w-full text-center fs-sm lf-text-muted hover:text-zinc-200 transition-colors"
-            >
-              {isEn ? 'Need help? Talk on WhatsApp' : 'Precisa de ajuda? Fale no WhatsApp'}
-            </a>
             <textarea
               value={key}
               onChange={e => setKey(e.target.value)}
@@ -274,7 +298,7 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
               disabled={!keyUnlocked}
               placeholder={keyUnlocked
                 ? 'LF1-XXXX-XXXX-...'
-                : (isEn ? 'Confirm your contact above to unlock' : 'Confirme seu contato acima para liberar')}
+                : (isEn ? 'Fill a valid contact above to unlock' : 'Preencha um contato válido acima para liberar')}
               className="w-full p-2.5 rounded-xl lf-surface-40 lf-border font-mono text-xs text-white placeholder:text-zinc-600 focus:outline-none disabled:opacity-50"
             />
             <button
@@ -393,5 +417,5 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
         )}
       </div>
     </div>
-  );
+  ), document.body);
 }
