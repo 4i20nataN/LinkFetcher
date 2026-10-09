@@ -179,9 +179,7 @@ export function MediaResultCard({
                       ? <Lock size={14} />
                       : (settings.iconStyle === 'emoji' ? <span>🖼️</span> : <ImageIcon size={14} className={getAccentTextClass(settings)} />)}
                     {settings.language === 'en' ? 'Download Thumbnail' : 'Baixar Capa'}
-                    {customLocked && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">PRO</span>
-                    )}
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">PRO</span>
                   </button>
                   {showCoverFormats && (
                     <div className="flex gap-1.5">
