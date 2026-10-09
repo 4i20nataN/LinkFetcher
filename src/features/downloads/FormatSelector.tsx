@@ -397,7 +397,7 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
         </button>
       </div>
       {/* Divisor: download personalizado em bloco próprio abaixo */}
-      <div className="border-t lf-border pt-4 mt-1">
+      <div className="border-t lf-border pt-4 mt-5">
       <div className="text-center mb-3">
         <p className="font-bold text-white text-base">
           {settings.language === 'en' ? '✨ Custom Download' : '✨ Download Personalizado'}
