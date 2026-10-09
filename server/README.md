@@ -8,8 +8,8 @@
 
 ## 2. Chave de emissão (1x, na sua máquina)
 `node scripts/mint-key.mjs --init` gera `signing-keys/license.key`.
-Converta a privada p/ JWK de linha única e cole em `LICENSE_PRIVATE_JWK`:
-`node -e "console.log(JSON.stringify(require('./signing-keys/license.key').privateJwk))"`
+Exporte a privada p/ JWK de linha única e cole em `LICENSE_PRIVATE_JWK`:
+`node scripts/export-jwk.mjs`
 A pública correspondente vai em `LICENSE_PUBLIC_SPKI_B64` no app.
 
 ## 3. Subir
