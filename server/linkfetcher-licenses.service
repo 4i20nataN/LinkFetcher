@@ -1,0 +1,26 @@
+# LinkFetcher License Server — unidade systemd.
+# Instalação: sudo cp server/linkfetcher-licenses.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now linkfetcher-licenses
+# O .env mora em APP_DIR/server/.env (NUNCA no repo). Logs: journalctl -u linkfetcher-licenses -f
+[Unit]
+Description=LinkFetcher License Server (Pix MP + chaves PRO)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=linkfetcher
+WorkingDirectory=/opt/linkfetcher
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node server/server.mjs
+Restart=always
+RestartSec=5
+# .env carregado pelo cwd (server/server.mjs lê process.env do ambiente;
+# use EnvironmentFile se preferir centralizar):
+EnvironmentFile=/opt/linkfetcher/server/.env
+# Endurecimento básico (sem escrita fora do que precisa):
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

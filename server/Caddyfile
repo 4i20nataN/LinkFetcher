@@ -1,0 +1,11 @@
+# LinkFetcher License Server — proxy reverso + HTTPS automático (Let's Encrypt).
+# Instalado por server/deploy-vps.sh (que substitui $DOMAIN/$ACME_EMAIL).
+# Manual: troque pelos valores e `sudo systemctl reload caddy`. Requer portas
+# 80/443 abertas + DNS apontando p/ a VPS (ex. subdomínio gratuito DuckDNS).
+{
+	email $ACME_EMAIL
+}
+
+$DOMAIN {
+	reverse_proxy 127.0.0.1:8787
+}

@@ -14,11 +14,28 @@ A pública correspondente vai em `LICENSE_PUBLIC_SPKI_B64` no app.
 
 ## 3. Subir
 ```
-cp server/.env.example server/.env  # preencher
+cp server/.env.example server/.env  # preencher (sem dotenv: exporte antes)
+set -a; . server/.env; set +a
 node server/server.mjs
 ```
-Qualquer VPS/PaaS com Node 22 serve (Fly.io, Railway, VPS). HTTPS obrigatório
-(o MP só chama webhook em HTTPS). Dados em `server/data/db.json` (gitignored).
+Qualquer VPS/PaaS com Node 22 serve. HTTPS obrigatório (o MP só chama
+webhook em HTTPS). Dados em `server/data/db.json` (gitignored).
+
+## 3b. Deploy 100% gratuito (Oracle Always Free + Caddy)
+VM permanente grátis + HTTPS automático + disco local (sem sleep, sem
+perder vendas — Render/Railway gratuitos dormem e não têm disco):
+1. Crie a VM Always Free (Ubuntu 24.04) e um subdomínio gratuito (DuckDNS)
+   apontando p/ o IP dela; libere as portas 80/443 no security list.
+2. Na VM, como root:
+```
+DOMAIN=seu-sub.duckdns.org ACME_EMAIL=voce@email.com \
+REPO_URL=https://github.com/voce/LinkFetcher-Tauri.git \
+bash server/deploy-vps.sh
+```
+   (sem REPO_URL: clone o repo em `/opt/linkfetcher` antes).
+3. Crie `/opt/linkfetcher/server/.env` a partir de `server/.env.example`
+   (JWK entre aspas simples) e rode o script de novo — ele valida
+   `https://SEU-DOMINIO/api/health` no final.
 
 ## 4. Ligar o app
 Em `src/core/license/autoBuy.ts`, preencha `LICENSE_SERVER_URL` com o HTTPS
