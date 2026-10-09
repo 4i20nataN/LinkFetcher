@@ -181,7 +181,7 @@ export function MediaResultCard({
                       : (settings.iconStyle === 'emoji' ? <span>🖼️</span> : <ImageIcon size={14} className={getAccentTextClass(settings)} />)}
                     {settings.language === 'en' ? 'Download Thumbnail' : 'Baixar Capa'}
                   </button>
-                  <span className="px-1 rounded text-[7px] font-bold leading-tight bg-amber-500 text-white border border-amber-600">PRO</span>
+                  <span className="px-1 rounded text-[7px] font-bold leading-tight bg-amber-500 text-black border border-amber-600">PRO</span>
                   </div>
                   {showCoverFormats && (
                     <div className="flex gap-1.5">
