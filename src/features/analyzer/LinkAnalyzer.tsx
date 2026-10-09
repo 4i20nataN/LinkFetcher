@@ -261,10 +261,10 @@ export const LinkAnalyzer: React.FC = () => {
       setError(settings.language === 'en' ? 'No format selected. Please wait for analysis to complete.' : 'Nenhum formato selecionado. Aguarde a analise completar.');
       return;
     }
-    // Download personalizado é PRO: sem licença, o caminho é o Download Rápido
+    // Download personalizado é PRO: sem licença, o caminho é o Download Gratuito
     // (fecha o bypass de baixar 4K pelos defaults com o painel travado).
     if (!isLicenseActive(getLicense())) {
-      setError(settings.language === 'en' ? 'Custom download is PRO — use Quick Download or activate your key in the Custom Download panel.' : 'Download personalizado é PRO — use o Download Rápido ou ative sua chave no painel Download Personalizado.');
+      setError(settings.language === 'en' ? 'Custom download is PRO — use Free Download or activate your key in the Custom Download panel.' : 'Download personalizado é PRO — use o Download Gratuito ou ative sua chave no painel Download Personalizado.');
       return;
     }
 
