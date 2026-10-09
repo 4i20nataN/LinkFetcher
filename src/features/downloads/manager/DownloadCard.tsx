@@ -7,7 +7,7 @@ import React from 'react';
 import { DownloadItem, type AppSettings } from '../../../types';
 import { DownloadEngine } from '../../../core/engine/DownloadEngine';
 import {
-  Play, Pause, Trash2, FolderOpen, Share2, RotateCcw,
+  Play, Pause, X, Trash2, FolderOpen, Share2, RotateCcw,
   ArrowUp, ArrowDown,
   Subtitles, Scissors, Shield, Tag, Code
 } from 'lucide-react';
@@ -40,11 +40,12 @@ export interface DownloadCardProps {
   onOpenFolder: (item: DownloadItem) => void;
   onShare: (item: DownloadItem) => void;
   onPreview: (item: DownloadItem) => void;
+  onRequestDelete: (item: DownloadItem) => void;
 }
 
 export const DownloadCard = React.memo(function DownloadCard({
   item, settings, t, queuePos, queuedTotal,
-  onMoveUp, onMoveDown, onOpenFolder, onShare, onPreview,
+  onMoveUp, onMoveDown, onOpenFolder, onShare, onPreview, onRequestDelete,
 }: DownloadCardProps) {
               const platform = ProviderRegistry.getPlatformConfig(item.platform);
               const isDownloading = item.status === 'downloading';
@@ -160,55 +161,74 @@ export const DownloadCard = React.memo(function DownloadCard({
                   </div>
 
                   {/* Quick controls Toolbelt block */}
-                  <div className="flex items-center gap-2 justify-end w-full md:w-auto shrink-0 pt-2 md:pt-0 border-t md:border-t-0 lf-border">
-                    {/* Reordering Controls (Only for queue/active lists) */}
+                  <div className="flex items-center gap-2 justify-end w-full md:w-auto shrink-0 pt-2 md:pt-0 border-t md:border-t-0 lf-border flex-wrap">
+                    {/* Reordering Controls (Only for queue/active lists).
+                        No touch não há hover: setas sempre visíveis no mobile,
+                        só auto-ocultam no desktop (lg). */}
                     {['queued', 'downloading', 'paused'].includes(item.status) && (
-                      <div className="flex flex-col gap-1 mr-2 border-r lf-border pr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="flex flex-col gap-1 mr-2 border-r lf-border pr-2 transition-opacity duration-300 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-within:opacity-100">
                         <button
                           onClick={() => onMoveUp(item.id)}
                           disabled={queuePos <= 0}
-                          className="p-1 rounded hover:bg-white/5 lf-text-muted hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent"
+                          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-white/5 lf-text-muted hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent"
                           title={settings.language === 'en' ? 'Move up' : 'Mover para cima'}
+                          aria-label={settings.language === 'en' ? 'Move up' : 'Mover para cima'}
                         >
-                          {settings.iconStyle === 'emoji' ? <span>⬆️</span> : <ArrowUp size={12} className={getAccentTextClass(settings)} />}
+                          {settings.iconStyle === 'emoji' ? <span>⬆️</span> : <ArrowUp size={14} className={getAccentTextClass(settings)} />}
                         </button>
                         <button
                           onClick={() => onMoveDown(item.id)}
                           disabled={queuePos < 0 || queuePos >= queuedTotal - 1}
-                          className="p-1 rounded hover:bg-white/5 lf-text-muted hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent"
+                          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-white/5 lf-text-muted hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent"
                           title={settings.language === 'en' ? 'Move down' : 'Mover para baixo'}
+                          aria-label={settings.language === 'en' ? 'Move down' : 'Mover para baixo'}
                         >
-                          {settings.iconStyle === 'emoji' ? <span>⬇️</span> : <ArrowDown size={12} className={getAccentTextClass(settings)} />}
+                          {settings.iconStyle === 'emoji' ? <span>⬇️</span> : <ArrowDown size={14} className={getAccentTextClass(settings)} />}
                         </button>
                       </div>
                     )}
 
-                    {/* Main Action Toggles */}
+                    {/* Main Action Toggles — pausa/retomar são reversíveis:
+                        ação imediata. Parar/excluir é destrutivo: abre o
+                        popup de confirmação (onRequestDelete). */}
                     {isDownloading && (
                       <button
                         onClick={() => DownloadEngine.pauseDownload(item.id)}
-                        className="p-2.5 rounded-lg lf-surface-raised hover:bg-zinc-750 lf-text-secondary hover:text-white transition-colors"
+                        className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg lf-surface-raised hover:bg-zinc-750 lf-text-secondary hover:text-white transition-colors active:scale-95"
                         title={settings.language === 'en' ? 'Pause' : 'Pausar'}
+                        aria-label={settings.language === 'en' ? 'Pause' : 'Pausar'}
                       >
-                        {settings.iconStyle === 'emoji' ? <span>⏸️</span> : <Pause size={13} className={getAccentTextClass(settings)} />}
+                        {settings.iconStyle === 'emoji' ? <span>⏸️</span> : <Pause size={16} className={getAccentTextClass(settings)} />}
                       </button>
                     )}
                     {isPaused && (
                       <button
                         onClick={() => DownloadEngine.resumeDownload(item.id)}
-                        className="p-2.5 rounded-lg lf-surface-raised hover:bg-zinc-800 lf-text hover:text-white transition-colors"
+                        className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg lf-surface-raised hover:bg-zinc-800 lf-text hover:text-white transition-colors active:scale-95"
                         title={settings.language === 'en' ? 'Resume' : 'Retomar'}
+                        aria-label={settings.language === 'en' ? 'Resume' : 'Retomar'}
                       >
-                        {settings.iconStyle === 'emoji' ? <span>▶️</span> : <Play size={13} fill="currentColor" className={getAccentTextClass(settings)} />}
+                        {settings.iconStyle === 'emoji' ? <span>▶️</span> : <Play size={16} fill="currentColor" className={getAccentTextClass(settings)} />}
+                      </button>
+                    )}
+                    {(isDownloading || isPaused) && (
+                      <button
+                        onClick={() => onRequestDelete(item)}
+                        className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg lf-surface-raised hover:bg-red-950/40 lf-text-muted hover:text-rose-400 transition-colors active:scale-95"
+                        title={settings.language === 'en' ? 'Stop download…' : 'Parar download…'}
+                        aria-label={settings.language === 'en' ? 'Stop download' : 'Parar download'}
+                      >
+                        {settings.iconStyle === 'emoji' ? <span>✖️</span> : <X size={16} className={getAccentTextClass(settings)} />}
                       </button>
                     )}
                     {isFailed && (
                       <button
                         onClick={() => DownloadEngine.retryDownload(item.id)}
-                        className="p-2.5 rounded-lg lf-surface-raised hover:bg-zinc-800 lf-text hover:text-white transition-colors"
+                        className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg lf-surface-raised hover:bg-zinc-800 lf-text hover:text-white transition-colors active:scale-95"
                         title={settings.language === 'en' ? 'Retry Download' : 'Repetir Download'}
+                        aria-label={settings.language === 'en' ? 'Retry Download' : 'Repetir Download'}
                       >
-                        {settings.iconStyle === 'emoji' ? <span>🔄</span> : <RotateCcw size={13} className={getAccentTextClass(settings)} />}
+                        {settings.iconStyle === 'emoji' ? <span>🔄</span> : <RotateCcw size={16} className={getAccentTextClass(settings)} />}
                       </button>
                     )}
 
@@ -216,35 +236,39 @@ export const DownloadCard = React.memo(function DownloadCard({
                     {isCompleted && (
                       <button
                         onClick={() => onOpenFolder(item)}
-                        className="p-2.5 rounded-lg lf-surface-raised hover:bg-zinc-800 lf-text hover:text-white transition-colors"
+                        className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg lf-surface-raised hover:bg-zinc-800 lf-text hover:text-white transition-colors active:scale-95"
                         title={settings.language === 'en' ? 'Open Folder' : 'Abrir Pasta'}
+                        aria-label={settings.language === 'en' ? 'Open Folder' : 'Abrir Pasta'}
                       >
-                        {settings.iconStyle === 'emoji' ? <span>📁</span> : <FolderOpen size={13} className={getAccentTextClass(settings)} />}
+                        {settings.iconStyle === 'emoji' ? <span>📁</span> : <FolderOpen size={16} className={getAccentTextClass(settings)} />}
                       </button>
                     )}
 
                     <button
                       onClick={() => onPreview(item)}
-                      className="p-2.5 rounded-lg lf-surface-raised hover:bg-zinc-800 lf-text-secondary hover:text-zinc-200 transition-colors"
+                      className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg lf-surface-raised hover:bg-zinc-800 lf-text-secondary hover:text-zinc-200 transition-colors active:scale-95"
                       title={settings.language === 'en' ? 'View Command' : 'Ver Comando'}
+                      aria-label={settings.language === 'en' ? 'View Command' : 'Ver Comando'}
                     >
-                      {settings.iconStyle === 'emoji' ? <span>💻</span> : <Code size={13} className={getAccentTextClass(settings)} />}
+                      {settings.iconStyle === 'emoji' ? <span>💻</span> : <Code size={16} className={getAccentTextClass(settings)} />}
                     </button>
 
                     <button
                       onClick={() => onShare(item)}
-                      className="p-2.5 rounded-lg lf-surface-raised hover:bg-zinc-800 lf-text-secondary hover:text-zinc-200 transition-colors"
+                      className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg lf-surface-raised hover:bg-zinc-800 lf-text-secondary hover:text-zinc-200 transition-colors active:scale-95"
                       title={settings.language === 'en' ? 'Share Link' : 'Compartilhar Link'}
+                      aria-label={settings.language === 'en' ? 'Share Link' : 'Compartilhar Link'}
                     >
-                      {settings.iconStyle === 'emoji' ? <span>🔗</span> : <Share2 size={13} className={getAccentTextClass(settings)} />}
+                      {settings.iconStyle === 'emoji' ? <span>🔗</span> : <Share2 size={16} className={getAccentTextClass(settings)} />}
                     </button>
 
                     <button
-                      onClick={() => DownloadEngine.removeDownload(item.id)}
-                      className="p-2.5 rounded-lg lf-surface-raised hover:bg-red-950/40 lf-text-muted hover:text-rose-400 transition-colors"
-                      title={settings.language === 'en' ? 'Delete Record' : 'Excluir Registro'}
+                      onClick={() => onRequestDelete(item)}
+                      className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg lf-surface-raised hover:bg-red-950/40 lf-text-muted hover:text-rose-400 transition-colors active:scale-95"
+                      title={settings.language === 'en' ? 'Delete…' : 'Excluir…'}
+                      aria-label={settings.language === 'en' ? 'Delete' : 'Excluir'}
                     >
-                      {settings.iconStyle === 'emoji' ? <span>🗑️</span> : <Trash2 size={13} className={getAccentTextClass(settings)} />}
+                      {settings.iconStyle === 'emoji' ? <span>🗑️</span> : <Trash2 size={16} className={getAccentTextClass(settings)} />}
                     </button>
                   </div>
         </AnimatedCard>

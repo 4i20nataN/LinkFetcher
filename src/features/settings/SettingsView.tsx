@@ -25,7 +25,7 @@ export const SettingsView: React.FC = () => {
   const { t } = useTranslation(settings);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  const { isElectron, isAndroid, mobileDir, engineVersion } = useMobileInfo();
+  const { isDesktop, isAndroid, mobileDir, engineVersion } = useMobileInfo();
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -33,7 +33,7 @@ export const SettingsView: React.FC = () => {
   };
 
   useEffect(() => {
-    if (isElectron && (!settings.defaultDir || settings.defaultDir === 'Downloads')) {
+    if (isDesktop && (!settings.defaultDir || settings.defaultDir === 'Downloads')) {
       window.electron!.invoke('shell:getDownloadsPath').then((p: any) => {
         if (p && typeof p === 'string') {
           updateSettings({ defaultDir: p });
@@ -44,10 +44,10 @@ export const SettingsView: React.FC = () => {
 
   // Sync auto-update preference to main process
   useEffect(() => {
-    if (isElectron && window.electron?.setAutoCheck) {
+    if (isDesktop && window.electron?.setAutoCheck) {
       window.electron.setAutoCheck(settings.updates);
     }
-  }, [settings.updates, isElectron]);
+  }, [settings.updates, isDesktop]);
 
   const handleOpenFolder = async () => {
     if (isAndroid) {
@@ -68,12 +68,12 @@ export const SettingsView: React.FC = () => {
       showToast(settings.language === 'en' ? 'No folder configured. Choose a destination folder first.' : 'Nenhuma pasta configurada. Escolha uma pasta de destino primeiro.');
       return;
     }
-    if (!isElectron) return;
+    if (!isDesktop) return;
     await window.electron!.invoke('shell:openPath', downloadPath);
   };
 
   const handleSelectFolder = async () => {
-    if (!isElectron) return;
+    if (!isDesktop) return;
     const selectedPath = await window.electron!.invoke('shell:selectFolder', settings.defaultDir) as string | null;
     if (selectedPath) {
       updateSettings({ defaultDir: selectedPath });

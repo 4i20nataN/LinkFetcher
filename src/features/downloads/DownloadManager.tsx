@@ -17,6 +17,7 @@ import {
 import { getMediaType, formatSpeed } from './manager/downloadFormat';
 import { DownloadList } from './manager/DownloadList';
 import { CommandPreview } from './manager/CommandPreview';
+import { DeleteConfirm } from './manager/DeleteConfirm';
 
 
 export const DownloadManager: React.FC = () => {
@@ -30,6 +31,7 @@ export const DownloadManager: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(LIST_PAGE);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [commandPreview, setCommandPreview] = useState<DownloadItem | null>(null);
+  const [pendingAction, setPendingAction] = useState<DownloadItem | null>(null);
 
   const showToast = useCallback((msg: string) => {
     setToastMsg(msg);
@@ -348,6 +350,7 @@ export const DownloadManager: React.FC = () => {
         onOpenFolder={handleOpenFolder}
         onShare={handleShare}
         onPreview={setCommandPreview}
+        onRequestDelete={setPendingAction}
       />
 
       <AnimatedList>
@@ -356,6 +359,17 @@ export const DownloadManager: React.FC = () => {
             item={commandPreview}
             settings={settings}
             onClose={() => setCommandPreview(null)}
+            showToast={showToast}
+          />
+        )}
+      </AnimatedList>
+
+      <AnimatedList>
+        {pendingAction && (
+          <DeleteConfirm
+            item={pendingAction}
+            settings={settings}
+            onClose={() => setPendingAction(null)}
             showToast={showToast}
           />
         )}

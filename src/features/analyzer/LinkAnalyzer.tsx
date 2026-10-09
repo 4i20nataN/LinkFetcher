@@ -305,6 +305,47 @@ export const LinkAnalyzer: React.FC = () => {
     }, 1200);
   };
 
+  // Download rápido — padrão equilibrado recomendado do yt-dlp:
+  // vídeo: melhor até 1080p60 priorizando mp4+m4a (merge --merge-output-format
+  // mp4 via copy, sem re-encode = merge mínimo) com fallback p/ qualquer
+  // fonte ≤1080p; áudio: bestaudio extraído em MP3 qualidade 0 (máxima).
+  // Mantém as demais opções atuais (pasta, nome, legendas). Sem desc file.
+  const handleQuickDownload = (kind: 'audio' | 'video') => {
+    if (!mediaInfo || mediaInfo.formats.length === 0) {
+      setError(settings.language === 'en' ? 'No format selected. Please wait for analysis to complete.' : 'Nenhum formato selecionado. Aguarde a analise completar.');
+      return;
+    }
+    const refFormat = kind === 'audio'
+      ? (mediaInfo.formats.find(f => f.type === 'audio') ?? mediaInfo.formats[0])
+      : mediaInfo.formats[0];
+    const quickOptions: FormatOptions = {
+      ...formatOptions,
+      format: kind === 'audio'
+        ? 'bestaudio/best'
+        : 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b[height<=1080]',
+      audioOnly: kind === 'audio',
+      audioFormat: kind === 'audio' ? 'mp3' : formatOptions.audioFormat,
+      audioQuality: kind === 'audio' ? '0' : formatOptions.audioQuality,
+      videoOnly: false,
+      // Vídeo rápido: teto 1080p60, container mp4, codecs originais (sem
+      // --format-sort vcodec nem --ppa = merge copy, sem re-encode).
+      ...(kind === 'video' ? {
+        fpsMax: 60,
+        videoFormat: 'mp4',
+        videoCodec: '',
+        normalizeAudio: false,
+        videoSharpen: 'none' as const,
+      } : {}),
+    };
+    setFormatOptions(quickOptions);
+    setSelectedFormat(refFormat);
+    DownloadEngine.addDownload(mediaInfo, refFormat, quickOptions);
+    setSuccessMsg(settings.language === 'en' ? `Added to queue: ${mediaInfo.title.substring(0, 45)}...` : `Adicionado a fila: ${mediaInfo.title.substring(0, 45)}...`);
+    setTimeout(() => {
+      setActiveTab('manager');
+    }, 1200);
+  };
+
   const handleDownloadAllPlaylist = async () => {
     if (!playlistInfo || playlistInfo.items.length === 0 || enqueueProgress) return;
 
@@ -517,9 +558,6 @@ export const LinkAnalyzer: React.FC = () => {
     <div className="max-w-4xl mx-auto space-y-8 py-2 md:py-6 px-4">
       {/* Title Header */}
       <div className="text-center md:text-left space-y-2">
-        <h2 className="font-display font-extrabold text-2xl md:text-4xl text-white tracking-tight leading-tight break-words">
-          {t('universalDownloader')}
-        </h2>
         <p className="lf-text-secondary text-sm md:text-base">
           {settings.language === 'en' 
             ? 'Enter video, audio or image link from any supported platform to start.' 
@@ -615,6 +653,7 @@ export const LinkAnalyzer: React.FC = () => {
           onFormatChange={setSelectedFormat}
           selectedFormat={selectedFormat}
           onStartDownload={handleStartDownload}
+          onQuickDownload={handleQuickDownload}
         />
       )}
 

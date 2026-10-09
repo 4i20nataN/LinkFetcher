@@ -4,15 +4,15 @@ function isTauri(): boolean {
   return typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window);
 }
 
-function isElectron(): boolean {
+function isDesktop(): boolean {
   return typeof window !== 'undefined' && !!(window as any).electron?.invoke;
 }
 
-async function callElectron<T>(channel: string, payload?: unknown): Promise<T> {
-  if (isElectron()) {
+async function callDesktop<T>(channel: string, payload?: unknown): Promise<T> {
+  if (isDesktop()) {
     return window.electron.invoke(channel, payload) as Promise<T>;
   }
-  throw new Error('Electron bridge unavailable');
+  throw new Error('Desktop bridge unavailable');
 }
 
 async function callTauri<T>(command: string, payload?: unknown): Promise<T> {
@@ -65,9 +65,9 @@ export async function probeUrlWithAdapter(options: ProbeOptions): Promise<any> {
   let data: any;
   if (isTauri()) {
     data = await callTauri<any>('ytdlp_probe', options);
-  } else if (isElectron()) {
-    // Electron: use IPC bridge (via shim no Tauri/dev)
-    data = await callElectron<any>('yt-dlp-probe', options);
+  } else if (isDesktop()) {
+    // Desktop: use IPC bridge (via shim no Tauri/dev)
+    data = await callDesktop<any>('yt-dlp-probe', options);
   } else {
     throw new Error('No transport available (requires app)');
   }
@@ -83,8 +83,8 @@ export async function probePlaylistWithAdapter(options: { url: string; proxy?: s
   if (isTauri()) {
     return callTauri<any>('ytdlp_probe_playlist', options);
   }
-  if (isElectron()) {
-    return callElectron<any>('yt-dlp-probe-playlist', options);
+  if (isDesktop()) {
+    return callDesktop<any>('yt-dlp-probe-playlist', options);
   }
   throw new Error('No transport available (requires app)');
 }
@@ -93,9 +93,9 @@ export async function searchVideosWithAdapter(options: SearchOptions): Promise<S
   if (isTauri()) {
     return callTauri<SearchResult[]>('ytdlp_search', options);
   }
-  // Electron: use IPC bridge
-  if (isElectron()) {
-    return callElectron<SearchResult[]>('yt-dlp-search', options);
+  // Desktop: use IPC bridge
+  if (isDesktop()) {
+    return callDesktop<SearchResult[]>('yt-dlp-search', options);
   }
   throw new Error('No transport available (requires app)');
 }
@@ -104,9 +104,9 @@ export async function getYtDlpStatusWithAdapter(): Promise<{ ready: boolean; bin
   if (isTauri()) {
     return callTauri<{ ready: boolean; binaryPath?: string; version?: string; missing?: string[] }>('ytdlp_status');
   }
-  // Electron: use IPC bridge
-  if (isElectron()) {
-    return callElectron<{ ready: boolean; binaryPath?: string }>('yt-dlp-status');
+  // Desktop: use IPC bridge
+  if (isDesktop()) {
+    return callDesktop<{ ready: boolean; binaryPath?: string }>('yt-dlp-status');
   }
   return { ready: false };
 }

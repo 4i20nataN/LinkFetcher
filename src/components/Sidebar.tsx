@@ -28,25 +28,30 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
 
   return (
     <>
-      {/* Header bar (narrow viewport) */}
-      <header className="lg:hidden min-h-16 border-b lf-border bg-black/40 backdrop-blur-md sticky top-0 z-50 flex items-center justify-between px-4 safe-top">
-        <div className="flex items-center gap-2">
+      {/* Header bar (narrow viewport) — com tamanho maior e tons padrão do app */}
+      <header className="lg:hidden min-h-20 py-3 border-b lf-border bg-black/40 backdrop-blur-md sticky top-0 z-50 flex items-center justify-between px-5 safe-top">
+        <div className="flex items-center gap-3">
           <img
             src={getThemeLogo(settings)}
             alt="LinkFetcher"
-            width={36}
-            height={36}
-            className="w-9 h-9 rounded-xl object-cover shrink-0"
+            width={48}
+            height={48}
+            className="w-12 h-12 rounded-2xl object-cover shrink-0 shadow-md"
             decoding="async"
           />
-          <span className="font-display font-bold text-lg tracking-tight">LinkFetcher</span>
+          <div className="flex flex-col">
+            <span className="font-display font-extrabold text-xl tracking-tight leading-tight">LinkFetcher</span>
+            <span className="text-[11px] lf-text-secondary font-mono tracking-wider uppercase opacity-80">
+              {t('mediaDownloader')}
+            </span>
+          </div>
         </div>
         <button 
           onClick={toggleOpen} 
-          className="p-2 rounded-lg hover:bg-white/5 transition-colors"
+          className="p-2.5 rounded-xl hover:bg-white/5 transition-colors"
           aria-label={isOpen ? (settings.language === 'en' ? 'Close menu' : 'Fechar menu') : (settings.language === 'en' ? 'Open menu' : 'Abrir menu')}
         >
-          {isOpen ? <X size={22} /> : <Menu size={22} />}
+          {isOpen ? <X size={26} /> : <Menu size={26} />}
         </button>
       </header>
 
@@ -60,7 +65,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
       {/* Navigation Drawer */}
       <nav 
         className={`
-          fixed top-16 bottom-0 left-0 z-40 w-64 glass-sidebar p-4
+          fixed top-20 bottom-0 left-0 z-40 w-64 glass-sidebar p-4
           lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:glass-sidebar lg:p-6
           transition-transform duration-300 transform
           ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
@@ -68,17 +73,17 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
       >
       <div className="h-full overflow-y-auto">
         {/* Title branding on desktop */}
-        <div className="hidden lg:flex items-center gap-3 mb-10">
+        <div className="hidden lg:flex items-center gap-3.5 mb-10">
           <img
             src={getThemeLogo(settings)}
             alt="LinkFetcher"
-            width={44}
-            height={44}
-            className="w-11 h-11 rounded-2xl object-cover shrink-0"
+            width={48}
+            height={48}
+            className="w-12 h-12 rounded-2xl object-cover shrink-0 shadow-md"
             decoding="async"
           />
           <div>
-            <h1 className="font-display font-extrabold text-xl tracking-tight text-white leading-tight">
+            <h1 className="font-display font-extrabold text-xl tracking-tight leading-tight">
               LinkFetcher
             </h1>
             <p className="text-xs lf-text-secondary font-mono tracking-wider uppercase">{t('mediaDownloader')}</p>

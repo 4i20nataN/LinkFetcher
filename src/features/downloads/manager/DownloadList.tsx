@@ -25,6 +25,7 @@ export interface DownloadListProps {
   onOpenFolder: (item: DownloadItem) => void;
   onShare: (item: DownloadItem) => void;
   onPreview: (item: DownloadItem) => void;
+  onRequestDelete: (item: DownloadItem) => void;
 }
 
 export function listSignature(items: DownloadItem[]): string {
@@ -33,10 +34,12 @@ export function listSignature(items: DownloadItem[]): string {
 
 export const DownloadList = React.memo(function DownloadList({
   items: filteredDownloads, visibleCount, onShowMore, settings, t, queuedIds,
-  onMoveUp, onMoveDown, onOpenFolder, onShare, onPreview,
+  onMoveUp, onMoveDown, onOpenFolder, onShare, onPreview, onRequestDelete,
 }: DownloadListProps) {
   return (
-    <div className="space-y-3.5">
+    // Padding inferior folgado: no Android edge-to-edge a barra de gestos do
+    // sistema sobrepunha os botões do último card (print SM-A107M).
+    <div className="space-y-3.5 pb-[max(5rem,env(safe-area-inset-bottom))]">
       {filteredDownloads.length === 0 ? (
         /* Empty State */
         <div className="p-12 text-center rounded-2xl lf-surface/10 border border-dashed lf-border flex flex-col items-center justify-center space-y-3">
@@ -69,6 +72,7 @@ export const DownloadList = React.memo(function DownloadList({
                 onOpenFolder={onOpenFolder}
                 onShare={onShare}
                 onPreview={onPreview}
+                onRequestDelete={onRequestDelete}
               />
             );
           })}

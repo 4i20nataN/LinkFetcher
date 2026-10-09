@@ -11,7 +11,7 @@ import { AnimatedAccordion } from '../../animation/AnimatedAccordion';
 import { AnimatedButton } from '../../animation/AnimatedButton';
 import { TabIndicator, LayoutGroup } from '../../animation/TabIndicator';
 import { slideUp, scaleIn, transitions } from '../../animation/variants';
-import { ChevronDown, ChevronUp, Info, ArrowDownToLine, AlertTriangle, FileText, Download, X, Subtitles } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info, ArrowDownToLine, AlertTriangle, FileText, Download, X, Subtitles, Music, Clapperboard } from 'lucide-react';
 import { AUDIO_QUALITY_PRESETS } from './constants';
 
 interface FormatSelectorProps {
@@ -19,6 +19,7 @@ interface FormatSelectorProps {
   onFormatSelect: (options: FormatOptions) => void;
   onFormatChange?: (format: MediaFormat) => void;
   formatOptions?: FormatOptions;
+  onQuickDownload?: (kind: 'audio' | 'video') => void;
 }
 
 import type { FormatOptions } from './FormatOptions';
@@ -66,7 +67,7 @@ import {
 
 type TabId = 'media' | 'advanced';
 
-export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, formatOptions }: FormatSelectorProps) {
+export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, formatOptions, onQuickDownload }: FormatSelectorProps) {
   const { settings, updateSettings } = useApp();
   const { t } = useTranslation(settings);
   const [activeTab, setActiveTab] = useState<TabId>('media');
@@ -344,6 +345,31 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
 
   return (
     <div className="space-y-3" style={{ '--ui-scale': uiScale } as React.CSSProperties}>
+      {/* Download rápido: vídeo 1080p60 mp4 (merge copy) / MP3 máxima */}
+      <p className="font-bold text-white text-center text-base pt-4 mb-3">
+        {settings.language === 'en' ? '⚡ Quick Download' : '⚡ Download Rápido'}
+      </p>
+      <div className="grid grid-cols-2 gap-2 pb-3">
+        <button
+          onClick={() => onQuickDownload?.('video')}
+          className="flex items-center justify-center gap-2 py-2.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold fs-sm whitespace-nowrap transition-all shadow-lg hover:scale-[1.01] active:scale-[0.99]"
+        >
+          <Clapperboard size={15} className="text-white shrink-0" />
+          {settings.language === 'en' ? 'Default Video' : 'Vídeo Padrão'}
+        </button>
+        <button
+          onClick={() => onQuickDownload?.('audio')}
+          className="flex items-center justify-center gap-2 py-2.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold fs-sm whitespace-nowrap transition-all shadow-lg hover:scale-[1.01] active:scale-[0.99]"
+        >
+          <Music size={15} className="text-white shrink-0" />
+          {settings.language === 'en' ? 'MP3 Audio' : 'Áudio MP3'}
+        </button>
+      </div>
+      {/* Divisor: download personalizado em bloco próprio abaixo */}
+      <div className="border-t lf-border pt-4 mt-1">
+      <p className="font-bold text-white text-center text-base mb-3">
+        {settings.language === 'en' ? '🎛️ Custom Download' : '🎛️ Download Personalizado'}
+      </p>
       <LayoutGroup>
       <div className="flex items-center gap-1 border-b lf-border">
         {([
@@ -401,6 +427,7 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
         )}
       </AnimatedList>
       </LayoutGroup>
+      </div>
     </div>
   );
 });

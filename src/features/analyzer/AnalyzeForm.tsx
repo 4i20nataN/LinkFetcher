@@ -55,61 +55,7 @@ export function AnalyzeForm({ url, setUrl, loading, onPaste, onSubmit, onClear }
   };
 
   return (
-    <div className="p-4 md:p-6 rounded-3xl glass-card shadow-2xl">
-      <div className="flex flex-col md:flex-row gap-3">
-        <div className="relative flex-1">
-          <input
-            type="text"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder={t('mainPlaceholder')}
-            autoComplete="off"
-              className={`
-              w-full pl-4 pr-12 py-3.5 rounded-xl lf-surface border lf-border text-sm text-white placeholder-zinc-500
-              focus:border-transparent focus:outline-none focus:ring-2 ${getAccentRingClass(settings)} transition-all
-            `}
-            onKeyDown={(e) => e.key === 'Enter' && onSubmit()}
-          />
-          {url && (
-            <button
-              onClick={onClear}
-              className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-white/5 lf-text-secondary hover:text-white transition-colors"
-            >
-              <Trash2 size={16} />
-            </button>
-          )}
-        </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={onPaste}
-            type="button"
-            className="flex-1 md:flex-none px-4 py-3.5 rounded-xl lf-surface-raised hover:bg-zinc-850 text-zinc-200 border lf-border hover:text-white font-medium text-sm transition-all"
-          >
-            {t('btnPaste')}
-          </button>
-          <button
-            onClick={() => onSubmit()}
-            disabled={loading || !url}
-            className={`
-              flex-1 md:flex-none px-6 py-3.5 rounded-xl text-white font-semibold text-sm transition-all shadow-lg
-              ${loading || !url
-                ? 'lf-surface-raised lf-text-muted cursor-not-allowed border lf-border shadow-none'
-                : `${getAccentBgClass(settings)} hover:shadow-indigo-500/20`
-              }
-            `}
-          >
-            {loading ? (
-              <span className="flex items-center gap-2 justify-center">
-                <RefreshCw size={16} className="animate-spin" /> {settings.language === 'en' ? 'Analyzing...' : 'Analisando...'}
-              </span>
-            ) : (
-              t('btnAnalyze')
-            )}
-          </button>
-        </div>
-      </div>
-
+    <>
       {/* Supported platforms strip */}
       <div
         className="slider-container"
@@ -180,6 +126,63 @@ export function AnalyzeForm({ url, setUrl, loading, onPaste, onSubmit, onClear }
           <div className="tag bandcamp"><Music size={18} />Bandcamp</div>
         </div>
       </div>
+
+      <div className="p-4 md:p-6 rounded-3xl glass-card shadow-2xl">
+      <div className="flex flex-col md:flex-row gap-3">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder={t('mainPlaceholder')}
+            autoComplete="off"
+              className={`
+              w-full pl-4 pr-12 py-3.5 rounded-xl lf-surface border lf-border text-sm text-white placeholder-zinc-500
+              focus:border-transparent focus:outline-none focus:ring-2 ${getAccentRingClass(settings)} transition-all
+            `}
+            onKeyDown={(e) => e.key === 'Enter' && onSubmit()}
+          />
+          {url && (
+            <button
+              onClick={onClear}
+              className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-white/5 lf-text-secondary hover:text-white transition-colors"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={onPaste}
+            type="button"
+            className="flex-1 md:flex-none px-4 py-3.5 rounded-xl lf-surface-raised hover:bg-zinc-850 text-zinc-200 border lf-border hover:text-white font-medium text-sm transition-all"
+          >
+            {t('btnPaste')}
+          </button>
+          <button
+            onClick={() => onSubmit()}
+            disabled={loading || !url}
+            className={`
+              flex-1 md:flex-none px-6 py-3.5 rounded-xl text-white font-semibold text-sm transition-all shadow-lg
+              ${loading || !url
+                ? 'lf-surface-raised lf-text-muted cursor-not-allowed border lf-border shadow-none'
+                : `${getAccentBgClass(settings)} hover:shadow-indigo-500/20`
+              }
+            `}
+          >
+            {loading ? (
+              <span className="flex items-center gap-2 justify-center">
+                <RefreshCw size={16} className="animate-spin" /> {settings.language === 'en' ? 'Analyzing...' : 'Analisando...'}
+              </span>
+            ) : (
+              t('btnAnalyze')
+            )}
+          </button>
+        </div>
+      </div>
+
     </div>
+    </>
   );
 }

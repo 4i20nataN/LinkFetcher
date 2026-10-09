@@ -31,8 +31,13 @@ class DownloadEngineClass {
   private items: DownloadItem[] = [];
   private listeners: Set<EngineListener> = new Set();
 
-  // Map download id → cancel function
-  private cancelFns = new Map<string, () => void>();
+  // Map download id → kill nativo. Recebe `cleanup` explícito: `true` =
+  // cancelamento definitivo (apaga .part), `false` = pausa (preserva .part
+  // p/ resume). Explícito de propósito: a versão anterior lia `item.status`
+  // dentro do closure, mas o status só era ajustado DEPOIS da chamada — todo
+  // cancel chegava ao nativo como pausa (sem cleanup, notificação de
+  // "pausado" no Android e .part órfão). Quem chama decide, sem adivinhar.
+  private cancelFns = new Map<string, (cleanup: boolean) => void>();
   // Throttle de renders: último notify de progresso por download (ms)
   private lastProgressNotify = new Map<string, number>();
   // Último evento recebido por download: sem evento há muito tempo + volta
@@ -248,23 +253,40 @@ class DownloadEngineClass {
     this.processQueue();
   }
 
-  pauseDownload(id: string) {
+  // advanceQueue: pausa unica libera o slot p/ o proximo; bulk (pauseAll)
+  // mantem false p/ nao ressuscitar a fila no meio do loop.
+  pauseDownload(id: string, advanceQueue = false) {
     const item = this.items.find(i => i.id === id);
     if (!item || item.status !== 'downloading') return;
 
-    // Cancel any active download function
-    const cancelFn = this.cancelFns.get(id);
-    if (cancelFn) {
-      cancelFn();
-      this.cancelFns.delete(id);
-    }
-
+    // Estado primeiro: o kill abaixo é fire-and-forget e o `catch` do
+    // startTauriDownload decide entre "intenção do usuário" vs "failed" pelo
+    // status. Com a ordem inversa, o kill viajava como `downloading` e um
+    // erro de corrida virava "failed" indevido.
     item.status = 'paused';
     item.speed = 0;
     item.eta = 0;
     item.processing = false;
+    item.activity = undefined;
     this.touch(id);
+
+    // Mata o processo preservando o .part (resume reaproveita).
+    const cancelFn = this.cancelFns.get(id);
+    if (cancelFn) {
+      try { cancelFn(false); } catch {}
+      this.cancelFns.delete(id);
+    } else {
+      // Sem handle local (ex. reload com nativo órfão): tenta matar direto.
+      this.forceNativeCancel(id, false);
+    }
+    this.stopPoll(id);
+    this.unlistenFns.get(id)?.();
+    this.unlistenFns.delete(id);
+    this.lastProgressNotify.delete(id);
+    this.lastEventSig.delete(id);
+
     this.notify();
+    if (advanceQueue) this.processQueue();
   }
 
   resumeDownload(id: string) {
@@ -287,34 +309,82 @@ class DownloadEngineClass {
     ).catch(() => {});
   }
 
-  cancelDownload(id: string) {
+  // advanceQueue: cancelamento unico avanca a fila; bulk (cancelAll)
+  // mantem false p/ nao iniciar queued no meio do loop.
+  cancelDownload(id: string, advanceQueue = false) {
     const item = this.items.find(i => i.id === id);
     if (!item) return;
+    if (!['queued', 'downloading', 'paused'].includes(item.status)) return;
 
-    // Cancel any active download function
-    const cancelFn = this.cancelFns.get(id);
-    if (cancelFn) {
-      cancelFn();
-      this.cancelFns.delete(id);
-    }
-
+    // Estado primeiro (mesmo motivo do pauseDownload): kill é async e o
+    // desfecho do invoke consulta o status.
     item.status = 'cancelled';
     item.speed = 0;
     item.eta = 0;
     item.processing = false;
+    item.activity = undefined;
     this.touch(id);
+
+    // Cancelamento definitivo: mata o nativo + apaga .part.
+    const cancelFn = this.cancelFns.get(id);
+    if (cancelFn) {
+      try { cancelFn(true); } catch {}
+      this.cancelFns.delete(id);
+    } else {
+      this.forceNativeCancel(id, true);
+    }
+    this.stopPoll(id);
+    this.unlistenFns.get(id)?.();
+    this.unlistenFns.delete(id);
+    this.lastProgressNotify.delete(id);
+    this.lastEventSig.delete(id);
+    this.fireCleanup(item.id, item.filePath);
+
     this.notify();
+    if (advanceQueue) this.processQueue();
   }
 
+  // Excluir da lista: ativo PRECISA parar o nativo ANTES de sumir — sem
+  // isso o card some mas o yt-dlp continua em background (sintoma do
+  // SM-A107M). Ordem: marca cancelled → kill com cleanup=true → limpa
+  // listeners/poll → apaga .part → remove da lista → avança a fila.
+  // Finalizado (completed/failed/cancelled) só remove o registro: o arquivo
+  // final em disco nunca é tocado.
   removeDownload(id: string) {
     const item = this.items.find(i => i.id === id);
-    this.items = this.items.filter(i => i.id !== id);
-    // Item fora da lista não tem mais resume: apaga parciais órfãos.
-    // Só temporários (.part etc.) — o final de `completed` é preservado.
-    if (item && item.status !== 'downloading') {
+    if (!item) return;
+    const isActive = ['queued', 'downloading', 'paused'].includes(item.status);
+    if (isActive) {
+      item.status = 'cancelled';
+      const cancelFn = this.cancelFns.get(id);
+      if (cancelFn) {
+        try { cancelFn(true); } catch {}
+        this.cancelFns.delete(id);
+      } else {
+        this.forceNativeCancel(id, true);
+      }
+      this.stopPoll(id);
+      this.unlistenFns.get(id)?.();
+      this.unlistenFns.delete(id);
+      this.lastProgressNotify.delete(id);
+      this.lastEventAt.delete(id);
+      this.lastEventSig.delete(id);
+      this.fireCleanup(item.id, item.filePath);
+    } else {
       this.fireCleanup(item.id, item.filePath);
     }
-    this.notify();
+    this.items = this.items.filter(i => i.id !== id);
+    this.notify(true);
+    this.processQueue();
+  }
+
+  // Mata um nativo órfão (sem handle local): reload com download correndo,
+  // item pausado sem cancelFn, etc. Fire-and-forget — erro significa "nada
+  // rodando", que já é o estado desejado.
+  private forceNativeCancel(id: string, cleanup: boolean) {
+    import('@tauri-apps/api/core').then(({ invoke }) =>
+      invoke('ytdlp_cancel', { id, cleanup }).catch(() => {})
+    ).catch(() => {});
   }
 
   // Registra um arquivo já salvo em disco (ex. capa) como item concluído,
@@ -550,6 +620,7 @@ class DownloadEngineClass {
           finish();
           this.touch(item.id);
           this.notify();
+          this.processQueue();
         } else if (data.type === 'error') {
           if (item.status === 'paused' || item.status === 'cancelled') {
             finish();
@@ -572,6 +643,7 @@ class DownloadEngineClass {
           finish();
           this.touch(item.id);
           this.notify();
+          this.processQueue();
         }
       };
 
@@ -614,17 +686,17 @@ class DownloadEngineClass {
         this.unlistenFns.delete(item.id);
       };
 
-      // Store unlisten and kill hook for cancel/pause. O status já foi
-      // ajustado pelo chamador: `cancelled` = definitivo (apaga .part),
-      // `paused` = preserva o .part para resume.
-      this.cancelFns.set(item.id, () => {
+      // Store unlisten and kill hook for cancel/pause. `cleanup` é
+      // explícito (não lido do status): pause=false preserva o .part p/
+      // resume, cancel/delete=true apaga. Ver comentário do cancelFns.
+      this.cancelFns.set(item.id, (cleanup: boolean) => {
         finish();
         this.lastProgressNotify.delete(item.id);
         this.lastEventAt.delete(item.id);
         this.lastEventSig.delete(item.id);
         this.unlistenFns.get(item.id)?.();
         this.unlistenFns.delete(item.id);
-        const args = item.status === 'cancelled'
+        const args = cleanup
           ? { id: item.id, cleanup: true }
           : { id: item.id };
         invoke('ytdlp_cancel', args).catch(() => {});
@@ -644,6 +716,7 @@ class DownloadEngineClass {
         this.lastEventSig.delete(item.id);
         this.touch(item.id);
         this.notify();
+        this.processQueue();
       }
     } catch (error: any) {
       // O kill de pausa/cancelamento rejeita o invoke de propósito: a intenção
@@ -784,6 +857,7 @@ class DownloadEngineClass {
     } catch {
       return;
     }
+    let applied = false;
     for (const item of stale) {
       let st: any = null;
       try {
@@ -819,7 +893,9 @@ class DownloadEngineClass {
       this.unlistenFns.delete(item.id);
       this.touch(item.id);
       this.notify();
+      applied = true;
     }
+    if (applied) this.processQueue();
   }
 
   // Progress helpers

@@ -149,7 +149,7 @@ function DashboardContent() {
       </div>
 
       {/* Main Panel */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain relative p-4 md:p-8">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain relative p-4 md:p-8 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
 
         {/* Auto-Update Banner — lazy loaded (desktop only: sem plugin no mobile) */}
         {!isAndroid() && (

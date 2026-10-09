@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 
 export function useMobileInfo() {
-  const isElectron = typeof window !== 'undefined' && !!window.electron;
+  const isDesktop = typeof window !== 'undefined' && !!window.electron;
   // Tauri mobile (Android): sem diálogo de pasta nem path custom — o app
   // usa a pasta própria no armazenamento externo (via `fs_get_downloads_path`).
   const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
@@ -28,5 +28,5 @@ export function useMobileInfo() {
     })();
   }, [isAndroid]);
 
-  return { isElectron, isAndroid, mobileDir, engineVersion };
+  return { isDesktop, isAndroid, mobileDir, engineVersion };
 }

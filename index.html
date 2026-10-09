@@ -8,18 +8,107 @@
     <title>LinkFetcher</title>
     <style>
       html,body,#root{height:100%;margin:0;padding:0;overflow:hidden;background:#030406;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif}
-      #root>div{display:flex;flex-direction:column;height:100%}
-      .lf-skel{display:flex;align-items:center;gap:.5rem;padding:1rem;font-weight:700;font-size:1.125rem;letter-spacing:-.025em;min-height:4rem;border-bottom:1px solid rgba(255,255,255,.06)}
-      .lf-skel-icon{width:2.5rem;height:2.5rem;border-radius:.75rem;background:linear-gradient(135deg,#6366f1,#818cf8);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+      #root{display:flex;flex-direction:column;height:100%}
+      .lf-startup-splash {
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:center;
+        height:100%;
+        width:100%;
+        background:#030406;
+        user-select:none;
+        padding:2rem;
+        box-sizing:border-box;
+      }
+      .lf-startup-logo-wrapper {
+        position:relative;
+        width:96px;
+        height:96px;
+        margin-bottom:1.5rem;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+      }
+      .lf-startup-logo-glow {
+        position:absolute;
+        inset:-8px;
+        border-radius:28px;
+        background:radial-gradient(circle, rgba(6,182,212,0.45) 0%, rgba(168,85,247,0.3) 50%, transparent 70%);
+        filter:blur(14px);
+        animation:lf-pulse 2.2s ease-in-out infinite alternate;
+      }
+      .lf-startup-logo {
+        position:relative;
+        width:96px;
+        height:96px;
+        border-radius:24px;
+        object-fit:cover;
+        box-shadow:0 12px 30px rgba(0,0,0,0.6), 0 0 20px rgba(6,182,212,0.3);
+        border:1px solid rgba(255,255,255,0.12);
+        animation:lf-float 2.5s ease-in-out infinite alternate;
+      }
+      .lf-startup-title {
+        font-weight:900;
+        font-size:1.75rem;
+        letter-spacing:-0.03em;
+        background:linear-gradient(135deg, #ffffff 40%, #67e8f9 100%);
+        -webkit-background-clip:text;
+        -webkit-text-fill-color:transparent;
+        margin-bottom:0.25rem;
+      }
+      .lf-startup-sub {
+        font-size:0.8rem;
+        color:#94a3b8;
+        letter-spacing:0.12em;
+        text-transform:uppercase;
+        font-family:monospace;
+        margin-bottom:2rem;
+      }
+      .lf-startup-loader {
+        width:140px;
+        height:4px;
+        background:rgba(255,255,255,0.08);
+        border-radius:999px;
+        overflow:hidden;
+        position:relative;
+      }
+      .lf-startup-loader::after {
+        content:'';
+        position:absolute;
+        top:0;
+        left:0;
+        bottom:0;
+        width:45%;
+        background:linear-gradient(90deg, #06b6d4, #a855f7);
+        border-radius:999px;
+        animation:lf-slide 1.4s ease-in-out infinite;
+      }
+      @keyframes lf-pulse {
+        0% { opacity:0.4; transform:scale(0.95); }
+        100% { opacity:0.85; transform:scale(1.1); }
+      }
+      @keyframes lf-float {
+        0% { transform:translateY(0); }
+        100% { transform:translateY(-4px); }
+      }
+      @keyframes lf-slide {
+        0% { left:-45%; }
+        50% { left:40%; width:55%; }
+        100% { left:100%; width:30%; }
+      }
     </style>
   </head>
   <body>
     <div id="root" role="application" aria-label="LinkFetcher">
-      <div>
-        <div class="lf-skel">
-          <div class="lf-skel-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
-          <span>LinkFetcher</span>
+      <div class="lf-startup-splash">
+        <div class="lf-startup-logo-wrapper">
+          <div class="lf-startup-logo-glow"></div>
+          <img src="/app-logo.webp" alt="LinkFetcher" class="lf-startup-logo" />
         </div>
+        <div class="lf-startup-title">LinkFetcher</div>
+        <div class="lf-startup-sub">Media Downloader</div>
+        <div class="lf-startup-loader"></div>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>

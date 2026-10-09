@@ -14,11 +14,11 @@ export function ClipboardPopup({ onDismiss, onAnalyze, url }: ClipboardPopupProp
   const [detectedUrl, setDetectedUrl] = useState('');
   const [visible, setVisible] = useState(false);
 
-  const isElectron = typeof window !== 'undefined' && !!window.electron;
+  const isDesktop = typeof window !== 'undefined' && !!window.electron;
 
   // Desktop: listen for clipboard events (via shim)
   useEffect(() => {
-    if (!isElectron || !settings.clipboardMonitoringEnabled) return;
+    if (!isDesktop || !settings.clipboardMonitoringEnabled) return;
 
     const unsub = window.electron!.onClipboardUrlDetected((url: string) => {
       setDetectedUrl(url);
@@ -26,7 +26,7 @@ export function ClipboardPopup({ onDismiss, onAnalyze, url }: ClipboardPopupProp
     });
 
     return () => { unsub(); };
-  }, [isElectron, settings.clipboardMonitoringEnabled]);
+  }, [isDesktop, settings.clipboardMonitoringEnabled]);
 
   // URL vinda do monitoramento do App (polling nativo)
   useEffect(() => {

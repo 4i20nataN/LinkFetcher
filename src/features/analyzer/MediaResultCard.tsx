@@ -37,12 +37,13 @@ export interface MediaResultCardProps {
   onFormatChange: (f: MediaFormat) => void;
   selectedFormat: MediaFormat | null;
   onStartDownload: () => void;
+  onQuickDownload?: (kind: 'audio' | 'video') => void;
 }
 
 export function MediaResultCard({
   mediaInfo, isFav, isLater, onToggleFav, onToggleLater, onDownloadThumbnail,
   showCoverFormats, probeLoading, probeError, formatOptions, onFormatSelect,
-  onFormatChange, selectedFormat, onStartDownload,
+  onFormatChange, selectedFormat, onStartDownload, onQuickDownload,
 }: MediaResultCardProps) {
   const { settings } = useApp();
   const { t } = useTranslation(settings);
@@ -213,6 +214,7 @@ export function MediaResultCard({
               onFormatSelect={onFormatSelect}
               onFormatChange={onFormatChange}
               formatOptions={formatOptions}
+              onQuickDownload={onQuickDownload}
             />
           </Suspense>
         </div>
