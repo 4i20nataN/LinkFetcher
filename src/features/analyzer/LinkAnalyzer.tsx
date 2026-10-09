@@ -12,6 +12,8 @@ import {
   getAccentTextClass
 } from '../../components/ThemeWrapper';
 import { DownloadEngine } from '../../core/engine/DownloadEngine';
+import { getLicense } from '../../core/license/licenseStore';
+import { isLicenseActive } from '../../core/license/license';
 import type { FormatOptions } from '../downloads/FormatOptions';
 import { isPlaylistUrl } from '../../core/ytdlp/playlistUtils';
 import { adapterErrorMessage } from '../../core/ytdlp/YtDlpAdapter';
@@ -251,6 +253,12 @@ export const LinkAnalyzer: React.FC = () => {
   const handleStartDownload = () => {
     if (!mediaInfo || !selectedFormat) {
       setError(settings.language === 'en' ? 'No format selected. Please wait for analysis to complete.' : 'Nenhum formato selecionado. Aguarde a analise completar.');
+      return;
+    }
+    // Download personalizado é PRO: sem licença, o caminho é o Download Rápido
+    // (fecha o bypass de baixar 4K pelos defaults com o painel travado).
+    if (!isLicenseActive(getLicense())) {
+      setError(settings.language === 'en' ? 'Custom download is PRO — use Quick Download or activate your key in the Custom Download panel.' : 'Download personalizado é PRO — use o Download Rápido ou ative sua chave no painel Download Personalizado.');
       return;
     }
 

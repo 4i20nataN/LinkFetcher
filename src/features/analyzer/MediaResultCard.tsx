@@ -15,10 +15,12 @@ import { slideUpStrong } from '../../animation/variants';
 import { PlatformBadge } from '../../components/PlatformBadge';
 import {
   Play, FileVideo, Music, Image as ImageIcon, Eye, Calendar, FolderOpen,
-  Clock, Star, ExternalLink, Download, RefreshCw, AlertCircle,
+  Clock, Star, ExternalLink, Download, RefreshCw, AlertCircle, Lock,
 } from 'lucide-react';
 import { formatUploadDate } from './analyzerUtils';
 import { SummaryPanel } from './SummaryPanel';
+import { useLicense } from '../../core/license/licenseStore';
+import { isLicenseActive } from '../../core/license/license';
 
 const FormatSelector = React.lazy(() => import('../downloads/FormatSelector').then(m => ({ default: m.FormatSelector })));
 
@@ -48,6 +50,9 @@ export function MediaResultCard({
   const { settings } = useApp();
   const { t } = useTranslation(settings);
   const platformConfig = ProviderRegistry.getPlatformConfig(mediaInfo.platform);
+  // Sem PRO o download personalizado não executa (o painel acima explica e
+  // vende; o handleStartDownload mantém a barreira por segurança).
+  const customLocked = !isLicenseActive(useLicense());
 
   return (
     <AnimatedList>
@@ -225,13 +230,14 @@ export function MediaResultCard({
           <div className="flex justify-end">
             <button
               onClick={onStartDownload}
-              disabled={!selectedFormat}
+              disabled={!selectedFormat || customLocked}
+              title={customLocked ? (settings.language === 'en' ? 'PRO only' : 'Somente PRO') : undefined}
               className={`
                 w-full sm:w-auto px-6 py-3 rounded-xl text-white font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition-all
-                ${!selectedFormat ? 'bg-zinc-600 hover:bg-zinc-600 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500'} hover:scale-[1.02] active:scale-[0.98]
+                ${(!selectedFormat || customLocked) ? 'bg-zinc-600 hover:bg-zinc-600 cursor-not-allowed opacity-60' : 'bg-emerald-600 hover:bg-emerald-500'} hover:scale-[1.02] active:scale-[0.98]
               `}
             >
-              <Download size={18} />
+              {customLocked ? <Lock size={18} /> : <Download size={18} />}
               {t('btnDownloadSelected')}
             </button>
           </div>

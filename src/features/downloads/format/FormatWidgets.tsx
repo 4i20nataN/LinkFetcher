@@ -312,7 +312,7 @@ export const AccordionSection = React.memo<AccordionSectionProps>(({ title, bloc
   <div className="rounded-xl lf-surface-50 border-[0.5px] lf-border-strong glass-section">
     <button
       onClick={onToggle}
-      className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/[0.02] transition-colors"
+      className="acc-head w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/[0.02] transition-colors"
     >
       <div className="flex items-center gap-3">
         <BlockIcon blockId={blockId} />

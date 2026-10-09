@@ -1608,3 +1608,11 @@ input[type="checkbox"] {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
+/* ── Vitrine PRO ──────────────────────────────────────────────────────────── */
+/* Painel travado: tudo sem clique, EXCETO os cabeçalhos dos acordeões, que */
+/* seguem expansíveis p/ o usuário ver as opções (regra direta: o seletor   */
+/* arbitrário do Tailwind não cobria esse caso).                            */
+.pro-locked .acc-head {
+  pointer-events: auto;
+}
+

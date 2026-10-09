@@ -11,8 +11,11 @@ import { AnimatedAccordion } from '../../animation/AnimatedAccordion';
 import { AnimatedButton } from '../../animation/AnimatedButton';
 import { TabIndicator, LayoutGroup } from '../../animation/TabIndicator';
 import { slideUp, scaleIn, transitions } from '../../animation/variants';
-import { ChevronDown, ChevronUp, Info, ArrowDownToLine, AlertTriangle, FileText, Download, X, Subtitles, Music, Clapperboard } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info, ArrowDownToLine, AlertTriangle, FileText, Download, X, Subtitles, Music, Clapperboard, Lock, Sparkles } from 'lucide-react';
 import { AUDIO_QUALITY_PRESETS } from './constants';
+import { useLicense } from '../../core/license/licenseStore';
+import { isLicenseActive } from '../../core/license/license';
+import { LicenseModal } from '../../core/license/LicenseModal';
 
 interface FormatSelectorProps {
   mediaInfo: MediaInfo;
@@ -80,6 +83,9 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
   const [useUnderscore, setUseUnderscore] = useState(true);
   const [uiScale, setUiScale] = useState(50);
   const [descExpanded, setDescExpanded] = useState(false);
+  const [showLicense, setShowLicense] = useState(false);
+  const license = useLicense();
+  const proActive = isLicenseActive(license);
 
   const maxRes = useMemo(() => getMaxVideoHeight(mediaInfo.formats), [mediaInfo.formats]);
 
@@ -324,6 +330,31 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
   );
   const isOverMaxRes = selectedPreset && selectedPreset.height !== Infinity && maxRes > 0 && selectedPreset.height > maxRes;
 
+  // Presets pesados: avisa antes de baixar (4K, áudio sem perda, preset acima
+  // do real). Vende o PRO com honestidade — sem bloquear, só informar.
+  const heavyReason = (() => {
+    const isEn = settings.language === 'en';
+    if (isOverMaxRes) return isEn
+      ? `This video only goes up to ${maxRes}p — download will come at that quality.`
+      : `Este vídeo só tem até ${maxRes}p — o download virá nessa qualidade.`;
+    if (selectedPreset && selectedPreset.height !== Infinity && selectedPreset.height >= 2160) return isEn
+      ? '4K: heavy file and slow processing.'
+      : '4K: arquivo pesado e processamento lento.';
+    if (options.audioOnly && (options.audioFormat === 'flac' || options.audioFormat === 'wav')) return isEn
+      ? `${options.audioFormat.toUpperCase()} lossless: max quality, much bigger file.`
+      : `${options.audioFormat.toUpperCase()} sem perda: qualidade máxima, arquivo bem maior.`;
+    return null;
+  })();
+
+  // Vitrine: travado, cada aba vende o que libera (sempre visível e clicável).
+  const proPitch = activeTab === 'media'
+    ? (settings.language === 'en'
+      ? 'With PRO: up to 4K resolution, heavy files and specific codecs.'
+      : 'No PRO: resolução até 4K, arquivos pesados e codecs específicos.')
+    : (settings.language === 'en'
+      ? 'With PRO: trim clips, metadata, SponsorBlock, artwork and more.'
+      : 'No PRO: recorte trechos, metadados, SponsorBlock, capa e mais.');
+
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const toggleSection = useCallback((id: string) => {
     setOpenSections(prev => {
@@ -367,9 +398,38 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
       </div>
       {/* Divisor: download personalizado em bloco próprio abaixo */}
       <div className="border-t lf-border pt-4 mt-1">
-      <p className="font-bold text-white text-center text-base mb-3">
-        {settings.language === 'en' ? '🎛️ Custom Download' : '🎛️ Download Personalizado'}
-      </p>
+      <div className="text-center mb-3">
+        <p className="font-bold text-white text-base">
+          {settings.language === 'en' ? '🎛️ Custom Download' : '🎛️ Download Personalizado'}
+          <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 align-middle">PRO</span>
+        </p>
+        <p className="fs-sm lf-text-muted mt-1">
+          {settings.language === 'en'
+            ? 'Resolution, codec, trims and subtitles — full control of the final file'
+            : 'Resolução, codec, cortes e legendas — controle total do arquivo final'}
+        </p>
+        {proActive && license?.name && (
+          <p className="fs-sm text-emerald-400 mt-1">
+            {settings.language === 'en' ? `Licensed to ${license.name}` : `Licenciado para ${license.name}`}
+          </p>
+        )}
+      </div>
+      {!proActive && (
+        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
+          <span className="p-1.5 rounded-full bg-emerald-500/15 text-emerald-400 shrink-0">
+            <Sparkles size={14} />
+          </span>
+          <p className="flex-1 fs-sm lf-text-secondary text-left">
+            {settings.language === 'en' ? 'Explore freely — activate PRO to edit.' : 'Explore à vontade — ative o PRO para editar.'}
+          </p>
+          <button
+            onClick={() => setShowLicense(true)}
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold whitespace-nowrap transition-all"
+          >
+            {settings.language === 'en' ? 'Activate PRO' : 'Ativar PRO'}
+          </button>
+        </div>
+      )}
       <LayoutGroup>
       <div className="flex items-center gap-1 border-b lf-border">
         {([
@@ -395,6 +455,20 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
           );
         })}
       </div>
+      {!proActive ? (
+        <div className="flex items-center gap-2 p-2.5 mt-4 mb-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 fs-sm">
+          <Sparkles size={14} className="shrink-0" />
+          <span>{proPitch}</span>
+        </div>
+      ) : (
+        heavyReason && (
+          <div className="flex items-center gap-2 p-2.5 mt-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 fs-sm">
+            <AlertTriangle size={14} className="shrink-0" />
+            <span>{heavyReason}</span>
+          </div>
+        )
+      )}
+      <div className={proActive ? '' : 'pro-locked opacity-60 pointer-events-none select-none [&_.acc-head]:pointer-events-auto'} aria-disabled={!proActive}>
       <div className="flex justify-end -mt-2 mb-1">
         <div className="flex items-center gap-0.5">
           <span className="fs-sm lf-text-faint mr-0.5">🔍</span>
@@ -426,7 +500,9 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
           </AnimatedCard>
         )}
       </AnimatedList>
+      </div>
       </LayoutGroup>
+      {showLicense && <LicenseModal onClose={() => setShowLicense(false)} />}
       </div>
     </div>
   );

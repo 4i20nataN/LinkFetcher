@@ -52,6 +52,19 @@ export const SummaryPanel: React.FC<{ formatOptions: FormatOptions; selectedForm
   if (formatOptions.customFilename) items.push({ icon: '📁', label: formatOptions.customFilename });
   if (formatOptions.descFormat && formatOptions.descFormat !== 'none' && mediaInfo.description) items.push({ icon: '📄', label: `${t('sumDesc')}${formatOptions.descFormat}` });
 
+  // Custo do merge: --ppa (normalizar áudio / nitidez) re-encoda via ffmpeg
+  // (lento); sem isso o merge é copy (rápido). Vende o personalizado com honestidade.
+  const isEn = settings.language === 'en';
+  if (!formatOptions.audioOnly) {
+    const reencode = !!formatOptions.normalizeAudio || (!!formatOptions.videoSharpen && formatOptions.videoSharpen !== 'none');
+    items.push(reencode
+      ? { icon: '🐢', label: isEn ? 'Re-encode: slower' : 'Re-encode: demora mais' }
+      : { icon: '⚡', label: isEn ? 'Fast merge' : 'Merge rápido' });
+  }
+  if (selectedFormat?.sizeEst && selectedFormat.sizeEst !== 'N/A') {
+    items.push({ icon: '💾', label: `~${selectedFormat.sizeEst}` });
+  }
+
   if (items.length === 0) return null;
 
   return (
