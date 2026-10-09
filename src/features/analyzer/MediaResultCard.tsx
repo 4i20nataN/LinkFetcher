@@ -83,45 +83,45 @@ export function MediaResultCard({
           {/* Rich Metadata Information */}
           <div className="flex-1 flex flex-col justify-between space-y-4">
             <div className="space-y-2">
-              <h3 className="font-display font-bold text-lg md:text-xl text-white leading-snug">
+              <h3 className="font-display font-bold text-xl md:text-2xl text-white leading-snug">
                 {mediaInfo.title}
               </h3>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs lf-text-secondary font-medium font-sans">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm lf-text-secondary font-medium font-sans">
                 <span className="lf-text-secondary font-semibold">{t('authorLabel')} {mediaInfo.author}</span>
                 {platformConfig && (
                   <PlatformBadge platformId={mediaInfo.platform} name={platformConfig.name} color={platformConfig.color} variant="inline" />
                 )}
                 <span className="lf-text-faint">•</span>
                 <span className="px-2 py-0.5 rounded-md bg-white/5 border lf-border text-[10px] uppercase font-mono tracking-wider flex items-center gap-1.5 lf-text-secondary">
-                  {mediaInfo.type === 'video' && <>{settings.iconStyle === 'emoji' ? <span>🎬</span> : <FileVideo size={10} className="text-violet-400" />} {settings.language === 'en' ? 'Video' : 'Vídeo'}</>}
-                  {mediaInfo.type === 'audio' && <>{settings.iconStyle === 'emoji' ? <span>🎵</span> : <Music size={10} className="text-rose-400" />} {settings.language === 'en' ? 'Audio' : 'Áudio'}</>}
-                  {mediaInfo.type === 'image' && <>{settings.iconStyle === 'emoji' ? <span>🖼️</span> : <ImageIcon size={10} className="text-cyan-400" />} {settings.language === 'en' ? 'Image' : 'Imagem'}</>}
+                  {mediaInfo.type === 'video' && <>{settings.iconStyle === 'emoji' ? <span>🎬</span> : <FileVideo size={12} className="text-violet-400" />} {settings.language === 'en' ? 'Video' : 'Vídeo'}</>}
+                  {mediaInfo.type === 'audio' && <>{settings.iconStyle === 'emoji' ? <span>🎵</span> : <Music size={12} className="text-rose-400" />} {settings.language === 'en' ? 'Audio' : 'Áudio'}</>}
+                  {mediaInfo.type === 'image' && <>{settings.iconStyle === 'emoji' ? <span>🖼️</span> : <ImageIcon size={12} className="text-cyan-400" />} {settings.language === 'en' ? 'Image' : 'Imagem'}</>}
                 </span>
               </div>
               {/* Metadata: views, date, formats, duration */}
-              <div className="flex flex-wrap items-center gap-x-1 text-[11px] lf-text-faint font-medium">
+              <div className="flex flex-wrap items-center gap-x-1 text-xs lf-text-faint font-medium">
                 {mediaInfo.views && (
                   <span className="flex items-center gap-1 px-2">
-                    {settings.iconStyle === 'emoji' ? <span>👁️</span> : <Eye size={10} className="text-sky-400" />}
+                    {settings.iconStyle === 'emoji' ? <span>👁️</span> : <Eye size={12} className="text-sky-400" />}
                     <span className="lf-text-secondary">{mediaInfo.views}</span>
                   </span>
                 )}
                 <span className="text-zinc-700">|</span>
                 {mediaInfo.publishDate && (
                   <span className="flex items-center gap-1 px-2">
-                    {settings.iconStyle === 'emoji' ? <span>📅</span> : <Calendar size={10} className="text-amber-400" />}
+                    {settings.iconStyle === 'emoji' ? <span>📅</span> : <Calendar size={12} className="text-amber-400" />}
                     <span className="lf-text-secondary">{formatUploadDate(mediaInfo.publishDate)}</span>
                   </span>
                 )}
                 <span className="text-zinc-700">|</span>
                 <span className="flex items-center gap-1 px-2">
-                  {settings.iconStyle === 'emoji' ? <span>📁</span> : <FolderOpen size={10} className="text-emerald-400" />}
+                  {settings.iconStyle === 'emoji' ? <span>📁</span> : <FolderOpen size={12} className="text-emerald-400" />}
                   <span className="lf-text-secondary">{mediaInfo.formats.length} {settings.language === 'en' ? 'formats' : 'formatos'}</span>
                 </span>
                 <span className="text-zinc-700">|</span>
                 {mediaInfo.duration && (
                   <span className="flex items-center gap-1 px-2">
-                    {settings.iconStyle === 'emoji' ? <span>⏱️</span> : <Clock size={10} className="text-violet-400" />}
+                    {settings.iconStyle === 'emoji' ? <span>⏱️</span> : <Clock size={12} className="text-violet-400" />}
                     <span className="lf-text-secondary">{mediaInfo.duration}</span>
                   </span>
                 )}
@@ -134,7 +134,7 @@ export function MediaResultCard({
               <button
                 onClick={onToggleFav}
                 className={`
-                  px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all
+                  px-3.5 py-2 rounded-xl border text-sm font-semibold flex items-center gap-2 transition-all
                   ${isFav
                     ? `${getAccentBorderClass(settings)} bg-current text-white`
                     : 'lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850'
@@ -149,7 +149,7 @@ export function MediaResultCard({
               <button
                 onClick={onToggleLater}
                 className={`
-                  px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all
+                  px-3.5 py-2 rounded-xl border text-sm font-semibold flex items-center gap-2 transition-all
                   ${isLater
                     ? `${getAccentBorderClass(settings)} bg-current text-white`
                     : 'lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850'
@@ -169,7 +169,7 @@ export function MediaResultCard({
                     disabled={customLocked}
                     title={customLocked ? (settings.language === 'en' ? 'PRO only' : 'Somente PRO') : undefined}
                     className={`
-                      px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all
+                      px-3.5 py-2 rounded-xl border text-sm font-semibold flex items-center gap-2 transition-all
                       ${customLocked
                         ? 'lf-border lf-surface-40 lf-text-secondary opacity-60 cursor-not-allowed'
                         : 'lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850'
@@ -203,7 +203,7 @@ export function MediaResultCard({
                 href={mediaInfo.originalUrl}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="px-3.5 py-2 rounded-xl border lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850 text-xs font-semibold flex items-center gap-2 transition-all"
+                className="px-3.5 py-2 rounded-xl border lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850 text-sm font-semibold flex items-center gap-2 transition-all"
               >
                 {settings.iconStyle === 'emoji' ? <span>🔗</span> : <ExternalLink size={14} className={getAccentTextClass(settings)} />}
                 {t('btnOriginal')}
