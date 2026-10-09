@@ -4,6 +4,7 @@ import {
   formatActivityMessage,
   parseIpcNumber,
   progressEventSignature,
+  progressShowsMovement,
   progressThrottleMs,
   shouldNotifyProgress,
   smoothSpeed,
@@ -116,5 +117,20 @@ describe('parseIpcNumber', () => {
     expect(parseIpcNumber('7')).toBe(7);
     expect(parseIpcNumber('abc')).toBe(0);
     expect(parseIpcNumber(undefined)).toBe(0);
+  });
+});
+
+describe('progressShowsMovement (prova de vida no stall)', () => {
+  it('linha zerada (throttle/429) NÃO mostra movimento — activity sobrevive', () => {
+    expect(progressShowsMovement(0, 0)).toBe(false);
+    expect(progressShowsMovement('0', 0)).toBe(false);
+    expect(progressShowsMovement(undefined, 0)).toBe(false);
+  });
+
+  it('bytes ou % > 0 mostram movimento — activity pode limpar', () => {
+    expect(progressShowsMovement(1, 0)).toBe(true);
+    expect(progressShowsMovement('1024', 0)).toBe(true);
+    expect(progressShowsMovement(0, 0.5)).toBe(true);
+    expect(progressShowsMovement(0, 100)).toBe(true);
   });
 });

@@ -49,6 +49,8 @@ export function formatActivityMessage(data: any, lang: string): string {
     return en ? `Fragment ${data.current}/${data.total}` : `Fragmento ${data.current}/${data.total}`;
   }
   if (data.kind === 'retry') return en ? 'Retrying…' : 'Tentando de novo…';
+  if (data.kind === 'starting') return en ? 'Starting…' : 'Iniciando…';
+  if (data.kind === 'extracting') return en ? 'Extracting info…' : 'Extraindo dados…';
   if (typeof data.text === 'string' && data.text) return data.text;
   return en ? 'Working…' : 'Trabalhando…';
 }
@@ -70,6 +72,15 @@ export function progressThrottleMs(_isAndroid: boolean): number {
 
 export function shouldNotifyProgress(now: number, last: number, isAndroid: boolean): boolean {
   return now - last >= progressThrottleMs(isAndroid);
+}
+
+/** Houve movimento real (bytes ou % > 0)? Linha de progresso zerada num
+ *  stall (throttle/429/403) NÃO pode apagar a prova de vida (`activity` /
+ *  `processing`): sem isso o card congela em `0 KB/s` com a barra parada e
+ *  parece morto — embora o yt-dlp siga tentando em background. */
+export function progressShowsMovement(downloaded: unknown, percent: number): boolean {
+  if (typeof percent === 'number' && percent > 0) return true;
+  return parseIpcNumber(downloaded) > 0;
 }
 
 /** Parse tolerante de número vindo do IPC (Kotlin pode mandar string). */

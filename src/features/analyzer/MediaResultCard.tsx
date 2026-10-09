@@ -26,6 +26,7 @@ const FormatSelector = React.lazy(() => import('../downloads/FormatSelector').th
 
 export interface MediaResultCardProps {
   mediaInfo: MediaInfo;
+  panelKey: string;
   isFav: boolean;
   isLater: boolean;
   onToggleFav: () => void;
@@ -43,7 +44,7 @@ export interface MediaResultCardProps {
 }
 
 export function MediaResultCard({
-  mediaInfo, isFav, isLater, onToggleFav, onToggleLater, onDownloadThumbnail,
+  mediaInfo, panelKey, isFav, isLater, onToggleFav, onToggleLater, onDownloadThumbnail,
   showCoverFormats, probeLoading, probeError, formatOptions, onFormatSelect,
   onFormatChange, selectedFormat, onStartDownload, onQuickDownload,
 }: MediaResultCardProps) {
@@ -215,6 +216,7 @@ export function MediaResultCard({
 
           <Suspense fallback={<div className="h-40 lf-surface-40 rounded-xl animate-pulse" />}>
             <FormatSelector
+              key={panelKey}
               mediaInfo={mediaInfo}
               onFormatSelect={onFormatSelect}
               onFormatChange={onFormatChange}

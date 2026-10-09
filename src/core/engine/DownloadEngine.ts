@@ -4,6 +4,7 @@ import {
   formatActivityMessage,
   parseIpcNumber,
   progressEventSignature,
+  progressShowsMovement,
   shouldNotifyProgress,
   smoothSpeed,
   withRateLimitHint,
@@ -504,9 +505,10 @@ class DownloadEngineClass {
     // Desktop Tauri é o único transporte (web/mobile removidos).
     const isTauri = typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window);
     if (!isTauri) {
-      item.status = 'failed';
-      item.error = 'Download disponível apenas no app desktop';
-      this.touch(item.id);
+      const live = this.items.find(i => i.id === item.id) ?? item;
+      live.status = 'failed';
+      live.error = 'Download disponível apenas no app desktop';
+      this.touch(live.id);
       this.notify();
       return;
     }
@@ -577,73 +579,29 @@ class DownloadEngineClass {
         if (data.type === 'progress') {
           this.applyProgressEvent(item.id, data);
         } else if (data.type === 'processing') {
-          if (item.status === 'downloading') {
-            item.processing = true;
-            item.speed = 0;
-            item.eta = 0;
-            this.touch(item.id);
+          const live = this.items.find(i => i.id === item.id);
+          if (live && live.status === 'downloading') {
+            live.processing = true;
+            live.speed = 0;
+            live.eta = 0;
+            // Rótulo visível da fase silenciosa (merge/recode/extract): sem
+            // ele a barra congela no último % com velocidade fantasma.
+            live.activity = this.settings.language === 'en' ? 'Merging…' : 'Mesclando…';
+            this.touch(live.id);
             this.notify();
           }
         } else if (data.type === 'activity') {
-          if (item.status === 'downloading') {
-            item.activity = formatActivityMessage(data, this.settings.language);
-            this.touch(item.id);
+          const live = this.items.find(i => i.id === item.id);
+          if (live && live.status === 'downloading') {
+            live.activity = formatActivityMessage(data, this.settings.language);
+            this.touch(live.id);
             this.notify(false);
           }
-        } else if (data.type === 'complete') {
-          if (item.status === 'paused' || item.status === 'cancelled') {
-            finish();
-            return;
-          }
-          // Dedupe defensivo: `complete` repetido do mesmo ciclo é no-op, sem
-          // re-render nem persistência.
-          if (item.status === 'completed') {
-            finish();
-            return;
-          }
-          item.status = 'completed';
-          item.progress = 100;
-          item.processing = false;
-          if (data.filePath) item.filePath = data.filePath;
-          if (data.subWarning) item.subWarning = data.subWarning;
-          if (data.size && data.size > 0) {
-            item.sizeTotal = data.size;
-            item.sizeDownloaded = data.size;
-          }
-          item.finishedAt = new Date().toISOString();
-          this.cancelFns.delete(item.id);
-          this.lastProgressNotify.delete(item.id);
-        this.lastEventAt.delete(item.id);
-        this.lastEventSig.delete(item.id);
-        this.unlistenFns.get(item.id)?.();
-        this.unlistenFns.delete(item.id);
+        } else if (data.type === 'complete' || data.type === 'error') {
           finish();
-          this.touch(item.id);
-          this.notify();
-          this.processQueue();
-        } else if (data.type === 'error') {
-          if (item.status === 'paused' || item.status === 'cancelled') {
-            finish();
-            return;
+          if (this.applyTerminalEvent(item.id, data)) {
+            this.processQueue();
           }
-          // Mesmo dedupe do `complete`: erro duplicado não re-renderiza.
-          if (item.status === 'failed') {
-            finish();
-            return;
-          }
-          item.status = 'failed';
-          item.processing = false;
-          item.error = withRateLimitHint(data.message || 'Download failed', this.settings.language);
-          this.cancelFns.delete(item.id);
-          this.lastProgressNotify.delete(item.id);
-        this.lastEventAt.delete(item.id);
-        this.lastEventSig.delete(item.id);
-        this.unlistenFns.get(item.id)?.();
-        this.unlistenFns.delete(item.id);
-          finish();
-          this.touch(item.id);
-          this.notify();
-          this.processQueue();
         }
       };
 
@@ -705,46 +663,56 @@ class DownloadEngineClass {
       // Start download
       const resultPath = await invoke<string>('ytdlp_download', { options: params });
       finish();
-      if (resultPath && item.status === 'downloading') {
-        item.status = 'completed';
-        item.progress = 100;
-        item.processing = false;
-        item.filePath = resultPath;
-        item.finishedAt = new Date().toISOString();
-        this.cancelFns.delete(item.id);
-        this.lastEventAt.delete(item.id);
-        this.lastEventSig.delete(item.id);
-        this.touch(item.id);
+      // Re-find: o closure pode estar obsoleto (ver applyTerminalEvent).
+      // Limpeza total aqui também (antes vazava listener/unlisten/poll a cada
+      // conclusão por este caminho).
+      const done = this.items.find(i => i.id === item.id);
+      if (resultPath && done && done.status === 'downloading') {
+        done.status = 'completed';
+        done.progress = 100;
+        done.processing = false;
+        done.filePath = resultPath;
+        done.finishedAt = new Date().toISOString();
+        this.cancelFns.delete(done.id);
+        this.stopPoll(done.id);
+        this.lastEventAt.delete(done.id);
+        this.lastEventSig.delete(done.id);
+        this.lastProgressNotify.delete(done.id);
+        this.unlistenFns.get(done.id)?.();
+        this.unlistenFns.delete(done.id);
+        this.touch(done.id);
         this.notify();
         this.processQueue();
       }
     } catch (error: any) {
       // O kill de pausa/cancelamento rejeita o invoke de propósito: a intenção
       // do usuário prevalece — nunca converter em "failed".
-      if (item.status === 'paused' || item.status === 'cancelled') {
-        item.processing = false;
-        this.cancelFns.delete(item.id);
-        this.stopPoll(item.id);
-        this.lastProgressNotify.delete(item.id);
-        this.lastEventAt.delete(item.id);
-        this.lastEventSig.delete(item.id);
-        this.unlistenFns.get(item.id)?.();
-        this.unlistenFns.delete(item.id);
-        this.touch(item.id);
+      const live = this.items.find(i => i.id === item.id);
+      if (!live) return;
+      if (live.status === 'paused' || live.status === 'cancelled') {
+        live.processing = false;
+        this.cancelFns.delete(live.id);
+        this.stopPoll(live.id);
+        this.lastProgressNotify.delete(live.id);
+        this.lastEventAt.delete(live.id);
+        this.lastEventSig.delete(live.id);
+        this.unlistenFns.get(live.id)?.();
+        this.unlistenFns.delete(live.id);
+        this.touch(live.id);
         this.notify();
         return;
       }
-      item.status = 'failed';
-      item.processing = false;
-      item.error = withRateLimitHint(adapterErrorMessage(error, 'Download failed'), this.settings.language);
-      this.cancelFns.delete(item.id);
-      this.stopPoll(item.id);
-      this.lastProgressNotify.delete(item.id);
-      this.lastEventAt.delete(item.id);
-      this.lastEventSig.delete(item.id);
-      this.unlistenFns.get(item.id)?.();
-      this.unlistenFns.delete(item.id);
-      this.touch(item.id);
+      live.status = 'failed';
+      live.processing = false;
+      live.error = withRateLimitHint(adapterErrorMessage(error, 'Download failed'), this.settings.language);
+      this.cancelFns.delete(live.id);
+      this.stopPoll(live.id);
+      this.lastProgressNotify.delete(live.id);
+      this.lastEventAt.delete(live.id);
+      this.lastEventSig.delete(live.id);
+      this.unlistenFns.get(live.id)?.();
+      this.unlistenFns.delete(live.id);
+      this.touch(live.id);
       this.notify();
     }
   }
@@ -776,6 +744,53 @@ class DownloadEngineClass {
     this.notify();
   }
 
+  // Aplica um evento terminal (complete/error) no item VIVO (find por id).
+  // O closure de startTauriDownload captura a ref ANTERIOR ao `touch` de
+  // startDownload — sem o re-find, o estado terminal ia para um objeto órfão
+  // e o `touch` seguinte republicava a lista sem a transição: card travado
+  // em `downloading` com o arquivo pronto em disco (regressão do memo
+  // 48f01b3; progresso funcionava porque applyProgressEvent já rebuscava).
+  // Retorna true numa transição real (chamador avança a fila); guards
+  // (pausado/cancelado/dedupe/id ausente) retornam false sem tocar em nada.
+  private applyTerminalEvent(id: string, data: any): boolean {
+    const live = this.items.find(i => i.id === id);
+    if (!live) return false;
+    if (data.type === 'complete') {
+      if (live.status === 'paused' || live.status === 'cancelled') return false;
+      // Dedupe defensivo: `complete` repetido do mesmo ciclo é no-op, sem
+      // re-render nem persistência.
+      if (live.status === 'completed') return false;
+      live.status = 'completed';
+      live.progress = 100;
+      live.processing = false;
+      if (data.filePath) live.filePath = data.filePath;
+      if (data.subWarning) live.subWarning = data.subWarning;
+      if (data.size && data.size > 0) {
+        live.sizeTotal = data.size;
+        live.sizeDownloaded = data.size;
+      }
+      live.finishedAt = new Date().toISOString();
+    } else if (data.type === 'error') {
+      if (live.status === 'paused' || live.status === 'cancelled') return false;
+      // Mesmo dedupe do `complete`: erro duplicado não re-renderiza.
+      if (live.status === 'failed') return false;
+      live.status = 'failed';
+      live.processing = false;
+      live.error = withRateLimitHint(data.message || 'Download failed', this.settings.language);
+    } else {
+      return false;
+    }
+    this.cancelFns.delete(id);
+    this.lastProgressNotify.delete(id);
+    this.lastEventAt.delete(id);
+    this.lastEventSig.delete(id);
+    this.unlistenFns.get(id)?.();
+    this.unlistenFns.delete(id);
+    this.touch(id);
+    this.notify();
+    return true;
+  }
+
   // Aplica um evento de progresso (push ou poll): corpo único p/ não
   // divergir. Throttle de notify continua valendo (500ms Android).
   private applyProgressEvent(id: string, data: any) {
@@ -784,7 +799,13 @@ class DownloadEngineClass {
     item.progress = typeof data.percent === 'number' ? data.percent : (parseFloat(data.percent) || 0);
     item.speed = smoothSpeed(item.speed, parseIpcNumber(data.speed));
     item.eta = parseIpcNumber(data.eta);
-    item.activity = undefined;
+    // Linha zerada num stall (throttle/429) não apaga a prova de vida: o
+    // último sinal (`Iniciando…`, `Extraindo…`, `Tentando de novo…`,
+    // `Mesclando…`) fica visível até os bytes voltarem a andar.
+    if (progressShowsMovement(data.downloaded, item.progress)) {
+      item.activity = undefined;
+      item.processing = false;
+    }
     if (data.downloaded && data.downloaded > 0) {
       item.sizeDownloaded = data.downloaded;
     }

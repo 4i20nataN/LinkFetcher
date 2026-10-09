@@ -757,6 +757,12 @@ pub async fn ytdlp_download(
     })?;
 
     eprintln!("[ytdlp_download] process spawned successfully");
+    // Prova de vida imediata: pré-download silencioso (binários, extração)
+    // deixava o card em 0% sem nada — parecia "nem começa".
+    let _ = app.emit(
+        "yt-dlp-progress",
+        &serde_json::json!({ "id": params.id, "type": "activity", "kind": "starting" }),
+    );
 
     // Take stdout/stderr pipes BEFORE wrapping child
     let mut stdout = proc.stdout.take().expect("stdout pipe");
@@ -769,9 +775,9 @@ pub async fn ytdlp_download(
     // Stdout channel for line processing
     let (stdout_tx, mut stdout_rx) = tokio::sync::mpsc::channel::<String>(128);
 
-    // Stdout reader task: detém o stdout_tx exclusivamente para que quando o processo terminar
-    // e der EOF no stdout, stdout_tx seja dropado e o canal mpsc feche sem deadlock!
-    tokio::spawn(async move {
+    // Stdout reader task: detém o stdout_tx exclusivamente; quando o leitor
+    // termina, o canal fecha. (Antes o loop principal ia até EOF — ver abaixo.)
+    let stdout_reader = tokio::spawn(async move {
         let mut buf = [0u8; 4096];
         let mut line_buf = String::new();
         loop {
@@ -828,7 +834,42 @@ pub async fn ytdlp_download(
         .checked_sub(std::time::Duration::from_secs(1))
         .unwrap_or_else(std::time::Instant::now);
 
-    while let Some(line) = stdout_rx.recv().await {
+    // Espera CONCORRENTE com a drenagem do stdout. Antes, o loop abaixo ia
+    // até EOF e SÓ ENTÃO esperava o filho: um neto (ffmpeg do merge/extract)
+    // com o pipe herdado impedia o EOF com o arquivo já em disco — % congelado
+    // p/ sempre, sem `complete` (sintoma: 85,8% + 0 KB/s + .mp4 na pasta).
+    // Agora a saída do filho encerra a espera; o `complete` deriva do disco.
+    let mut wait_task = tokio::spawn(async move {
+        let mut child_guard = child_arc.lock().await;
+        child_guard.wait().await
+    });
+    let mut eof = false;
+    let wait_res: std::io::Result<std::process::ExitStatus> = loop {
+        if eof {
+            // EOF antes da saída (pipes fechados, filho em fase silenciosa):
+            // aguarda o término normal.
+            eprintln!("[ytdlp_download] stdout EOF antes da saída; aguardando término");
+            break wait_task
+                .await
+                .unwrap_or_else(|e| Err(std::io::Error::new(std::io::ErrorKind::Other, format!("wait: {e}"))));
+        }
+        // Sem `break` nos braços: `break` dentro de `select!` atingiria o
+        // loop interno do macro, não este.
+        let mut exited: Option<std::io::Result<std::process::ExitStatus>> = None;
+        let line: Option<String> = tokio::select! {
+            w = &mut wait_task => {
+                exited = Some(w.unwrap_or_else(|e| Err(std::io::Error::new(std::io::ErrorKind::Other, format!("wait: {e}")))));
+                None
+            }
+            l = stdout_rx.recv() => l,
+        };
+        if let Some(wr) = exited {
+            break wr;
+        }
+        let Some(line) = line else {
+            eof = true;
+            continue;
+        };
         let trimmed = line.trim();
         if let Some(prog) = parse_progress(trimmed) {
             if progress_emit_due(Some(last_emit), std::time::Instant::now()) {
@@ -852,8 +893,34 @@ pub async fn ytdlp_download(
             eprintln!("[ytdlp_download] captured merged file: {}", merged);
             remember_download_path(&download_id, &merged);
             captured_filepath = Some(merged);
+            // Merge começou: sem isso a UI congela no último % (fase silenciosa).
+            let _ = app.emit(
+                "yt-dlp-progress",
+                &serde_json::json!({ "id": download_id, "type": "processing" }),
+            );
+        } else if is_postprocess_line(trimmed) {
+            // Recode/extract/remux: idem (linhas únicas; o frontend dedupa).
+            let _ = app.emit(
+                "yt-dlp-progress",
+                &serde_json::json!({ "id": download_id, "type": "processing" }),
+            );
+        } else if parse_retry_signal(trimmed) {
+            // Retry de fragmento/rede com backoff: a cauda do download não
+            // emite progresso — sem este sinal o card congela na última %
+            // ("para no final"). Vira "Tentando de novo…" pulsante no card.
+            let _ = app.emit(
+                "yt-dlp-progress",
+                &serde_json::json!({ "id": download_id, "type": "activity", "kind": "retry" }),
+            );
         } else if parse_subtitle_path(trimmed).is_some() {
             subtitle_written = true;
+        } else if trimmed.contains("Extracting URL:") {
+            // Extração (webpage/API) sem %: sem isso, throttle/bot-check do
+            // YouTube parecia "nem começa" (0% mudo).
+            let _ = app.emit(
+                "yt-dlp-progress",
+                &serde_json::json!({ "id": download_id, "type": "activity", "kind": "extracting" }),
+            );
         } else if trimmed.contains("has already been downloaded") {
             if let Some(start) = trimmed.find("[download] ") {
                 if let Some(end) = trimmed.find(" has already been downloaded") {
@@ -864,15 +931,19 @@ pub async fn ytdlp_download(
                 }
             }
         }
-    }
-
-    // Wait for the child process to finish completely
-    let wait_res = {
-        let mut child_guard = child_arc.lock().await;
-        child_guard.wait().await
     };
+    // Solta o leitor: sem isso, o neto com pipe herdado o prenderia p/ sempre
+    // (linhas finais eventuais se perdem — o `complete` deriva do disco).
+    stdout_reader.abort();
 
-    let stderr_output = stderr_collector.await.unwrap_or_default();
+    // Coletor do stderr com teto (mesmo motivo do stdout): segue sem ele.
+    let stderr_output = match tokio::time::timeout(std::time::Duration::from_secs(5), stderr_collector).await {
+        Ok(r) => r.unwrap_or_default(),
+        Err(_) => {
+            eprintln!("[ytdlp_download] WARN stderr travado após saída; seguindo sem ele");
+            String::new()
+        }
+    };
     let _ = unregister_cancel(&download_id);
 
     match wait_res {
@@ -1592,6 +1663,17 @@ fn progress_emit_due(
     }
 }
 
+/// Linhas de pós-processamento silencioso ([ExtractAudio], [VideoRemuxer],
+/// [VideoConverter], [Merger]): merge/recode não emite progresso, então sem
+/// este sinal a UI congela no último % com velocidade fantasma ("travado").
+/// Função pura p/ teste.
+fn is_postprocess_line(line: &str) -> bool {
+    line.starts_with("[ExtractAudio]")
+        || line.starts_with("[VideoRemuxer]")
+        || line.starts_with("[VideoConverter]")
+        || line.starts_with("[Merger]")
+}
+
 pub fn parse_merge(line: &str) -> Option<String> {
     let p = "Merging formats into \"";
     if let Some(idx) = line.find(p) {
@@ -1601,6 +1683,21 @@ pub fn parse_merge(line: &str) -> Option<String> {
         }
     }
     None
+}
+
+/// Sinal de retry do yt-dlp (`RetryManager.report_retry` + `report_retry` em
+/// downloader/common.py, formatos oficiais):
+/// - `[download] Got error: E. Retrying fragment N (C/T)...`
+/// - `[download] Got error: E. Retrying (C/T)...`
+/// - `Sleeping 2.00 seconds ...`
+/// Sem isso, a cauda do download (fragmentos 429/403 com backoff) é
+/// silenciosa: nenhum progresso novo chega e o card congela na última %
+/// com velocidade fantasma ("para no final", mas o yt-dlp segue tentando).
+/// Função pura p/ teste.
+pub fn parse_retry_signal(line: &str) -> bool {
+    line.contains("Retrying fragment ")
+        || line.contains("Retrying (")
+        || (line.contains("Sleeping ") && line.contains(" seconds"))
 }
 
 /// Encontra o arquivo mais recente no diretório de downloads,
@@ -1670,6 +1767,34 @@ mod tests {
         let msg = clean_error_message(stderr);
         assert!(!msg.contains('\r'), "{msg}");
         assert!(msg.chars().count() <= 500, "{msg}");
+    }
+
+    #[test]
+    fn postprocess_lines_detected_for_processing_signal() {
+        // Fase silenciosa do yt-dlp (merge/recode/extract): sem este sinal a
+        // UI congela no último % com velocidade fantasma ("travado").
+        // UI congela no último % com velocidade fantasma ("travado").
+        assert!(is_postprocess_line("[Merger] Merging formats into \"a.mp4\""));
+        assert!(is_postprocess_line("[ExtractAudio] Destination: a.mp3"));
+        assert!(is_postprocess_line("[VideoRemuxer] Not remuxing"));
+        assert!(is_postprocess_line("[VideoConverter] Converting"));
+        assert!(!is_postprocess_line("[download]  95.5% of 11.50MiB at 17.40MiB/s"));
+        assert!(!is_postprocess_line("[info] Test"));
+        assert!(!is_postprocess_line(""));
+    }
+
+    #[test]
+    fn retry_lines_detected_for_activity_signal() {
+        // Cauda silenciosa (fragmentos 429/403 com backoff): formatos
+        // oficiais de RetryManager.report_retry — sem este sinal o card
+        // congela na última % ("para no final").
+        assert!(parse_retry_signal("[download] Got error: HTTP Error 429: Too Many Requests. Retrying fragment 12 (3/10)..."));
+        assert!(parse_retry_signal("[download] Got error: HTTP Error 403: Forbidden. Retrying (2/10)..."));
+        assert!(parse_retry_signal("Sleeping 2.00 seconds ..."));
+        assert!(!parse_retry_signal("download:LF_PROG:86.7%|29.7MiB|NA|10000000|11500000"));
+        assert!(!parse_retry_signal("[Merger] Merging formats into \"a.mp4\""));
+        assert!(!parse_retry_signal("[download] Destination: /dl/a.mp4"));
+        assert!(!parse_retry_signal(""));
     }
 
     #[test]

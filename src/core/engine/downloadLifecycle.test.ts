@@ -30,6 +30,8 @@ function engineState() {
   return DownloadEngine as unknown as {
     items: DownloadItem[];
     cancelFns: Map<string, (cleanup: boolean) => void>;
+    applyTerminalEvent: (id: string, data: any) => boolean;
+    touch: (id: string) => void;
   };
 }
 
@@ -91,5 +93,66 @@ describe('contrato de kill nativo (regressão delete-fantasma)', () => {
     st.items = [item];
     DownloadEngine.cancelDownload(item.id, false);
     expect(st.items[0].status).toBe('completed');
+  });
+});
+
+describe('evento terminal no objeto vivo (regressão memo 48f01b3)', () => {
+  it('complete atravessa o touch: closure obsoleta não perde a transição', () => {
+    const st = engineState();
+    const item = fakeItem('downloading');
+    st.items = [item];
+    st.cancelFns.set(item.id, () => {});
+    // Simula o startDownload: o closure capturou `item`, o touch trocou a ref.
+    const stale = st.items[0];
+    st.touch(item.id);
+    expect(st.items[0]).not.toBe(stale);
+
+    const settled = st.applyTerminalEvent(item.id, {
+      type: 'complete', filePath: '/dl/a.mp4', size: 123,
+    });
+
+    expect(settled).toBe(true);
+    expect(st.items[0].status).toBe('completed');
+    expect(st.items[0].progress).toBe(100);
+    expect(st.items[0].filePath).toBe('/dl/a.mp4');
+    expect(st.items[0].sizeTotal).toBe(123);
+    // O órfão do closure não contamina a lista; mapas limpos.
+    expect(stale.status).toBe('downloading');
+    expect(st.cancelFns.has(item.id)).toBe(false);
+  });
+
+  it('complete em pausado/cancelado é ignorado (intenção do usuário)', () => {
+    const st = engineState();
+    for (const s of ['paused', 'cancelled'] as const) {
+      st.items = [fakeItem(s)];
+      expect(st.applyTerminalEvent(st.items[0].id, { type: 'complete' })).toBe(false);
+      expect(st.items[0].status).toBe(s);
+    }
+  });
+
+  it('complete duplicado é no-op', () => {
+    const st = engineState();
+    st.items = [fakeItem('downloading')];
+    const id = st.items[0].id;
+    expect(st.applyTerminalEvent(id, { type: 'complete' })).toBe(true);
+    expect(st.applyTerminalEvent(id, { type: 'complete' })).toBe(false);
+    expect(st.items[0].status).toBe('completed');
+  });
+
+  it('error vira failed com mensagem e hint 429', () => {
+    const st = engineState();
+    st.items = [fakeItem('downloading')];
+    const id = st.items[0].id;
+    expect(st.applyTerminalEvent(id, { type: 'error', message: 'HTTP Error 429' })).toBe(true);
+    expect(st.items[0].status).toBe('failed');
+    expect(st.items[0].error).toContain('429');
+    expect(st.applyTerminalEvent(id, { type: 'error', message: 'x' })).toBe(false);
+  });
+
+  it('id desconhecido não quebra', () => {
+    const st = engineState();
+    st.items = [fakeItem('downloading')];
+    expect(st.applyTerminalEvent('dl_inexistente', { type: 'complete' })).toBe(false);
+    expect(st.items[0].status).toBe('downloading');
   });
 });

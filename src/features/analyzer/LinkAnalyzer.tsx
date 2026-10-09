@@ -17,7 +17,7 @@ import { isLicenseActive } from '../../core/license/license';
 import type { FormatOptions } from '../downloads/FormatOptions';
 import { isPlaylistUrl } from '../../core/ytdlp/playlistUtils';
 import { adapterErrorMessage } from '../../core/ytdlp/YtDlpAdapter';
-import { sanitizeUrl, formatUploadDate as fmtDate } from './analyzerUtils';
+import { sanitizeUrl, formatUploadDate as fmtDate, pickQuickRefFormat, buildQuickOptions } from './analyzerUtils';
 import { AnalyzeForm } from './AnalyzeForm';
 import { PlaylistCard } from './PlaylistCard';
 import { MediaResultCard } from './MediaResultCard';
@@ -46,6 +46,11 @@ export const LinkAnalyzer: React.FC = () => {
   const [mediaInfo, setMediaInfo] = useState<MediaInfo | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<MediaFormat | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  // Sequência da análise: o FormatSelector é remontado a cada nova análise
+  // (key) para o painel interno nunca exibir seleções obsoletas de outro
+  // vídeo enquanto o RESULTADO lê o estado zerado — mesma URL reanalisada
+  // também conta (id do probe seria igual).
+  const [analysisSeq, setAnalysisSeq] = useState(0);
 
   const [probeLoading, setProbeLoading] = useState(false);
   const [probeError, setProbeError] = useState<string | null>(null);
@@ -179,8 +184,9 @@ export const LinkAnalyzer: React.FC = () => {
     try {
       const provider = ProviderRegistry.getProviderForUrl(targetUrl);
       const info = await provider.analyze(targetUrl);
-      
+
       setMediaInfo(info);
+      setAnalysisSeq(s => s + 1);
       if (info.formats && info.formats.length > 0) {
         setSelectedFormat(info.formats[0]); // Default to first format
       }
@@ -313,40 +319,21 @@ export const LinkAnalyzer: React.FC = () => {
     }, 1200);
   };
 
-  // Download rápido — padrão equilibrado recomendado do yt-dlp:
-  // vídeo: melhor até 1080p60 priorizando mp4+m4a (merge --merge-output-format
-  // mp4 via copy, sem re-encode = merge mínimo) com fallback p/ qualquer
-  // fonte ≤1080p; áudio: bestaudio extraído em MP3 qualidade 0 (máxima).
-  // Mantém as demais opções atuais (pasta, nome, legendas). Sem desc file.
   const handleQuickDownload = (kind: 'audio' | 'video') => {
-    if (!mediaInfo || mediaInfo.formats.length === 0) {
+    if (!mediaInfo) {
       setError(settings.language === 'en' ? 'No format selected. Please wait for analysis to complete.' : 'Nenhum formato selecionado. Aguarde a analise completar.');
       return;
     }
-    const refFormat = kind === 'audio'
-      ? (mediaInfo.formats.find(f => f.type === 'audio') ?? mediaInfo.formats[0])
-      : mediaInfo.formats[0];
-    const quickOptions: FormatOptions = {
-      ...formatOptions,
-      format: kind === 'audio'
-        ? 'bestaudio/best'
-        : 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b[height<=1080]',
-      audioOnly: kind === 'audio',
-      audioFormat: kind === 'audio' ? 'mp3' : formatOptions.audioFormat,
-      audioQuality: kind === 'audio' ? '0' : formatOptions.audioQuality,
-      videoOnly: false,
-      // Vídeo rápido: teto 1080p60, container mp4, codecs originais (sem
-      // --format-sort vcodec nem --ppa = merge copy, sem re-encode).
-      ...(kind === 'video' ? {
-        fpsMax: 60,
-        videoFormat: 'mp4',
-        videoCodec: '',
-        normalizeAudio: false,
-        videoSharpen: 'none' as const,
-      } : {}),
-    };
-    setFormatOptions(quickOptions);
-    setSelectedFormat(refFormat);
+    const refFormat = pickQuickRefFormat(mediaInfo, kind);
+    if (!refFormat) {
+      setError(settings.language === 'en' ? 'No format selected. Please wait for analysis to complete.' : 'Nenhum formato selecionado. Aguarde a analise completar.');
+      return;
+    }
+    const quickOptions = buildQuickOptions(formatOptions, kind);
+    // Fire-and-forget de propósito: NÃO publica no estado compartilhado.
+    // setFormatOptions/setSelectedFormat aqui vazavam o preset rápido
+    // (fpsMax 60, merge MP4, ~556 MB) para o painel personalizado e o
+    // RESULTADO passava a exibir opções que o usuário nunca selecionou.
     DownloadEngine.addDownload(mediaInfo, refFormat, quickOptions);
     setSuccessMsg(settings.language === 'en' ? `Added to queue: ${mediaInfo.title.substring(0, 45)}...` : `Adicionado a fila: ${mediaInfo.title.substring(0, 45)}...`);
     setTimeout(() => {
@@ -648,6 +635,7 @@ export const LinkAnalyzer: React.FC = () => {
       {mediaInfo && !loading && (
         <MediaResultCard
           mediaInfo={mediaInfo}
+          panelKey={`${mediaInfo.id}#${analysisSeq}`}
           isFav={isFav}
           isLater={isLater}
           onToggleFav={handleToggleFav}
