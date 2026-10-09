@@ -165,9 +165,19 @@ export function MediaResultCard({
                 <div className="flex flex-col gap-1.5">
                   <button
                     onClick={() => onDownloadThumbnail()}
-                    className="px-3.5 py-2 rounded-xl border lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850 text-xs font-semibold flex items-center gap-2 transition-all"
+                    disabled={customLocked}
+                    title={customLocked ? (settings.language === 'en' ? 'PRO only' : 'Somente PRO') : undefined}
+                    className={`
+                      px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all
+                      ${customLocked
+                        ? 'lf-border lf-surface-40 lf-text-secondary opacity-60 cursor-not-allowed'
+                        : 'lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850'
+                      }
+                    `}
                   >
-                    {settings.iconStyle === 'emoji' ? <span>🖼️</span> : <ImageIcon size={14} className={getAccentTextClass(settings)} />}
+                    {customLocked
+                      ? <Lock size={14} />
+                      : (settings.iconStyle === 'emoji' ? <span>🖼️</span> : <ImageIcon size={14} className={getAccentTextClass(settings)} />)}
                     {settings.language === 'en' ? 'Download Thumbnail' : 'Baixar Capa'}
                   </button>
                   {showCoverFormats && (

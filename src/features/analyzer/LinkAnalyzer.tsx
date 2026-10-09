@@ -411,6 +411,11 @@ export const LinkAnalyzer: React.FC = () => {
 
   const handleDownloadThumbnail = async (targetExt?: 'jpg' | 'png' | 'webp') => {
     if (!mediaInfo || !mediaInfo.thumbnailUrl) return;
+    // Baixar capa é PRO (mesma barreira do download personalizado).
+    if (!isLicenseActive(getLicense())) {
+      setError(settings.language === 'en' ? 'Cover download is PRO — activate your key in the Custom Download panel.' : 'Baixar capa é PRO — ative sua chave no painel Download Personalizado.');
+      return;
+    }
     // Sem formato escolhido: abre o seletor
     if (!targetExt) {
       setShowCoverFormats(v => !v);
