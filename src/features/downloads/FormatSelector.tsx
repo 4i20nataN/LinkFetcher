@@ -400,7 +400,7 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
       <div className="border-t lf-border pt-4 mt-1">
       <div className="text-center mb-3">
         <p className="font-bold text-white text-base">
-          {settings.language === 'en' ? '🎛️ Custom Download' : '🎛️ Download Personalizado'}
+          {settings.language === 'en' ? '🎚️ Custom Download' : '🎚️ Download Personalizado'}
           <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 align-middle">PRO</span>
         </p>
         <p className="fs-sm lf-text-muted mt-1">
