@@ -163,7 +163,7 @@ export function MediaResultCard({
 
               {mediaInfo.type !== 'image' && (
                 <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-1.5">
+                  <span className="self-end px-1 rounded text-[7px] font-bold leading-tight bg-amber-500/20 text-amber-400 border border-amber-500/30">PRO</span>
                   <button
                     onClick={() => onDownloadThumbnail()}
                     disabled={customLocked}
@@ -181,8 +181,6 @@ export function MediaResultCard({
                       : (settings.iconStyle === 'emoji' ? <span>🖼️</span> : <ImageIcon size={14} className={getAccentTextClass(settings)} />)}
                     {settings.language === 'en' ? 'Download Thumbnail' : 'Baixar Capa'}
                   </button>
-                  <span className="px-1 rounded text-[7px] font-bold leading-tight bg-amber-500/20 text-amber-400 border border-amber-500/30">PRO</span>
-                  </div>
                   {showCoverFormats && (
                     <div className="flex gap-1.5">
                       {(['jpg', 'png', 'webp'] as const).map(fmt => (
