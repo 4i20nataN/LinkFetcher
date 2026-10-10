@@ -1,10 +1,4 @@
-// Região viva do card (extraída do DownloadCard): barra + métricas.
-// O engine notifica 2x/s; re-renderizar o card a cada tick reconcilia a
-// árvore inteira. Aqui o React pinta UMA vez (ramificações) e os números
-// quentes (%, bytes, velocidade, ETA) são escritos direto no DOM via refs,
-// sem setState — custo por tick: 4 writes por card, zero renders.
-// Ramificações (activity/indeterminado/status) continuam no React: mudam
-// raramente e o comparador do card re-renderiza nessas transições.
+// Métricas vivas via refs (sem setState): o engine avisa 2x/s sem re-render.
 import { useEffect, useRef } from 'react';
 import { DownloadItem, type AppSettings } from '../../../types';
 import { DownloadEngine } from '../../../core/engine/DownloadEngine';
@@ -23,8 +17,7 @@ export function LiveDownloadStats({ item, settings }: LiveDownloadStatsProps) {
   const bytesRef = useRef<HTMLSpanElement>(null);
   const speedRef = useRef<HTMLSpanElement>(null);
   const etaRef = useRef<HTMLSpanElement>(null);
-  // Idioma via ref: o callback sobrevive a re-renders e a troca de idioma
-  // chega pela próxima pintura do React (settings está no comparador).
+  // Idioma via ref: a troca chega na próxima pintura.
   const langRef = useRef(settings.language);
   langRef.current = settings.language;
   const id = item.id;
@@ -92,7 +85,6 @@ export function LiveDownloadStats({ item, settings }: LiveDownloadStatsProps) {
         )}
       </div>
 
-      {/* Sub progress metrics */}
       <div className="flex justify-between items-center gap-3 text-[10px] lf-text-muted font-medium font-mono">
         <span
           ref={bytesRef}
@@ -141,8 +133,7 @@ export function LiveDownloadStats({ item, settings }: LiveDownloadStatsProps) {
           {isFailed && <span className="text-rose-500 flex items-center gap-0.5"><AlertTriangle size={10} /> {settings.language === 'en' ? 'Failed' : 'Falhou'}</span>}
         </div>
       </div>
-      {/* Erro em linha própria, largura total: dentro da row de
-          métricas ele era esmagado entre bytes e status. */}
+      {/* Erro em linha própria: na row ele era esmagado. */}
       {isFailed && item.error && (
         <div className="text-[11px] text-rose-400/80 mt-1 break-words line-clamp-3" title={item.error}>
           {item.error}

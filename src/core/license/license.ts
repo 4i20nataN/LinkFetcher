@@ -1,19 +1,11 @@
-// Sistema de licenças PRO — chaves assinadas offline (ECDSA P-256 + SHA-256).
+// Licenças PRO — chaves assinadas offline (ECDSA P-256 + SHA-256).
 //
-// Formato da chave: `LF1-<base32 Crockford em grupos de 4>`
-// Binário: ver(1B=0x01) | plan(1B=0x01=PRO) | exp(u32 BE unix, 0=vitalícia)
-//          | nameLen(1B) | name(0..24B UTF-8) | sig(64B r||s sobre tudo antes)
+// Formato: `LF1-<base32 Crockford em grupos de 4>`
+// Binário: ver(1B) | plan(1B=PRO) | exp(u32 BE, 0=vitalícia) | nameLen(1B)
+//          | name(≤24B) | sig(64B r||s sobre tudo antes)
 //
-// Segurança honesta: a privada NUNCA entra no repo (fica em
-// `signing-keys/license.key`, já ignorado pelo .gitignore — mesmo padrão da
-// chave do updater). O app embarca só a pública: ninguém forja chave sem a
-// privada. Limite conhecido: sem servidor não há vínculo de máquina — a chave
-// pode ser repassada; o nome do comprador vai embutido e exibido (atrito
-// social). Bypass via modificação do código sempre é possível em app desktop;
-// isto é cancela de honestos + profissional, não DRM inviolável.
-//
-// Gerar par + vender: `node scripts/mint-key.mjs --init` (1x) e
-// `node scripts/mint-key.mjs "Nome do Cliente" [dias]`.
+// Privada fora do repo (só a pública embarca); sem vínculo de máquina.
+// Gerar: `scripts/mint-key.mjs --init` (1x); vender: `mint-key.mjs "Nome" [dias]`.
 
 export const LICENSE_VERSION = 0x01;
 export const LICENSE_PLAN_PRO = 0x01;

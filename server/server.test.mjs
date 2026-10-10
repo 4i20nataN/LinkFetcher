@@ -1,6 +1,4 @@
-// Testes do license server (runner nativo: `node --test server/`).
-// Cobrem: assinatura do webhook (vetor HMAC), extração do payment id,
-// trava de valor exato, idempotência do settle e formato da chave emitida.
+// License server (`node --test server/`): webhook, valor exato e chave.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac, generateKeyPairSync } from 'node:crypto';
@@ -112,7 +110,6 @@ describe('mint do servidor', () => {
     const { mintKeyFor } = await import('./mint.mjs');
     const key = await mintKeyFor('Teste Server', 30);
     assert.match(key, /^LF1-[0-9A-Z-]+$/);
-    // Confere assinatura com a pública (WebCrypto).
     const { webcrypto } = await import('node:crypto');
     const raw = b32dec(key.slice(4));
     const payload = raw.slice(0, -64);

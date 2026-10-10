@@ -16,7 +16,6 @@ export function ClipboardPopup({ onDismiss, onAnalyze, url }: ClipboardPopupProp
 
   const isDesktop = typeof window !== 'undefined' && !!window.electron;
 
-  // Desktop: listen for clipboard events (via shim)
   useEffect(() => {
     if (!isDesktop || !settings.clipboardMonitoringEnabled) return;
 
@@ -28,7 +27,6 @@ export function ClipboardPopup({ onDismiss, onAnalyze, url }: ClipboardPopupProp
     return () => { unsub(); };
   }, [isDesktop, settings.clipboardMonitoringEnabled]);
 
-  // URL vinda do monitoramento do App (polling nativo)
   useEffect(() => {
     if (url) {
       setDetectedUrl(url);
@@ -47,7 +45,6 @@ export function ClipboardPopup({ onDismiss, onAnalyze, url }: ClipboardPopupProp
     onDismiss();
   }, [onDismiss]);
 
-  // Auto-dismiss after 8 seconds
   useEffect(() => {
     if (!visible) return;
     const timer = setTimeout(() => {

@@ -1,5 +1,4 @@
-// Card do resultado da análise (extraído do LinkAnalyzer): header rico,
-// FormatSelector, resumo e botão de download.
+// Card do resultado da análise (header + seletor + resumo + download).
 import React, { Suspense } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useTranslation } from '../../core/i18n';
@@ -51,8 +50,7 @@ export function MediaResultCard({
   const { settings } = useApp();
   const { t } = useTranslation(settings);
   const platformConfig = ProviderRegistry.getPlatformConfig(mediaInfo.platform);
-  // Sem PRO o download personalizado não executa (o painel acima explica e
-  // vende; o handleStartDownload mantém a barreira por segurança).
+  // Sem PRO o personalizado não executa (barreira no handle).
   const customLocked = !isLicenseActive(useLicense());
 
   return (
@@ -61,9 +59,7 @@ export function MediaResultCard({
         variant={slideUpStrong}
         className="p-4 md:p-6 rounded-3xl glass-card shadow-2xl space-y-6 overflow-hidden"
       >
-        {/* Header / Thumbnail Block */}
         <div className="flex flex-col md:flex-row gap-6">
-          {/* Thumbnail Container */}
           <div className="relative group w-full md:w-64 h-40 rounded-xl shrink-0 overflow-hidden border lf-border lf-surface">
             <img
               src={mediaInfo.thumbnailUrl}
@@ -80,7 +76,6 @@ export function MediaResultCard({
             </div>
           </div>
 
-          {/* Rich Metadata Information */}
           <div className="flex-1 flex flex-col justify-between space-y-4">
             <div className="space-y-2">
               <h3 className="font-display font-bold text-xl md:text-2xl text-white leading-snug">
@@ -98,7 +93,6 @@ export function MediaResultCard({
                   {mediaInfo.type === 'image' && <>{settings.iconStyle === 'emoji' ? <span>🖼️</span> : <ImageIcon size={12} className="text-cyan-400" />} {settings.language === 'en' ? 'Image' : 'Imagem'}</>}
                 </span>
               </div>
-              {/* Metadata: views, date, formats, duration */}
               <div className="flex flex-wrap items-center gap-x-1 text-xs lf-text-faint font-medium">
                 {mediaInfo.views && (
                   <span className="flex items-center gap-1 px-2">
@@ -128,8 +122,6 @@ export function MediaResultCard({
               </div>
             </div>
 
-            {/* Actions Toolbelt (items-start: a coluna da capa cresce
-                com a linha de formatos sem esticar os vizinhos) */}
             <div className="flex flex-wrap items-start gap-2">
               <button
                 onClick={onToggleFav}
@@ -212,7 +204,6 @@ export function MediaResultCard({
           </div>
         </div>
 
-        {/* Format Selector with Probe Options */}
         <div className="border-t lf-border pt-6 space-y-5">
           {probeLoading && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-zinc-500/10 border lf-border lf-text-secondary text-xs font-medium">
@@ -239,7 +230,6 @@ export function MediaResultCard({
           </Suspense>
         </div>
 
-        {/* Execute Download trigger */}
         <div className="border-t lf-border pt-6 space-y-4">
           <SummaryPanel formatOptions={formatOptions} selectedFormat={selectedFormat} mediaInfo={mediaInfo} />
           <div className="flex justify-end">

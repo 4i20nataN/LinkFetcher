@@ -22,7 +22,6 @@ function cacheGet(key: string): SearchResult[] | undefined {
     searchCache.delete(key);
     return undefined;
   }
-  // LRU: re-insere para marcar como recente.
   searchCache.delete(key);
   searchCache.set(key, hit);
   return hit.value;
@@ -147,7 +146,6 @@ export const YouTubeSearch: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 py-2 md:py-6 px-4">
-      {/* Title Header */}
       <div className="text-center md:text-left space-y-2">
         <div className="flex items-center gap-2 justify-center md:justify-start">
           <Globe size={28} className={getAccentTextClass(settings)} />
@@ -160,7 +158,6 @@ export const YouTubeSearch: React.FC = () => {
         </p>
       </div>
 
-      {/* Search Input bar */}
       <form onSubmit={handleSearch} className="flex gap-3">
         <div className="relative flex-1">
           <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 lf-text-muted" />
@@ -187,7 +184,6 @@ export const YouTubeSearch: React.FC = () => {
         </button>
       </form>
 
-      {/* Error state */}
       {error && (
         <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
           <AlertCircle size={16} />
@@ -195,7 +191,6 @@ export const YouTubeSearch: React.FC = () => {
         </div>
       )}
 
-      {/* Results View */}
       <div className="space-y-4">
         <div className="flex items-center justify-between text-xs lf-text-muted font-medium">
           <span>
@@ -207,7 +202,6 @@ export const YouTubeSearch: React.FC = () => {
         </div>
 
         {searching ? (
-          /* Loading states */
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[1, 2, 4, 5].map((i) => (
               <div key={i} className="rounded-2xl glass-card p-3 animate-pulse space-y-4">
@@ -220,7 +214,6 @@ export const YouTubeSearch: React.FC = () => {
             ))}
           </div>
         ) : (
-          /* Search results Grid */
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <AnimatedList>
               {results.map((video) => (

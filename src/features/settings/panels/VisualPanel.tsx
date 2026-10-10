@@ -1,6 +1,4 @@
-// Painel "Personalização Visual" (extraído do SettingsView): tema, cor de
-// destaque (fileira única com scroll lateral), estilo de ícones, emojis da
-// lateral e idioma.
+// Painel "Personalização Visual": tema, accent, ícones e idioma.
 import { Settings, Globe, Smile, Palette } from 'lucide-react';
 import type { AppSettings } from '../../../types';
 import { useTranslation } from '../../../core/i18n';

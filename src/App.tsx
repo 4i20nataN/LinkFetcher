@@ -49,8 +49,7 @@ function DashboardContent() {
     })();
   }, [settings.updates]);
 
-  // ── Clipboard monitoring lifecycle ────────────────────────────────────────
-  // Polling real via plugin nativo (2s): mostra popup ao copiar um link.
+  // Clipboard: polling nativo (2s) mostra popup ao copiar link.
   useEffect(() => {
     if (!settings.clipboardMonitoringEnabled) return;
 
@@ -87,7 +86,7 @@ function DashboardContent() {
 
   const handleAnalyzeClipboardUrl = useCallback((url: string) => {
     setActiveTab('analyze');
-    // Dispatch custom event so LinkAnalyzer picks up the URL
+    // Avisa o LinkAnalyzer via evento.
     window.dispatchEvent(new CustomEvent('clipboard:analyze', { detail: { url } }));
   }, [setActiveTab]);
 
@@ -141,28 +140,26 @@ function DashboardContent() {
           <BinarySetupOverlay onReady={() => setNeedsSetup(false)} />
         </Suspense>
       )}
-      {/* Sidebar Navigation — lazy loaded */}
+      {/* Navegação lateral */}
       <div className="lf-suspense-sidebar">
         <Suspense fallback={null}>
           <Sidebar isOpen={sidebarOpen} toggleOpen={toggleSidebar} />
         </Suspense>
       </div>
 
-      {/* Main Panel */}
+      {/* Painel principal */}
       <main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain relative p-4 md:p-8 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
 
-        {/* Auto-Update Banner — lazy loaded (desktop only: sem plugin no mobile) */}
+      {/* Banner de update (só desktop) */}
         {!isAndroid() && (
           <Suspense fallback={null}>
             <UpdateBanner />
           </Suspense>
         )}
 
-        {/* Dynamic transition container */}
+        {/* Transição entre abas */}
         <div className="lf-animated-view">
-          {/* Downloads com keep-alive: trocar de aba nunca desmonta a fila —
-              o ciclo de vida da view não pode pausar, resetar scroll/filtros
-              nem congelar o progresso de downloads em curso. */}
+          {/* Keep-alive: trocar de aba nunca desmonta a fila de downloads. */}
           <div
             className="lf-suspense-view"
             style={activeTab === 'manager' ? undefined : { display: 'none' }}
@@ -179,7 +176,7 @@ function DashboardContent() {
         </div>
       </main>
 
-      {/* Clipboard link detection popup — lazy loaded */}
+      {/* Popup de link do clipboard */}
       <Suspense fallback={null}>
         <ClipboardPopup
           url={showClipboardPopup ? clipboardPopupUrl : ''}
@@ -188,7 +185,7 @@ function DashboardContent() {
         />
       </Suspense>
 
-      {/* First-run clipboard prompt — lazy loaded */}
+      {/* Prompt inicial do clipboard */}
       {showFirstRunPrompt && (
         <Suspense fallback={null}>
           <FirstRunClipboardPrompt onDismiss={() => setShowFirstRunPrompt(false)} />

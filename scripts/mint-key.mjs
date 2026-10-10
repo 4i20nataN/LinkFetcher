@@ -1,13 +1,5 @@
-// Venda de chaves PRO — uso do DONO, nunca commitar segredos.
-// A privada fica em signing-keys/license.key (gitignored, padrão do updater).
-//
-//   1x:  node scripts/mint-key.mjs --init
-//        → gera o par, salva a privada, IMPRIME a pública p/ colar em
-//           LICENSE_PUBLIC_SPKI_B64 (src/core/license/license.ts)
-//   venda: node scripts/mint-key.mjs "Nome do Cliente" [dias]
-//        → sem dias = vitalícia. Imprime a chave + autoverificação.
-//
-// Espelho de src/core/license/license.ts (payload + base32 Crockford).
+// Emite chaves PRO (uso do dono; nunca commitar segredos).
+// Espelho de src/core/license/license.ts (payload + base32).
 import { webcrypto } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -66,9 +58,8 @@ async function mint(name, days) {
   const priv = await subtle.importKey('jwk', file.privateJwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
   const payload = buildPayload(name, exp);
   const sig = new Uint8Array(await subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, priv, payload));
-  // Autoverificação antes de entregar (mesma primitiva do app).
-  // JWK pública = privada sem `d` e sem `key_ops` (a privada carrega
-  // key_ops ['sign']; herdar quebra o import p/ ['verify']).
+  // Autoverifica antes de entregar (mesma primitiva do app).
+  // Pública = privada sem `d`/`key_ops` (herdar quebra o verify).
   const { d: _d, key_ops: _k, ext: _e, ...pubJwk } = file.privateJwk;
   const pub = await subtle.importKey('jwk', pubJwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
   const ok = await subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, pub, sig, payload);

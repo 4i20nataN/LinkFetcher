@@ -1,17 +1,7 @@
-/**
- * Animation presets centralizados.
- *
- * Todos os componentes animados do app consomem variantes daqui.
- * Para alterar timing/easing de um padrão, mude UM arquivo.
- *
- * Referência motion/react v12:
- *   - Variants aceitam { hidden, visible, exit }
- *   - Transition pode ser number | Spring | Tween | PerProperty
- */
+/** Presets centralizados de animação (timing/easing mudam só aqui). */
 
 import type { Variants, Transition } from 'motion/react';
 
-// ── Transições reutilizáveis ────────────────────────────────────────────────
 
 export const spring = (stiffness = 400, damping = 30): Transition => ({
   type: 'spring' as const,
@@ -25,7 +15,6 @@ export const tween = (duration = 0.25, ease: Transition['ease'] = 'easeInOut'): 
   ease,
 });
 
-// ── Variantes de enter/exit ─────────────────────────────────────────────────
 
 /** Fade simples (opacidade 0→1) */
 export const fadeIn: Variants = {
@@ -69,35 +58,34 @@ export const modalScale: Variants = {
   exit: { opacity: 0, scale: 0.9, y: 20 },
 };
 
-/** Slide from bottom (y: 80→0) — clipboard popup */
+/** Slide de baixo (y: 80→0) — popup do clipboard */
 export const slideFromBottom: Variants = {
   hidden: { y: 80, opacity: 0, scale: 0.95 },
   visible: { y: 0, opacity: 1, scale: 1 },
   exit: { y: 80, opacity: 0, scale: 0.95 },
 };
 
-/** Slide from left (x: -15→0) — download item exit */
+/** Saída p/ esquerda (x: -15→0) — item de download */
 export const slideExitLeft: Variants = {
   hidden: { opacity: 0, y: 15 },
   visible: { opacity: 1, y: 0 },
   exit: { opacity: 0, x: -15 },
 };
 
-/** Accordion expand/collapse (height: 0→auto) */
+/** Expande/colapsa (height: 0→auto) */
 export const accordionExpand: Variants = {
   hidden: { height: 0, opacity: 0 },
   visible: { height: 'auto' as const, opacity: 1 },
   exit: { height: 0, opacity: 0 },
 };
 
-/** Update banner entry (y: -12→0, subtle scale) */
+/** Entrada do banner (y: -12→0, scale sutil) */
 export const bannerEntry: Variants = {
   hidden: { opacity: 0, y: -12, scale: 0.98 },
   visible: { opacity: 1, y: 0, scale: 1 },
   exit: { opacity: 0, y: -12, scale: 0.98 },
 };
 
-// ── Transições específicas por componente ───────────────────────────────────
 
 export const transitions = {
   /** Spring padrão para cards/modais */
@@ -108,20 +96,20 @@ export const transitions = {
   tooltip: spring(450, 25),
   /** Spring suave para modais */
   modal: spring(300, 25),
-  /** Tween para page transitions */
+  /** Tween p/ transições de página */
   page: tween(0.25, 'easeInOut'),
-  /** Tween para indicadores de aba */
+  /** Tween p/ indicadores de aba */
   tab: tween(0.2),
-  /** Tween para accordion opacity */
+  /** Tween p/ opacidade do accordion */
   accordionOpacity: tween(0.2),
-  /** Spring para accordion height */
+  /** Spring p/ altura do accordion */
   accordionHeight: spring(400, 30),
-  /** Tween para shimmer */
+  /** Tween p/ shimmer */
   shimmer: { duration: 1.5, repeat: Infinity, ease: 'linear' as const },
-  /** Spring para toggle */
+  /** Spring p/ toggle */
   toggle: spring(500, 30),
-  /** Bezier custom para accordion chevron */
+  /** Curva do chevron do accordion */
   chevron: tween(0.3, [0.25, 0.1, 0.25, 1]),
-  /** Bezier premium para update banner */
+  /** Curva do banner de update */
   banner: tween(0.3, [0.23, 1, 0.32, 1]),
 } as const;

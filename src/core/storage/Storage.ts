@@ -1,7 +1,6 @@
 import { FavoriteItem, DownloadLaterItem, AppSettings } from '../../types';
 
 export class StorageService {
-  // --- FAVORITES ---
   static getFavorites(): FavoriteItem[] {
     try {
       const data = localStorage.getItem('universal_downloader_favorites');
@@ -47,7 +46,6 @@ export class StorageService {
     }
   }
 
-  // --- DOWNLOAD LATER ---
   static getDownloadLater(): DownloadLaterItem[] {
     try {
       const data = localStorage.getItem('universal_downloader_later');
@@ -84,13 +82,11 @@ export class StorageService {
     return this.getDownloadLater().some(l => l.url === url);
   }
 
-  // --- SETTINGS CONFIGS ---
   static getSettings(): AppSettings {
     try {
       const data = localStorage.getItem('universal_downloader_settings');
       if (data) return JSON.parse(data);
     } catch (_) {
-      // ignore
     }
     return {
       themeMode: 'dark',
@@ -115,7 +111,6 @@ export class StorageService {
     localStorage.setItem('universal_downloader_settings', JSON.stringify(settings));
   }
 
-  // --- CLEAR CACHE & STORAGE ---
   static clearCache() {
     localStorage.removeItem('universal_downloader_later');
   }
@@ -127,12 +122,10 @@ export class StorageService {
     localStorage.removeItem('universal_downloader_items');
   }
 
-  // --- LIGHTWEIGHT BACKUP (links only) ---
   static exportLinksBackup(): string {
     const favorites = this.getFavorites();
     const later = this.getDownloadLater();
     
-    // Get download history (finished items only with URLs)
     let downloads: { url: string; title: string; platform: string }[] = [];
     try {
       const stored = localStorage.getItem('universal_downloader_items');
@@ -165,7 +158,6 @@ export class StorageService {
     try {
       const data = JSON.parse(jsonStr);
       
-      // Import favorites
       if (Array.isArray(data.favorites)) {
         const currentFavs = this.getFavorites();
         const existingUrls = new Set(currentFavs.map(f => f.url));
@@ -184,7 +176,6 @@ export class StorageService {
         }
       }
 
-      // Import download later
       if (Array.isArray(data.downloadLater)) {
         for (const item of data.downloadLater) {
           if (item.url) {
@@ -200,7 +191,6 @@ export class StorageService {
         }
       }
 
-      // Import downloads to history
       if (Array.isArray(data.downloads)) {
         try {
           const stored = localStorage.getItem('universal_downloader_items');

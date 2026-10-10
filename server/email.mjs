@@ -1,6 +1,4 @@
-// Entrega da chave por e-mail (SMTP). Transporte injetável p/ teste; em
-// produção usa nodemailer (lazy — dependência só do servidor).
-// Falha de envio NUNCA quebra a venda: a chave segue disponível no poll.
+// Chave por e-mail (SMTP lazy); falha nunca quebra a venda (poll entrega).
 export function buildKeyEmail({ to, key, days }) {
   const where = `LF1 (cole em Ativar PRO → Já tenho uma chave)`;
   return {

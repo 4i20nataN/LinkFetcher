@@ -1,17 +1,5 @@
-// LinkFetcher License Server — verificação automática de Pix (Mercado Pago)
-// + emissão de chaves PRO. Zero dependências (só Node 22+: fetch, crypto,
-// JSON). Roda em qualquer VPS/PaaS: `node server/server.mjs`.
-//
-// Fluxo:
-//   app → POST /api/checkout {email, contact} → cria Pix no MP (R$ 9,99,
-//     external_reference=lf-<id>) → devolve QR/copia-e-cola + checkoutId
-//   app → GET /api/key/:id?contact=... (poll 5s) → {status} → {key} pago
-//   MP  → POST /api/webhook/mercadopago (x-signature) → confere valor exato,
-//     aprova, minta a chave (30 dias) e guarda (idempotente).
-// A fonte da verdade é SEMPRE o GET no MP — nunca o corpo do webhook.
-// Sem webhook (perdido), o próprio poll revalida no MP após 45s.
-//
-// Segredos SÓ via env (nunca no repo): ver .env.example.
+// Servidor de licenças: Pix via Mercado Pago + emissão de chaves PRO.
+// Segredos só via env; rode com `node server/server.mjs`.
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { createPixPayment } from './mp.mjs';
@@ -55,7 +43,7 @@ const server = createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
 
-    // ---- Checkout: cria o Pix no MP ----
+    // Checkout: cria o Pix no MP.
     if (req.method === 'POST' && url.pathname === '/api/checkout') {
       if (!rateOk(ip)) return json(res, 429, { error: 'rate-limited' });
       let body;
@@ -90,7 +78,7 @@ const server = createServer(async (req, res) => {
       });
     }
 
-    // ---- Poll da chave (só entrega p/ o contato da compra) ----
+    // Poll da chave (só entrega ao contato da compra).
     const keyMatch = url.pathname.match(/^\/api\/key\/([A-Za-z0-9-]+)$/);
     if (req.method === 'GET' && keyMatch) {
       // Lock: o refresh revalida no MP (await) antes de salvar.
@@ -114,7 +102,7 @@ const server = createServer(async (req, res) => {
       return json(res, out.code, out.body);
     }
 
-    // ---- Webhook do Mercado Pago ----
+    // Webhook do Mercado Pago.
     if (req.method === 'POST' && url.pathname === '/api/webhook/mercadopago') {
       const raw = await readBody(req);
       let body = null;
@@ -130,8 +118,7 @@ const server = createServer(async (req, res) => {
       })) {
         return json(res, 401, { error: 'bad-signature' });
       }
-      // Lock: settle faz rede antes de salvar; sem ele, dois webhooks
-      // concorrentes e um saveAll apaga o outro.
+      // Lock: settle faz rede antes de salvar; senão um save apaga o outro.
       const out = await withStoreLock(async () => {
         const db = loadAll();
         const checkout = Object.values(db.checkouts).find(c => String(c.mpId) === String(paymentId));

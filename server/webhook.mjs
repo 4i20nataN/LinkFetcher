@@ -1,8 +1,5 @@
-// Validação do webhook v2 do Mercado Pago (documentação oficial):
-// header `x-signature: ts=<ts>,v1=<hmac>` + header `x-request-id`.
-// Manifesto: `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`
-// HMAC-SHA256 com o segredo do dashboard (hex minúsculo), ts ±5min.
-// Suporta também o formato legado (?id=..&topic=payment).
+// Valida webhook v2 do MP (HMAC-SHA256, ts ±5min).
+// Suporta formato legado (?id/&topic).
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 export function extractPaymentId(jsonBody, searchParams) {

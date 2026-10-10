@@ -1,14 +1,4 @@
-/**
- * LazyMotionProvider — lazy-load do motor de animação motion/react.
- *
- * Reduz o bundle inicial em ~29KB gzip ao carregar apenas domAnimation.
- * Componentes filhos usam `m.div` em vez de `motion.div`.
- *
- * Uso:
- *   <LazyMotionProvider>
- *     <App />
- *   </LazyMotionProvider>
- */
+/** Lazy-load do motor de animação (só domAnimation). */
 
 import React, { Suspense } from 'react';
 import { LazyMotion } from 'motion/react';

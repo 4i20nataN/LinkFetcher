@@ -1,5 +1,4 @@
-// Funções puras do seletor de formato (extraídas do FormatSelector).
-// Sem React, sem estado — candidatas naturais a teste unitário.
+// Funções puras do seletor de formato (sem React/estado).
 import type { MediaInfo } from '../../../types';
 import type { FormatOptions } from '../FormatOptions';
 

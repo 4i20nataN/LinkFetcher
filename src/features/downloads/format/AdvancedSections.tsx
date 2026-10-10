@@ -1,5 +1,4 @@
-// Seções da aba "Avançado" do seletor de formato (extraídas do FormatSelector).
-// Cada seção recebe o ctx compartilhado e lê `settings`/`t` via hooks.
+// Seções da aba "Avançado" do seletor de formato.
 import { useApp } from '../../../context/AppContext';
 import { useTranslation } from '../../../core/i18n';
 import { BlockIcon, BlockTitle } from '../../../components/BlockIcon';
@@ -18,7 +17,6 @@ import type { FormatSectionCtx } from './sectionCtx';
 
 type Ctx = { ctx: FormatSectionCtx };
 
-/* ── Recorte de tempo ── */
 export function TrimSection({ ctx }: Ctx) {
   const { options, update, mediaInfo, openSections, toggleSection, accentBg, trimStart, setTrimStart, trimEnd, setTrimEnd, trimStartRef, trimEndRef } = ctx;
   const { settings } = useApp();
@@ -73,7 +71,6 @@ export function TrimSection({ ctx }: Ctx) {
   );
 }
 
-/* ── Modo de Saída + FPS (2 colunas) ── */
 export function OutputSection({ ctx }: Ctx) {
   const { options, update, openSections, toggleSection, accentBg, isFpsAvailable, selectedTargetHeight } = ctx;
   const { settings } = useApp();
@@ -145,7 +142,6 @@ export function OutputSection({ ctx }: Ctx) {
   );
 }
 
-/* ── SponsorBlock ── */
 export function SponsorBlockSection({ ctx }: Ctx) {
   const { options, update, openSections, toggleSection, accentBg } = ctx;
   const { settings } = useApp();
@@ -210,7 +206,6 @@ export function SponsorBlockSection({ ctx }: Ctx) {
   );
 }
 
-/* ── Metadados + Thumbnail (2 colunas) ── */
 export function MetadataSection({ ctx }: Ctx) {
   const { options, update, openSections, toggleSection, accentBg } = ctx;
   const { settings } = useApp();
@@ -237,7 +232,6 @@ export function MetadataSection({ ctx }: Ctx) {
   );
 }
 
-/* ── Comportamento + Limite de Velocidade (2 colunas) ── */
 export function BehaviorSection({ ctx }: Ctx) {
   const { options, update, openSections, toggleSection, accentBg } = ctx;
   const { settings } = useApp();

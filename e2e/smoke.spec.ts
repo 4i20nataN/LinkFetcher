@@ -1,6 +1,5 @@
-// Smoke battery: o que dá para validar sem backend Tauri nem rede.
-// Roda headless aqui na máquina (Chromium Playwright) contra o build de
-// produção (`dist-web`). Downloads reais e mobile continuam manuais.
+// Smoke sem backend Tauri nem rede (Chromium headless, build dist-web).
+// Downloads reais e mobile seguem manuais.
 import { test, expect } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
@@ -23,7 +22,6 @@ test('navega pelas abas sem erro', async ({ page }) => {
   for (const tab of ['Downloads', 'Favoritos', 'Configurações', 'Baixar Depois']) {
     await page.getByRole('button', { name: new RegExp(tab) }).first().click();
   }
-  // Volta ao analisador
   await page.getByRole('button', { name: /Analisar Link/ }).first().click();
   await expect(page.getByPlaceholder(/Cole o link|Paste link/i)).toBeVisible();
 });

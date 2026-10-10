@@ -1,11 +1,4 @@
-/**
- * AnimatedButton — botão com feedback whileTap.
- *
- * Uso:
- *   <AnimatedButton onTap={() => handleDownload()} className="px-4 py-2 bg-indigo-600">
- *     Baixar
- *   </AnimatedButton>
- */
+/** Botão com feedback de toque (whileTap). */
 
 import React from 'react';
 import { m } from 'motion/react';

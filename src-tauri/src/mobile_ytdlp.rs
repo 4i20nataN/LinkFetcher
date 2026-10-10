@@ -1,7 +1,5 @@
-//! Ponte mobile: registra o plugin Kotlin `YtDlpPlugin` (yt-dlp embarcado
-//! via youtubedl-android) sob o nome `ytdlp` e oferece os mesmos comandos do
-//! backend desktop, encaminhando cada chamada ao Kotlin com
-//! `run_mobile_plugin`. Só compila no Android; no desktop este módulo é vazio.
+//! Ponte mobile: encaminha comandos ao plugin Kotlin `YtDlpPlugin`.
+//! Só compila no Android.
 
 #[cfg(target_os = "android")]
 mod inner {
@@ -12,12 +10,10 @@ mod inner {
         AppHandle, Manager, Runtime,
     };
 
-    /// Handle do plugin Kotlin, guardado no estado do app no `setup`.
+    /// Plugin Kotlin guardado no estado do app.
     pub struct MobileYtdlp<R: Runtime>(pub PluginHandle<R>);
 
-    /// Plugin Tauri `ytdlp`: no setup registra a classe Kotlin no
-    /// PluginManager (é o que torna `plugin:ytdlp|*` e `run_mobile_plugin`
-    /// funcionais — sem isso o JS cai no fallback desktop que não existe).
+    /// Registra a classe Kotlin no PluginManager.
     pub fn init<R: Runtime>() -> TauriPlugin<R> {
         Builder::new("ytdlp")
             .setup(|app, api| {
@@ -30,7 +26,7 @@ mod inner {
             .build()
     }
 
-    /// Chamada assíncrona a um comando do `YtDlpPlugin` Kotlin.
+    /// Chamada a um comando do `YtDlpPlugin` Kotlin.
     pub async fn call_mobile<R: Runtime, T: DeserializeOwned>(
         app: &AppHandle<R>,
         command: &str,
@@ -46,8 +42,7 @@ mod inner {
             .map_err(|e| e.to_string())
     }
 
-    /// `invoke.resolve` do Kotlin só aceita `JSObject`: os comandos que
-    /// retornam escalar respondem com envelope (`{dir}`, `{success}`).
+    /// `invoke.resolve` exige `JSObject`: escalares usam envelope.
     #[derive(serde::Deserialize)]
     struct DirResult {
         dir: String,
@@ -70,7 +65,7 @@ mod inner {
         Ok(std::path::PathBuf::from(r.dir))
     }
 
-    /// Versão do yt-dlp embarcado (diagnóstico de bitrot na UI).
+    /// Versão do yt-dlp embarcado (diagnóstico na UI).
     pub async fn engine_version<R: Runtime>(app: &AppHandle<R>) -> Result<String, String> {
         let r: VersionResult = call_mobile(app, "engineVersion", &serde_json::json!({})).await?;
         Ok(r.version)
@@ -91,9 +86,7 @@ mod inner {
         Ok(r.success)
     }
 
-    /// Desfecho de um job no Kotlin (`jobState`): reconciliação quando o
-    /// `complete` se perdeu com o WebView suspenso. Retorna o JSON cru
-    /// (`{state: running|finished|unknown, ...}`) — o engine interpreta.
+    /// Desfecho do job no Kotlin p/ reconciliação; retorna o JSON cru.
     pub async fn job_state_mobile<R: Runtime>(
         app: &AppHandle<R>,
         id: &str,
@@ -101,8 +94,7 @@ mod inner {
         call_mobile(app, "jobState", &serde_json::json!({ "id": id })).await
     }
 
-    /// Snapshot do progresso de um job ativo (`jobProgress`): poll de
-    /// segurança do engine (push pode falhar). `{active: bool, ...}`.
+    /// Progresso do job ativo p/ poll do engine.
     pub async fn job_progress_mobile<R: Runtime>(
         app: &AppHandle<R>,
         id: &str,

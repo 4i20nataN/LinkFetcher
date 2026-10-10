@@ -34,9 +34,7 @@ fn str_field(v: &serde_json::Value, keys: &[&str]) -> String {
         .to_owned()
 }
 
-/// `encodeURIComponent` mínimo (sem nova dep): codifica tudo exceto
-/// `A-Za-z0-9 -_.!~*'()`, igual ao JS. Usado só nas URLs diretas,
-/// como em YtDlpSearch.ts:22,24,28.
+/// `encodeURIComponent` mínimo p/ URLs diretas (sem nova dep).
 fn pct_encode(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
@@ -51,7 +49,7 @@ fn pct_encode(s: &str) -> String {
     out
 }
 
-/// YtDlpSearch.ts:16-35 — mapeamento plataforma→query, literal.
+/// Mapeia plataforma→query de busca.
 fn build_query(platform: &str, query: &str, max: u32) -> String {
     match platform {
         "youtube" => format!("ytsearch{max}:{query}"),
@@ -69,16 +67,14 @@ fn build_query(platform: &str, query: &str, max: u32) -> String {
     }
 }
 
-/// YtDlpSearch.ts:37-73 — mesmos args, mesmo NDJSON, mesmos 9 fallbacks.
+/// Mesmos args/NDJSON/fallbacks do frontend.
 #[cfg(target_os = "android")]
 #[tauri::command]
 pub async fn ytdlp_search(
     app: AppHandle,
     options: SearchOptions,
 ) -> Result<Vec<SearchResult>, String> {
-    // O plugin Kotlin resolve um objeto `{results: [...]}` (o `invoke.resolve`
-    // só aceita `JSObject`): desserializa o envelope e devolve o vetor, que é
-    // o contrato do comando no desktop e o que o frontend espera.
+    // Envelope `{results}` pois `invoke.resolve` exige `JSObject`.
     #[derive(serde::Deserialize)]
     struct SearchResponse {
         #[serde(default)]
@@ -88,7 +84,7 @@ pub async fn ytdlp_search(
     Ok(res.results)
 }
 
-/// YtDlpSearch.ts:37-73 — mesmos args, mesmo NDJSON, mesmos 9 fallbacks.
+/// Mesmos args/NDJSON/fallbacks do frontend.
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub async fn ytdlp_search(

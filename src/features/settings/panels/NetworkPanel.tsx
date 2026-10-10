@@ -1,4 +1,4 @@
-// Painel "Rede e Fila de Downloads" (extraído do SettingsView).
+// Painel "Rede e Fila de Downloads".
 import { Sliders } from 'lucide-react';
 import type { AppSettings } from '../../../types';
 import { useTranslation } from '../../../core/i18n';

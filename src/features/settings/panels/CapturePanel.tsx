@@ -1,6 +1,4 @@
-// Painel "Captura de Links" (extraído do SettingsView): comportamento da
-// área de transferência. Não é visual — por isso saiu do card de
-// personalização para um card próprio.
+// Painel "Captura de Links": comportamento da área de transferência.
 import { Clipboard, Eye } from 'lucide-react';
 import type { AppSettings } from '../../../types';
 import { useTranslation } from '../../../core/i18n';

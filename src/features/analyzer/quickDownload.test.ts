@@ -1,6 +1,5 @@
-// Contrato do download rápido: o que cada botão resolve (formato de
-// referência p/ o card + opções neutras p/ o backend). Se alguém mudar o
-// preset (ex. herdar fragmentos agressivos de novo), estes testes quebram.
+// Contrato do download gratuito: formato de referência + opções neutras.
+// Trava o preset (ex.: voltar a herdar fragmentos agressivos quebra).
 import { describe, expect, it } from 'vitest';
 import { buildQuickOptions, pickQuickRefFormat } from './analyzerUtils';
 import type { FormatOptions } from '../downloads/FormatOptions';

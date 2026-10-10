@@ -11,8 +11,7 @@ import { useTranslation, TranslationKey } from '../core/i18n';
 export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = React.memo(({ isOpen, toggleOpen }) => {
   const { settings } = useSettings();
   const { activeTab, setActiveTab } = useNavigation();
-  // Badge via contador (só muda de verdade) — a Sidebar não re-renderiza
-  // a cada tick de progresso do engine.
+  // Badge via contador: evita re-render a cada tick do engine.
   const activeBadge = useDownloadCount(['downloading', 'queued']);
   const { t } = useTranslation(settings);
 
@@ -28,7 +27,6 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
 
   return (
     <>
-      {/* Header bar (narrow viewport) — com tamanho maior e tons padrão do app */}
       <header className="lg:hidden min-h-20 py-3 border-b lf-border bg-black/40 backdrop-blur-md sticky top-0 z-50 flex items-center justify-between px-5 safe-top">
         <div className="flex items-center gap-3">
           <img
@@ -55,14 +53,12 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
         </button>
       </header>
 
-      {/* Backdrop for drawer (narrow viewport) */}
       <AnimatedBackdrop
         visible={isOpen}
         onClick={toggleOpen}
         className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-sm"
       />
 
-      {/* Navigation Drawer */}
       <nav 
         className={`
           fixed top-20 bottom-0 left-0 z-40 w-64 glass-sidebar p-4
@@ -72,7 +68,6 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
         `}
       >
       <div className="h-full overflow-y-auto">
-        {/* Title branding on desktop */}
         <div className="hidden lg:flex items-center gap-3.5 mb-10">
           <img
             src={getThemeLogo(settings)}
@@ -90,7 +85,6 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
           </div>
         </div>
 
-        {/* Sidebar Sections */}
         <div className="space-y-1.5 pb-4">
           {menuItems.map((item) => {
             const Icon = item.icon;
@@ -115,7 +109,6 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
                   }
                 `}
               >
-                {/* Active Highlight Pill */}
                 {isActive && (
                   <TabIndicator
                     layoutId="active-sidebar-pill"
@@ -124,7 +117,6 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
                   />
                 )}
                 
-                {/* Active Left Indicator Bar */}
                 {isActive && (
                   <TabIndicator
                     layoutId="active-sidebar-bar"
@@ -150,7 +142,6 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
                   </div>
                 </div>
 
-                {/* Badge for active downloads */}
                 {item.badge !== undefined && item.badge > 0 && (
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold z-10 ${getAccentBgClass(settings)} text-white ${RENDER_PROFILE === 'efficient' ? '' : 'animate-pulse'}`}>
                     {item.badge}

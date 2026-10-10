@@ -13,29 +13,25 @@ use tauri::AppHandle;
 #[cfg(not(target_os = "android"))]
 use tauri::{Emitter, Manager};
 
-/// Maps download id → child process (kill on cancel).
+/// Mapa id do download → processo filho (p/ cancelar).
 type CancelMap = std::collections::HashMap<String, std::sync::Arc<tokio::sync::Mutex<Child>>>;
 
-/// Global cancel map (shared state across commands) - LazyLock para static init.
+/// Processos ativos p/ cancelamento.
 static CANCEL_MAP: LazyLock<std::sync::Mutex<CancelMap>> = LazyLock::new(|| {
     std::sync::Mutex::new(std::collections::HashMap::new())
 });
 
-/// Insere child process no mapa global.
 pub fn register_cancel(id: String, child: std::sync::Arc<tokio::sync::Mutex<Child>>) {
     let mut g = CANCEL_MAP.lock().unwrap();
     g.insert(id, child);
 }
 
-/// Remove e retorna o child.
 pub fn unregister_cancel(id: &str) -> Option<std::sync::Arc<tokio::sync::Mutex<Child>>> {
     let mut g = CANCEL_MAP.lock().unwrap();
     g.remove(id)
 }
 
-/// Intenção de limpeza: ids cujo `.part` deve ser apagado quando a task
-/// `ytdlp_download` terminar. `pause` NÃO marca (resume reaproveita o
-/// `.part`); `cancel` definitivo marca via `ytdlp_cancel(cleanup=true)`.
+/// Ids com `.part` a apagar ao terminar; `pause` preserva p/ resume.
 static CLEANUP_INTENT: LazyLock<std::sync::Mutex<std::collections::HashSet<String>>> =
     LazyLock::new(|| std::sync::Mutex::new(std::collections::HashSet::new()));
 
@@ -43,15 +39,12 @@ fn mark_cleanup_intent(id: &str) {
     CLEANUP_INTENT.lock().unwrap().insert(id.to_owned());
 }
 
-/// Consome a intenção (true = havia pedido de limpeza).
+/// Consome a intenção de limpeza.
 fn take_cleanup_intent(id: &str) -> bool {
     CLEANUP_INTENT.lock().unwrap().remove(id)
 }
 
-/// Últimos destinos capturados por download id (todos os `Destination:`
-/// vistos no stdout — vídeo + áudio separados geram arquivos distintos).
-/// Mantido após falha para permitir `ytdlp_cleanup` post-mortem e resume;
-/// descartado no sucesso. Só guarda nomes (a deleção valida o diretório).
+/// Últimos `Destination:` por download (p/ cleanup post-mortem e resume).
 static LAST_PATHS: LazyLock<std::sync::Mutex<std::collections::HashMap<String, Vec<String>>>> =
     LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
 
@@ -73,7 +66,7 @@ fn forget_download_paths(id: &str) -> Option<Vec<String>> {
     LAST_PATHS.lock().unwrap().remove(id)
 }
 
-/// Retorna o diretório de downloads do SO. Paridade `main.cjs:203`.
+/// Diretório de downloads do SO.
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub fn fs_get_downloads_path(app: AppHandle) -> Result<String, String> {
@@ -81,10 +74,7 @@ pub fn fs_get_downloads_path(app: AppHandle) -> Result<String, String> {
     Ok(p.to_string_lossy().into_owned())
 }
 
-/// No Android: pasta de downloads do app no armazenamento externo
-/// (`getExternalFilesDir(DOWNLOADS)` via Kotlin) — gravável sem permissão,
-/// visível em gerenciadores de arquivos. A pública (`/Download`) é
-/// bloqueada pelo scoped storage (EACCES via File API no SDK 30+).
+/// No Android: pasta do app no armazenamento externo (sem permissão extra).
 #[cfg(target_os = "android")]
 #[tauri::command]
 pub async fn fs_get_downloads_path(app: AppHandle) -> Result<String, String> {
@@ -92,8 +82,7 @@ pub async fn fs_get_downloads_path(app: AppHandle) -> Result<String, String> {
     Ok(dir.to_string_lossy().into_owned())
 }
 
-/// `shell:openPath` — abre arquivo ou pasta no gerenciador de arquivos do SO.
-/// Paridade `main.cjs:205-230`.
+/// Abre arquivo ou pasta no gerenciador do SO.
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub async fn fs_open_path(_app: AppHandle, target_path: String) -> Result<(), String> {
@@ -104,7 +93,6 @@ pub async fn fs_open_path(_app: AppHandle, target_path: String) -> Result<(), St
     let path = PathBuf::from(normalized);
     if path.exists() {
         if path.is_file() {
-            // show in folder
             #[cfg(target_os = "linux")]
             {
                 use std::process::Command;
@@ -122,7 +110,6 @@ pub async fn fs_open_path(_app: AppHandle, target_path: String) -> Result<(), St
                 Command::new("open").args(["-R", &normalized]).spawn().map_err(|e| e.to_string())?;
             }
         } else if path.is_dir() {
-            // open folder
             #[cfg(target_os = "linux")]
             {
                 use std::process::Command;
@@ -140,7 +127,6 @@ pub async fn fs_open_path(_app: AppHandle, target_path: String) -> Result<(), St
             }
         }
     } else {
-        // path não existe — tenta abrir o pai
         if let Some(parent) = path.parent() {
             if parent.exists() {
                 #[cfg(target_os = "linux")]
@@ -164,7 +150,7 @@ pub async fn fs_open_path(_app: AppHandle, target_path: String) -> Result<(), St
     Ok(())
 }
 
-/// No Android: abre via intent VIEW com FileProvider (Kotlin).
+/// No Android: abre via intent VIEW (Kotlin).
 #[cfg(target_os = "android")]
 #[tauri::command]
 pub async fn fs_open_path(app: AppHandle, target_path: String) -> Result<(), String> {
@@ -181,8 +167,7 @@ pub async fn fs_open_path(app: AppHandle, target_path: String) -> Result<(), Str
     Ok(())
 }
 
-/// `shell:selectFolder` — abre diálogo para selecionar pasta.
-/// Paridade `main.cjs:357-368`.
+/// Abre diálogo p/ selecionar pasta.
 #[tauri::command]
 pub async fn fs_select_folder(app: AppHandle, default_path: Option<String>) -> Result<Option<String>, String> {
     #[cfg(desktop)]
@@ -216,8 +201,7 @@ pub async fn fs_select_folder(app: AppHandle, default_path: Option<String>) -> R
     }
 }
 
-/// `save-description` — salva arquivo de texto na pasta de downloads.
-/// Paridade `main.cjs:335-355`.
+/// Salva arquivo de texto na pasta de downloads.
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub async fn fs_save_description(
@@ -229,7 +213,7 @@ pub async fn fs_save_description(
     write_description_file(&downloads, &filename, &content)
 }
 
-/// No Android: mesma lógica, na pasta do app (Kotlin).
+/// No Android: mesma lógica, na pasta do app.
 #[cfg(target_os = "android")]
 #[tauri::command]
 pub async fn fs_save_description(
@@ -267,7 +251,7 @@ fn write_description_file(
     }))
 }
 
-/// Extensão pela content-type (`image/jpeg; charset=x` → `jpg`).
+/// Extensão pela content-type.
 fn content_type_ext(ct: &str) -> Option<&'static str> {
     let mime = ct.split(';').next()?.trim().to_lowercase();
     match mime.as_str() {
@@ -281,7 +265,7 @@ fn content_type_ext(ct: &str) -> Option<&'static str> {
     }
 }
 
-/// Extensão pelo path da URL (`.../hqdefault.jpg?x` → `jpg`).
+/// Extensão pelo path da URL.
 fn url_path_ext(url: &str) -> Option<String> {
     let path = url.split(['?', '#']).next()?;
     let ext = path.rsplit('.').next()?;
@@ -300,9 +284,7 @@ fn url_path_ext(url: &str) -> Option<String> {
     }
 }
 
-/// Host bloqueado para capa (S3): a URL vem do probe (conteúdo de
-/// terceiros) — nunca buscar metadata/link-local/IP literal, mesmo que o
-/// backend não encaminhe a resposta a ninguém.
+/// Hosts bloqueados p/ capa (SSRF): sem metadata/local/IP literal.
 fn cover_host_blocked(url: &str) -> bool {
     let Some(after_scheme) = url.split("://").nth(1) else {
         return true;
@@ -313,14 +295,14 @@ fn cover_host_blocked(url: &str) -> bool {
         .unwrap_or("");
     let host = authority.rsplit('@').next().unwrap_or("");
     if host.starts_with('[') {
-        return true; // IPv6 literal
+        return true;
     }
     let bare = host.split(':').next().unwrap_or("").trim_end_matches('.');
     let lower = bare.to_lowercase();
     if lower.is_empty() || lower == "localhost" || lower.starts_with("localhost.") {
         return true;
     }
-    // IPv4 literal: 4 grupos decimais.
+    // IPv4 literal.
     let parts: Vec<&str> = lower.split('.').collect();
     if parts.len() == 4
         && parts
@@ -329,17 +311,15 @@ fn cover_host_blocked(url: &str) -> bool {
     {
         return true;
     }
-    // Sobra de IPv6 sem colchetes ou hostname inválido.
+    // IPv6 sem colchetes ou hostname inválido.
     if lower.contains(':') {
         return true;
     }
     false
 }
 
-/// `fs_fetch_cover` — baixa os bytes da imagem de capa via HTTPS direto
-/// (sem CORS de canvas) e devolve em base64 + extensão real. O frontend
-/// converte (blob: URL = canvas limpo) e salva via plugin-fs. Teto 25 MB.
-/// Só `https://` e hosts públicos (S3: sem IP literal/localhost/metadata).
+/// Baixa a capa via HTTPS e devolve base64 + extensão (teto 25 MB).
+/// Só `https://` com host público.
 #[tauri::command]
 pub async fn fs_fetch_cover(url: String) -> Result<serde_json::Value, String> {
     use base64::Engine as _;
@@ -368,7 +348,6 @@ pub async fn fs_fetch_cover(url: String) -> Result<serde_json::Value, String> {
         .map(str::to_owned)
         .or_else(|| url_path_ext(&url))
         .unwrap_or_else(|| "jpg".to_owned());
-    // Teto anti-abuso: capa de 25 MB já é absurda.
     const MAX_COVER: u64 = 25 * 1024 * 1024;
     if resp.content_length().is_some_and(|n| n > MAX_COVER) {
         return Err("capa grande demais".into());
@@ -385,20 +364,14 @@ pub async fn fs_fetch_cover(url: String) -> Result<serde_json::Value, String> {
     }))
 }
 
-/// Limpa o stderr para exibição: descarta segmentos de progresso do ffmpeg
-/// (`frame=… fps=…`, `size=… time=…`) que soterrariam o erro real; mantém as
-/// últimas linhas significativas, máx. 500 chars.
-///
-/// O ffmpeg atualiza o status com `\r` (mesma "linha"), não `\n` — o split
-/// precisa cobrir os dois, senão o progresso inteiro vira uma mega-linha que
-/// ou é descartada junto com a causa real ou vaza como "mensagem de erro".
+/// Filtra ruído de progresso do ffmpeg/stderr e mantém o erro real (máx. 500).
+/// Separa por `\n` e `\r` (o ffmpeg atualiza a mesma "linha" com `\r`).
 fn clean_error_message(stderr_output: &str) -> String {
     fn is_progress_noise(line: &str) -> bool {
         let l = line.trim();
         if l.is_empty() {
             return true;
         }
-        // Linhas de status do ffmpeg: "frame= 123 fps=... q=..." e "size=... time=..."
         (l.contains("frame=") && l.contains("fps="))
             || (l.starts_with("size=") && l.contains("time="))
             || (l.contains("bitrate=") && l.contains("speed="))
@@ -421,15 +394,13 @@ fn clean_error_message(stderr_output: &str) -> String {
         .collect();
     let mut msg = tail.join(" · ");
     if msg.is_empty() {
-        // Tudo era ruído (ex. ffmpeg morto no meio do corte): mostra o último
-        // segmento significativo em vez da mega-linha de progresso crua.
+        // Tudo era ruído: mostra o último segmento não-vazio.
         msg = stderr_output
             .split(['\n', '\r'])
             .map(str::trim).rfind(|l| !l.is_empty())
             .unwrap_or("erro desconhecido")
             .to_owned();
     }
-    // Normaliza prefixos comuns do yt-dlp/ffmpeg
     for prefix in ["ERROR: ", "Error: "] {
         if let Some(rest) = msg.strip_prefix(prefix) {
             msg = rest.to_owned();
@@ -457,8 +428,7 @@ fn parse_section_time(t: &str) -> Option<f64> {
     if any && total >= 0.0 { Some(total) } else { None }
 }
 
-/// Parse `*INÍCIO-FIM` (formato emitido pelo FormatSelector) → segundos.
-/// Fim pode ser vazio (`*01:00-` = até o fim); `*-02:00` = do início.
+/// Parse `*INÍCIO-FIM` → segundos (`*-02:00` = do início).
 fn parse_section_range(s: &str) -> Option<(Option<f64>, Option<f64>)> {
     let body = s.strip_prefix('*').unwrap_or(s);
     let (start_s, end_s) = body.split_once('-')?;
@@ -475,15 +445,14 @@ fn parse_section_range(s: &str) -> Option<(Option<f64>, Option<f64>)> {
     Some((start, end))
 }
 
-/// Corte local rápido: `ffmpeg -ss … -i cheio [-t …] -c copy tmp` + rename
-/// sobre o caminho final. Stream-copy, sem re-encode: segundos mesmo em GBs.
+/// Corte local via ffmpeg (`-c copy`, sem re-encode) + rename p/ o final.
 async fn ffmpeg_cut_local(
     ffmpeg: &Path,
     full_path: &str,
     start: Option<f64>,
     end: Option<f64>,
 ) -> Result<(), String> {
-    // Temp preserva a extensão: o ffmpeg infere o muxer pelo nome de saída.
+    // Temp preserva a extensão (o ffmpeg infere o muxer pelo nome).
     let ext = Path::new(full_path)
         .extension()
         .and_then(|e| e.to_str())
@@ -534,15 +503,13 @@ async fn ffmpeg_cut_local(
             msg
         });
     }
-    // Assume o nome final com o trecho (remove o cheio antes p/ Windows).
+    // Remove o cheio antes (Windows) e renomeia o trecho p/ o final.
     std::fs::remove_file(full_path).map_err(|e| format!("limpar arquivo cheio: {e}"))?;
     std::fs::rename(&tmp_path, full_path).map_err(|e| format!("finalizar corte: {e}"))?;
     Ok(())
 }
 
-/// Sufixos de artefatos temporários do yt-dlp/ffmpeg — nunca são entregáveis.
-/// Usado para (a) não eleger lixo como `latest_downloaded_file` e
-/// (b) limpar parciais no cancelamento definitivo.
+/// Nomes temporários (nunca entregáveis; p/ eleição e limpeza).
 fn is_temp_artifact_name(name: &str) -> bool {
     name.contains(".part")
         || name.ends_with(".ytdl")
@@ -554,9 +521,7 @@ fn is_temp_artifact_name(name: &str) -> bool {
         || name.contains("-Frag")
 }
 
-/// Remove as flags de legenda do argv (`--write-subs`, `--write-auto-subs`,
-/// `--sub-langs X`, `--sub-format X`, `--embed-subs`). Usado no retry
-/// video-only após falha de legenda (GAP1).
+/// Remove flags de legenda do argv (retry video-only).
 fn strip_sub_flags(argv: Vec<String>) -> Vec<String> {
     let mut out = Vec::with_capacity(argv.len());
     let mut skip_next = false;
@@ -577,9 +542,7 @@ fn strip_sub_flags(argv: Vec<String>) -> Vec<String> {
     out
 }
 
-/// Elegível ao retry sem legendas: pediu legendas, ainda não tentou, o
-/// stderr cita legenda (não é falha do vídeo) e o processo saiu sozinho
-/// (kill por pausa/cancel tem `code() == None` no unix).
+/// Retry sem legendas se o stderr citar legenda e a saída for natural (não kill).
 fn should_retry_without_subs(
     params: &crate::ytdlp::args::DownloadParams,
     err_lower: &str,
@@ -589,12 +552,7 @@ fn should_retry_without_subs(
     params.subs_fallback.is_none() && asked && err_lower.contains("subtitle") && code.is_some()
 }
 
-/// Elegível ao retry com cliente android: a mídia deu 403 (YouTube recusou
-/// as URLs dos clientes default `visionos,web` p/ este IP — extração OK,
-/// download 403) e ainda não tentou. O cliente android recebe URLs de outro
-/// pool, que passam (testado: mesmo vídeo 403 → 100%). Uma única tentativa
-/// (sem recursão infinita); kill por pausa/cancel nunca entra aqui
-/// (`code() == None` no unix).
+/// Retry com client android se a mídia der 403 (uma única tentativa; kill nunca entra).
 fn should_retry_with_android_client(
     params: &crate::ytdlp::args::DownloadParams,
     err_lower: &str,
@@ -605,13 +563,9 @@ fn should_retry_with_android_client(
         && (err_lower.contains("403") || err_lower.contains("forbidden"))
 }
 
-/// Apaga as variantes temporárias de um caminho-base (`base.part`,
-/// `base.ytdl`, `base.cutmp.*`, fragmentos `-Frag*` etc). Nunca apaga o
-/// arquivo final — exceto se o próprio base já for um artefato (ex.
-/// `"x.mp4.part"` capturado no stdout). Retorna quantos arquivos removeu.
+/// Apaga temporários de um base (nunca o final); retorna quantos removeu.
 fn remove_temp_variants(base: &Path) -> u32 {
     let mut removed = 0u32;
-    // O próprio base pode ser um artefato temporário.
     if let Some(name) = base.file_name().and_then(|s| s.to_str()) {
         if is_temp_artifact_name(name) && std::fs::remove_file(base).is_ok() {
             removed += 1;
@@ -623,7 +577,7 @@ fn remove_temp_variants(base: &Path) -> u32 {
             removed += 1;
         }
     }
-    // `.cuttmp.*` e fragmentos `-Frag*` compartilham o prefixo do base.
+    // Varre `.cuttmp.*` e `-Frag*` pelo prefixo do base.
     if let (Some(parent), Some(stem)) = (
         base.parent(),
         base.file_name().and_then(|s| s.to_str()),
@@ -644,16 +598,8 @@ fn remove_temp_variants(base: &Path) -> u32 {
     removed
 }
 
-/// `ytdlp_download` — spawna yt-dlp com argv canônico + ffmpeg se presente,
-/// parseia stdout para progresso e arquivos gerados, aguarda o término do processo,
-/// emite `yt-dlp-progress` events (compat Electron) + `binary-download`,
-/// retorna caminho do arquivo baixado ou erro.
-///
-/// Recorte (`download_sections`): baixa o arquivo CHEIO pelo yt-dlp nativo
-/// (rápido, progresso real, resume) e corta local com ffmpeg
-/// (`-c copy`, segundos). NÃO repassa `--download-sections`: ele delegaria o
-/// fetch ao ffmpeg remoto (1 conexão, sem cliente do yt-dlp → 403 e
-/// lerdeza no YouTube, stdout mudo, sem resume).
+/// Spawna yt-dlp com argv canônico, emite progresso e retorna o arquivo final.
+/// Recorte baixa cheio e corta local com ffmpeg (sem `--download-sections` remoto).
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub async fn ytdlp_download(
@@ -667,18 +613,15 @@ pub async fn ytdlp_download(
         .or(payload)
         .ok_or_else(|| "Nenhum parâmetro fornecido para download (esperado options, params ou payload)".to_string())?;
     eprintln!("[ytdlp_download] START id={} url={}", params.id, params.url);
-    // Intenção de limpeza de uma sessão anterior com o mesmo id não pode
-    // vazar para esta (retry reusa o id): o .part é necessário p/ resume.
+    // Limpa intenção antiga do mesmo id (retry reusa o id; `.part` é p/ resume).
     take_cleanup_intent(&params.id);
 
-    // Resolve binário yt-dlp via binary.rs
     let ytdlp_bin = crate::ytdlp::binary::ytdlp_path(&app).map_err(|e| {
         eprintln!("[ytdlp_download] ERROR resolving yt-dlp binary: {:?}", e);
         format!("{:?}", e)
     })?;
     eprintln!("[ytdlp_download] yt-dlp binary: {}", ytdlp_bin.display());
 
-    // Resolve binário ffmpeg opcional (se existir, repassa via --ffmpeg-location)
     let ffmpeg_bin = crate::ytdlp::binary::ffmpeg_path(&app)
         .ok()
         .filter(|p| p.is_file());
@@ -692,10 +635,8 @@ pub async fn ytdlp_download(
     std::fs::create_dir_all(&output_dir).ok();
     eprintln!("[ytdlp_download] output_dir: {}", output_dir.display());
 
-    // Usa build_args canônico com ffmpeg
     let mut argv = crate::ytdlp::args::build_args(&params, &output_dir, ffmpeg_bin.as_deref());
-    // Recorte: remove --download-sections (fetch remoto via ffmpeg = lento/403
-    // e sem progresso). O corte acontece local após o download cheio.
+    // Recorte: sem `--download-sections` remoto (lento/403, sem progresso).
     let wants_cut = params
         .download_sections
         .as_deref()
@@ -726,15 +667,12 @@ pub async fn ytdlp_download(
         }
         argv = stripped;
     }
-    // Retry video-only (GAP1): 2ª execução após falha de legenda carrega
-    // `subs_fallback` — remove as flags para salvar pelo menos o vídeo.
+    // Retry video-only: com `subs_fallback`, remove as flags de legenda.
     if params.subs_fallback.is_some() {
         eprintln!("[ytdlp_download] retry sem legendas");
         argv = strip_sub_flags(argv);
     }
-    // Runtime JS do sistema (se houver): sem ele a extração moderna do
-    // YouTube degrada (formatos ausentes). Vai antes da URL posicional, mas
-    // depois do `--` (S11): o separador fica colado na URL.
+    // Runtime JS antes da URL (após o `--`) p/ extração moderna.
     {
         let js = crate::ytdlp::binary::js_runtime_args();
         if !js.is_empty() {
@@ -755,7 +693,6 @@ pub async fn ytdlp_download(
     }
     eprintln!("[ytdlp_download] argv: {:?}", argv);
 
-    // Spawn com pipes
     let mut cmd = tokio::process::Command::new(ytdlp_bin);
     cmd.args(&argv)
        .stdout(std::process::Stdio::piped())
@@ -773,14 +710,12 @@ pub async fn ytdlp_download(
     })?;
 
     eprintln!("[ytdlp_download] process spawned successfully");
-    // Prova de vida imediata: pré-download silencioso (binários, extração)
-    // deixava o card em 0% sem nada — parecia "nem começa".
+    // Prova de vida imediata p/ o card não ficar em 0% mudo.
     let _ = app.emit(
         "yt-dlp-progress",
         &serde_json::json!({ "id": params.id, "type": "activity", "kind": "starting" }),
     );
 
-    // Take stdout/stderr pipes BEFORE wrapping child
     let mut stdout = proc.stdout.take().expect("stdout pipe");
     let mut stderr = proc.stderr.take().expect("stderr pipe");
 
@@ -788,11 +723,9 @@ pub async fn ytdlp_download(
     register_cancel(params.id.clone(), child_arc.clone());
     eprintln!("[ytdlp_download] registered in cancel map");
 
-    // Stdout channel for line processing
     let (stdout_tx, mut stdout_rx) = tokio::sync::mpsc::channel::<String>(128);
 
-    // Stdout reader task: detém o stdout_tx exclusivamente; quando o leitor
-    // termina, o canal fecha. (Antes o loop principal ia até EOF — ver abaixo.)
+    // Leitor detém o `tx`; ao terminar, o canal fecha.
     let stdout_reader = tokio::spawn(async move {
         let mut buf = [0u8; 4096];
         let mut line_buf = String::new();
@@ -816,7 +749,7 @@ pub async fn ytdlp_download(
         }
     });
 
-    // Stderr reader (mantém últimos 4000 chars para diagnóstico)
+    // Coleta stderr (últimos 4000 chars p/ diagnóstico).
     let stderr_collector = tokio::spawn(async move {
         let mut buf = [0u8; 1024];
         let mut stderr_buf = String::new();
@@ -835,26 +768,15 @@ pub async fn ytdlp_download(
         stderr_buf
     });
 
-    // Process stdout lines, emit progress events and track destination file
     let download_id = params.id.clone();
     let mut captured_filepath: Option<String> = None;
     let mut subtitle_written = false;
-    // Teto de emissão na fonte: yt-dlp cospe linhas de progresso até ~10x/s
-    // (`--newline` + `--progress-template`) e cada `app.emit` atravessa o
-    // IPC + JSON + handler JS. Portão PURAMENTE por tempo (250ms): o
-    // frontend throttla o notify em 500ms e dedupa assinaturas iguais, então
-    // nada visível se perde — e, por não olhar conteúdo, é impossível
-    // congelar a tela por engolir o evento "errado" (lição dos dois bugs
-    // anteriores deste mesmo portão).
+    // Portão por tempo (250ms); sem olhar conteúdo p/ não engolir eventos.
     let mut last_emit = std::time::Instant::now()
         .checked_sub(std::time::Duration::from_secs(1))
         .unwrap_or_else(std::time::Instant::now);
 
-    // Espera CONCORRENTE com a drenagem do stdout. Antes, o loop abaixo ia
-    // até EOF e SÓ ENTÃO esperava o filho: um neto (ffmpeg do merge/extract)
-    // com o pipe herdado impedia o EOF com o arquivo já em disco — % congelado
-    // p/ sempre, sem `complete` (sintoma: 85,8% + 0 KB/s + .mp4 na pasta).
-    // Agora a saída do filho encerra a espera; o `complete` deriva do disco.
+    // Espera concorrente com a drenagem; `complete` deriva do disco.
     let mut wait_task = tokio::spawn(async move {
         let mut child_guard = child_arc.lock().await;
         child_guard.wait().await
@@ -862,15 +784,13 @@ pub async fn ytdlp_download(
     let mut eof = false;
     let wait_res: std::io::Result<std::process::ExitStatus> = loop {
         if eof {
-            // EOF antes da saída (pipes fechados, filho em fase silenciosa):
-            // aguarda o término normal.
+            // EOF antes da saída: aguarda o término.
             eprintln!("[ytdlp_download] stdout EOF antes da saída; aguardando término");
             break wait_task
                 .await
                 .unwrap_or_else(|e| Err(std::io::Error::new(std::io::ErrorKind::Other, format!("wait: {e}"))));
         }
-        // Sem `break` nos braços: `break` dentro de `select!` atingiria o
-        // loop interno do macro, não este.
+        // Sem `break` nos braços (atingiria o `select!`, não este loop).
         let mut exited: Option<std::io::Result<std::process::ExitStatus>> = None;
         let line: Option<String> = tokio::select! {
             w = &mut wait_task => {
@@ -909,21 +829,19 @@ pub async fn ytdlp_download(
             eprintln!("[ytdlp_download] captured merged file: {}", merged);
             remember_download_path(&download_id, &merged);
             captured_filepath = Some(merged);
-            // Merge começou: sem isso a UI congela no último % (fase silenciosa).
+            // Merge: sinaliza `processing` (fase silenciosa).
             let _ = app.emit(
                 "yt-dlp-progress",
                 &serde_json::json!({ "id": download_id, "type": "processing" }),
             );
         } else if is_postprocess_line(trimmed) {
-            // Recode/extract/remux: idem (linhas únicas; o frontend dedupa).
+            // Pós-processamento: sinaliza `processing` (frontend dedupa).
             let _ = app.emit(
                 "yt-dlp-progress",
                 &serde_json::json!({ "id": download_id, "type": "processing" }),
             );
         } else if parse_retry_signal(trimmed) {
-            // Retry de fragmento/rede com backoff: a cauda do download não
-            // emite progresso — sem este sinal o card congela na última %
-            // ("para no final"). Vira "Tentando de novo…" pulsante no card.
+            // Retry de rede: sinaliza `retry` (cauda sem progresso).
             let _ = app.emit(
                 "yt-dlp-progress",
                 &serde_json::json!({ "id": download_id, "type": "activity", "kind": "retry" }),
@@ -931,8 +849,7 @@ pub async fn ytdlp_download(
         } else if parse_subtitle_path(trimmed).is_some() {
             subtitle_written = true;
         } else if trimmed.contains("Extracting URL:") {
-            // Extração (webpage/API) sem %: sem isso, throttle/bot-check do
-            // YouTube parecia "nem começa" (0% mudo).
+            // Extração sem %: sinaliza `extracting`.
             let _ = app.emit(
                 "yt-dlp-progress",
                 &serde_json::json!({ "id": download_id, "type": "activity", "kind": "extracting" }),
@@ -948,11 +865,10 @@ pub async fn ytdlp_download(
             }
         }
     };
-    // Solta o leitor: sem isso, o neto com pipe herdado o prenderia p/ sempre
-    // (linhas finais eventuais se perdem — o `complete` deriva do disco).
+    // Aborta o leitor (neto com pipe herdado o prenderia).
     stdout_reader.abort();
 
-    // Coletor do stderr com teto (mesmo motivo do stdout): segue sem ele.
+    // stderr com teto; segue sem ele se travar.
     let stderr_output = match tokio::time::timeout(std::time::Duration::from_secs(5), stderr_collector).await {
         Ok(r) => r.unwrap_or_default(),
         Err(_) => {
@@ -966,16 +882,11 @@ pub async fn ytdlp_download(
         Ok(status) if status.success() => {
             eprintln!("[ytdlp_download] Process exited successfully with status 0");
 
-            // Determina caminho do arquivo final:
-            // 1. Tenta o arquivo capturado via stdout
-            // 2. Se não existir, busca o arquivo mais recente em output_dir
             let final_path = captured_filepath
                 .filter(|p| Path::new(p).exists())
                 .or_else(|| latest_downloaded_file(&output_dir));
 
-            // Recorte: o arquivo cheio já baixou (rápido, com progresso real);
-            // corta local via ffmpeg e entrega só o trecho no caminho final.
-            // O corte local é stream-copy (segundos); a UI mostra "processando".
+            // Recorte: corta o cheio local via ffmpeg e entrega só o trecho.
             if wants_cut {
                 match (final_path.clone(), section_range) {
                     (Some(path), Some((start, end))) => {
@@ -1020,10 +931,7 @@ pub async fn ytdlp_download(
                 std::fs::metadata(p).ok().map(|m| m.len()).unwrap_or(0)
             }).unwrap_or(0);
 
-            // Aviso de legendas (não é erro: o vídeo está íntegro):
-            // - retry video-only (GAP1): a 1ª tentativa falhou nas legendas;
-            // - recorte + sidecar (GAP2): o .srt cobre o vídeo inteiro, pois
-            //   o corte local só atinge o vídeo (embutida não tem esse problema).
+            // Aviso de legendas (não é erro): retry sem elas ou recorte com sidecar.
             let sub_warning: Option<String> =
                 if let Some(reason) = params.subs_fallback.as_deref() {
                     Some(format!("Legendas indisponíveis ({reason}); vídeo salvo sem elas"))
@@ -1058,7 +966,7 @@ pub async fn ytdlp_download(
                     "size": size,
                 }),
             );
-            // Sucesso: nada a limpar depois; descarta o rastreio de parciais.
+            // Sucesso: descarta rastreio de parciais.
             let _ = forget_download_paths(&download_id);
             let _ = take_cleanup_intent(&download_id);
 
@@ -1072,10 +980,7 @@ pub async fn ytdlp_download(
             };
             eprintln!("[ytdlp_download] Process failed: {}", err_msg);
 
-            // GAP1: falha citando legenda com legendas pedidas = acessório
-            // (ex. 429 transitório), não o vídeo. Uma única re-execução sem
-            // as flags salva o vídeo e avisa no `complete`. Kill de pausa/
-            // cancel sai sozinho (code None no unix) e nunca entra aqui.
+            // Falha citando legenda = acessório; re-executa sem as flags (uma vez).
             if should_retry_without_subs(&params, &err_msg.to_lowercase(), status.code()) {
                 eprintln!("[ytdlp_download] subs falharam; repetindo sem legendas");
                 let mut retry_params = params;
@@ -1083,10 +988,7 @@ pub async fn ytdlp_download(
                 return Box::pin(ytdlp_download(app.clone(), None, Some(retry_params), None)).await;
             }
 
-            // 403 na mídia com clientes default = pool de URLs bloqueado p/
-            // este IP (extração passou, download 403). Uma única re-execução
-            // com o cliente android recebe URLs de outro pool e salva o
-            // download (testado); o `.part` é reaproveitado (resume).
+            // 403 na mídia = pool bloqueado; re-executa com client android (com resume).
             if should_retry_with_android_client(&params, &err_msg.to_lowercase(), status.code()) {
                 eprintln!("[ytdlp_download] 403 na mídia; repetindo com player_client=android");
                 let mut retry_params = params;
@@ -1094,8 +996,7 @@ pub async fn ytdlp_download(
                 return Box::pin(ytdlp_download(app.clone(), None, Some(retry_params), None)).await;
             }
 
-            // Cancelamento definitivo: apaga os parciais desta sessão.
-            // Pausa/erro comum: mantém o `.part` (resume no retry/resume).
+            // Cancelamento definitivo apaga parciais; pausa/erro mantém p/ resume.
             if take_cleanup_intent(&download_id) {
                 if let Some(remembered) = forget_download_paths(&download_id) {
                     for rp in remembered {
@@ -1145,11 +1046,7 @@ pub async fn ytdlp_download(
     }
 }
 
-/// Resposta do comando `execute` do plugin Kotlin.
-/// O Kotlin resolve com chave camelCase (`filePath`); o alias garante a
-/// desserialização — sem ele `file_path` vinha `None` e o download concluído
-/// (evento `complete` já emitido) era sobrescrito por
-/// "download concluído sem arquivo final".
+/// Resposta do `execute` Kotlin; alias garante o `filePath` camelCase.
 #[cfg(target_os = "android")]
 #[derive(Debug, serde::Deserialize)]
 struct MobileExecuteResult {
@@ -1158,8 +1055,7 @@ struct MobileExecuteResult {
     out: String,
     #[serde(default, alias = "filePath")]
     file_path: Option<String>,
-    // Tamanho vem no evento `complete` (usado pela UI); no `resolve` é só
-    // conferência — mantém desserializado p/ detectar payload incompleto.
+    // `size` é só conferência (a UI usa o evento `complete`).
     #[serde(default)]
     #[allow(dead_code)]
     size: u64,
@@ -1187,15 +1083,8 @@ mod mobile_contract_tests {
     }
 }
 
-/// `ytdlp_download` no Android: monta o argv canônico do desktop
-/// (`build_args`, mesma paridade de flags) e executa no yt-dlp embarcado
-/// via plugin Kotlin. Progresso/conclusão chegam pelo evento
-/// `yt-dlp-progress` emitido pelo Kotlin no formato do DownloadEngine.
-///
-/// Diferenças mobile (sem ffmpeg CLI local):
-/// - sem `--progress-template` (o Kotlin parseia o formato padrão);
-/// - sem `--ffmpeg-location` (a lib injeta o ffmpeg embarcado sozinha);
-/// - `download_sections` repassado nativo (sem corte local pós-download).
+/// `ytdlp_download` no Android: argv canônico via plugin Kotlin.
+/// Sem `--progress-template`/`--ffmpeg-location`; `download_sections` nativo.
 #[cfg(target_os = "android")]
 #[tauri::command]
 pub async fn ytdlp_download(
@@ -1214,11 +1103,7 @@ pub async fn ytdlp_download(
     let output_dir = crate::mobile_ytdlp::downloads_dir(&app).await?;
     std::fs::create_dir_all(&output_dir).map_err(|e| e.to_string())?;
 
-    // Até 2 tentativas: a 2ª sem legendas se a 1ª falhar citando legenda
-    // (GAP1 — mesmo contrato do desktop).
-    // `--ppa` é removido no mobile (ver `strip_mobile_unsupported`): se o
-    // usuário pediu filtros, avisa no `complete` via `warnFilters` em vez de
-    // entregar o arquivo calado sem eles. Lê antes do move p/ `attempt_params`.
+    // Até 2 tentativas (2ª sem legendas); filtros `--ppa` viram `warnFilters`.
     let filters_dropped = params.normalize_audio.unwrap_or(false)
         || params.video_sharpen.as_deref().is_some_and(|s| !s.is_empty() && s != "none");
     let mut attempt_params = params;
@@ -1272,12 +1157,7 @@ pub async fn ytdlp_download(
     Err("download falhou após retry".into())
 }
 
-/// Remove do argv o que só faz sentido no desktop: template de progresso
-/// custom (o Kotlin parseia o formato padrão do yt-dlp),
-/// `--ffmpeg-location` (a lib injeta o ffmpeg embarcado automaticamente) e
-/// `--ppa` (pós-processamento via ffmpeg CLI com filtros loudnorm/unsharp —
-/// não confiável no ffmpeg embarcado do youtubedl-android; o download segue
-/// sem o filtro em vez de falhar).
+/// Remove do argv o sem-suporte no mobile (progress-template, ffmpeg-location, `--ppa`).
 #[cfg(target_os = "android")]
 fn strip_mobile_unsupported(argv: &mut Vec<String>) {
     let mut out = Vec::with_capacity(argv.len());
@@ -1299,10 +1179,7 @@ fn strip_mobile_unsupported(argv: &mut Vec<String>) {
     *argv = out;
 }
 
-/// `ytdlp_cancel` — cancela um download ativo via CancelMap.
-/// Aceita { id: String }, { options: { id: String } } ou string direta.
-/// `cleanup=true` = cancelamento definitivo: a task apaga os `.part` ao
-/// terminar. Pausa omite a flag e preserva o `.part` para resume.
+/// Cancela download ativo; `cleanup=true` apaga os `.part` ao terminar.
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub async fn ytdlp_cancel(
@@ -1312,7 +1189,7 @@ pub async fn ytdlp_cancel(
     id: Option<String>,
     cleanup: Option<bool>,
 ) -> Result<(), String> {
-    // `cleanup` pode vir top-level ({id, cleanup}) ou aninhado ({options:{id, cleanup}}).
+    // `cleanup` pode vir top-level ou aninhado.
     let nested_cleanup = options
         .as_ref()
         .or(params.as_ref())
@@ -1347,8 +1224,7 @@ pub async fn ytdlp_cancel(
     }
 }
 
-/// `ytdlp_cancel` no Android: mata o processo no yt-dlp embarcado (Kotlin).
-/// `cleanup=true` pede ao Kotlin para apagar os `.part` da sessão.
+/// `ytdlp_cancel` no Android via Kotlin; `cleanup=true` apaga os `.part`.
 #[cfg(target_os = "android")]
 #[tauri::command]
 pub async fn ytdlp_cancel(
@@ -1384,8 +1260,7 @@ pub async fn ytdlp_cancel(
         mark_cleanup_intent(&resolved_id);
     }
     let killed = crate::mobile_ytdlp::cancel_mobile(&app, &resolved_id, want_cleanup).await?;
-    // Id inexistente/processo já morto não é erro: o estado final desejado
-    // (nada rodando) já vale. Erro aqui viraria "failed" indevido no engine.
+    // Inexistente/já morto não é erro (estado final já vale).
     if killed {
         eprintln!("[ytdlp_cancel:android] Cancelled download id={}", resolved_id);
     } else {
@@ -1394,12 +1269,8 @@ pub async fn ytdlp_cancel(
     Ok(())
 }
 
-/// `ytdlp_job_state` no Android: reconciliação pós-background. O `trigger()`
-/// do Kotlin não enfileira — evento emitido com o WebView suspenso é
-/// descartado e o `complete` nunca chega ao JS (item trava em `downloading`
-/// com o arquivo já em disco). Retorna o JSON cru do Kotlin
-/// (`{state: running|finished|unknown, ...}`); `unknown` = sem registro e o
-/// engine NÃO age (seguro por padrão: nunca reinicia nada sozinho).
+/// Reconciliação pós-background no Android; retorna o JSON cru do Kotlin.
+/// `unknown` = sem registro (engine não age).
 #[cfg(target_os = "android")]
 #[tauri::command]
 pub async fn ytdlp_job_state(
@@ -1425,17 +1296,14 @@ pub async fn ytdlp_job_state(
     crate::mobile_ytdlp::job_state_mobile(&app, &resolved_id).await
 }
 
-/// `ytdlp_job_state` fora do Android: sem registro de jobs — o engine nem
-/// chama (reconciliação só no mobile), então erro explícito em vez de silêncio.
+/// Fora do Android: sem registro de jobs (erro explícito).
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub async fn ytdlp_job_state() -> Result<serde_json::Value, String> {
     Err("job_state suportado só no Android".into())
 }
 
-/// `ytdlp_job_progress` no Android: snapshot do progresso de um job ativo
-/// p/ o poll de segurança do engine (push pode falhar nos dois transportes).
-/// Fora do Android: erro explícito.
+/// Progresso do job no Android p/ poll do engine; fora dele, erro.
 #[cfg(target_os = "android")]
 #[tauri::command]
 pub async fn ytdlp_job_progress(
@@ -1467,11 +1335,7 @@ pub async fn ytdlp_job_progress() -> Result<serde_json::Value, String> {
     Err("job_progress suportado só no Android".into())
 }
 
-/// `ytdlp_cleanup` — apaga artefatos temporários de um download
-/// (`.part`, `.ytdl`, `.temp`, `.cuttmp.*`, fragmentos `-Frag*`).
-/// Aceita `{ id }` (usa os destinos rastreados da sessão), `{ filePath }`
-/// explícito, ou ambos. Só atua dentro da pasta de downloads — nunca apaga
-/// o arquivo final nem nada fora dela. Falha de forma segura (idempotente).
+/// Apaga temporários (`.part`, `-Frag*`); só dentro dos downloads; idempotente.
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub async fn ytdlp_cleanup(
@@ -1492,7 +1356,6 @@ pub async fn ytdlp_cleanup(
         targets.push(p);
     }
     if let Some(did) = id {
-        // Consome eventual intenção pendente (processo já morto).
         let _ = take_cleanup_intent(&did);
         if let Some(remembered) = forget_download_paths(&did) {
             for rp in remembered {
@@ -1510,7 +1373,7 @@ pub async fn ytdlp_cleanup(
     Ok(serde_json::json!({ "success": true, "cleaned": cleaned }))
 }
 
-/// `ytdlp_cleanup` no Android: mesma lógica, restrita à pasta do app.
+/// `ytdlp_cleanup` no Android: mesma lógica, na pasta do app.
 #[cfg(target_os = "android")]
 #[tauri::command]
 pub async fn ytdlp_cleanup(
@@ -1547,8 +1410,6 @@ pub async fn ytdlp_cleanup(
     }
     Ok(serde_json::json!({ "success": true, "cleaned": cleaned }))
 }
-
-// --- Structs e helpers ---
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ParsedProgress {
@@ -1590,7 +1451,7 @@ fn parse_eta_str(s: &str) -> f64 {
     }
 }
 
-/// Parse progress templates: LF_PROG:... ou download:... ou genérico com |
+/// Parse das linhas de progresso (`LF_PROG:`, `download:` ou genérico com `|`).
 pub fn parse_progress(line: &str) -> Option<ParsedProgress> {
     let payload = if let Some(rest) = line.strip_prefix("LF_PROG:") {
         rest
@@ -1659,8 +1520,7 @@ pub fn parse_progress(line: &str) -> Option<ParsedProgress> {
     })
 }
 
-/// Linha `[info] Writing video subtitles to: /path` (GAP2: com recorte, o
-/// sidecar cobre o vídeo inteiro — avisar, pois o corte só atinge o vídeo).
+/// Caminho da legenda sidecar (`Writing video subtitles to:`).
 pub fn parse_subtitle_path(line: &str) -> Option<String> {
     if let Some(idx) = line.find("Writing video subtitles to: ") {
         return Some(line[idx + "Writing video subtitles to: ".len()..].trim().to_owned());
@@ -1668,7 +1528,6 @@ pub fn parse_subtitle_path(line: &str) -> Option<String> {
     None
 }
 
-/// Linha `Destination: /path`.
 pub fn parse_destination(line: &str) -> Option<String> {
     if let Some(idx) = line.find("Destination: ") {
         return Some(line[idx + "Destination: ".len()..].trim().to_owned());
@@ -1676,10 +1535,7 @@ pub fn parse_destination(line: &str) -> Option<String> {
     None
 }
 
-/// Linha `Merging formats into "..."`.
-/// Portão de emissão de progresso (usado no loop do `ytdlp_download`).
-/// Puramente por tempo (250ms): sem olhar conteúdo, então é impossível
-/// congelar a UI por engolir o evento "errado". Função pura p/ teste.
+/// Portão por tempo (250ms); sem olhar conteúdo. Função pura p/ teste.
 fn progress_emit_due(
     last_emit: Option<std::time::Instant>,
     now: std::time::Instant,
@@ -1690,10 +1546,7 @@ fn progress_emit_due(
     }
 }
 
-/// Linhas de pós-processamento silencioso ([ExtractAudio], [VideoRemuxer],
-/// [VideoConverter], [Merger]): merge/recode não emite progresso, então sem
-/// este sinal a UI congela no último % com velocidade fantasma ("travado").
-/// Função pura p/ teste.
+/// Pós-processamento silencioso (merge/recode); sem sinal a UI congela. Função pura p/ teste.
 fn is_postprocess_line(line: &str) -> bool {
     line.starts_with("[ExtractAudio]")
         || line.starts_with("[VideoRemuxer]")
@@ -1701,6 +1554,7 @@ fn is_postprocess_line(line: &str) -> bool {
         || line.starts_with("[Merger]")
 }
 
+/// Caminho do merge (`Merging formats into "..."`).
 pub fn parse_merge(line: &str) -> Option<String> {
     let p = "Merging formats into \"";
     if let Some(idx) = line.find(p) {
@@ -1712,23 +1566,14 @@ pub fn parse_merge(line: &str) -> Option<String> {
     None
 }
 
-/// Sinal de retry do yt-dlp (`RetryManager.report_retry` + `report_retry` em
-/// downloader/common.py, formatos oficiais):
-/// - `[download] Got error: E. Retrying fragment N (C/T)...`
-/// - `[download] Got error: E. Retrying (C/T)...`
-/// - `Sleeping 2.00 seconds ...`
-/// Sem isso, a cauda do download (fragmentos 429/403 com backoff) é
-/// silenciosa: nenhum progresso novo chega e o card congela na última %
-/// com velocidade fantasma ("para no final", mas o yt-dlp segue tentando).
-/// Função pura p/ teste.
+/// Retry de fragmento/rede do yt-dlp; sem ele o card congela no fim. Função pura p/ teste.
 pub fn parse_retry_signal(line: &str) -> bool {
     line.contains("Retrying fragment ")
         || line.contains("Retrying (")
         || (line.contains("Sleeping ") && line.contains(" seconds"))
 }
 
-/// Encontra o arquivo mais recente no diretório de downloads,
-/// ignorando artefatos temporários (`.part`, `.ytdl`, `.cuttmp.*`, `-Frag*`).
+/// Arquivo mais recente ignorando temporários.
 pub fn latest_downloaded_file(output_dir: &Path) -> Option<String> {
     let entries = match std::fs::read_dir(output_dir) {
         Ok(r) => r.flatten().map(|e| e.path()).collect::<Vec<PathBuf>>(),

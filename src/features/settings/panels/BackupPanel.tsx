@@ -1,5 +1,4 @@
-// Painel "Backup" (extraído do SettingsView): exportar/importar links.
-// Estado do formulário e handlers moram aqui — só o toast vem de fora.
+// Painel "Backup": exportar/importar links.
 import { useState } from 'react';
 import { RefreshCw, Upload, Download } from 'lucide-react';
 import type { AppSettings } from '../../../types';
@@ -27,14 +26,12 @@ export function BackupPanel({ settings, t, isAndroid, mobileDir, showToast }: Ba
     try {
       const dataStr = StorageService.exportLinksBackup();
       if (isAndroid) {
-        // WebView ignora `a[download]`: salva via plugin-fs e publica em
-        // Downloads (mesmo caminho dos downloads concluídos).
+        // WebView ignora `a[download]`: salva via plugin-fs.
         const { invoke } = await import('@tauri-apps/api/core');
         const { writeFile } = await import('@tauri-apps/plugin-fs');
         const { join } = await import('@tauri-apps/api/path');
         const dir = mobileDir || await invoke<string>('fs_get_downloads_path');
-        // Timestamp no nome: MediaStore tolera DISPLAY_NAME repetido e o
-        // usuário terminaria com arquivos indistinguíveis em Downloads.
+        // Timestamp no nome: evita arquivos indistinguíveis.
         const stamp = new Date().toISOString().replace(/[:.]/g, '').slice(0, 15);
         const filename = `linkfetcher-links-${stamp}.json`;
         const filePath = await join(dir, filename);

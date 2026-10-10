@@ -1,5 +1,4 @@
-// Painel de resumo do formato escolhido (extraído do LinkAnalyzer).
-// Auto-suficiente: lê settings via contexto.
+// Resumo do formato escolhido (settings via contexto).
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { useTranslation } from '../../core/i18n';
@@ -21,7 +20,7 @@ export const SummaryPanel: React.FC<{ formatOptions: FormatOptions; selectedForm
     }
   } else {
     if (formatOptions.videoFormat) items.push({ icon: '🎬', label: formatOptions.videoFormat.toUpperCase() });
-    // Extract resolution from format string pattern height<=XXXX
+    // Extrai a resolução do padrão height<=XXXX.
     const fmt = formatOptions.format || '';
     const heightMatch = fmt.match(/height[<=>]+(\d+)/);
     if (heightMatch) {
@@ -52,9 +51,7 @@ export const SummaryPanel: React.FC<{ formatOptions: FormatOptions; selectedForm
   if (formatOptions.customFilename) items.push({ icon: '📁', label: formatOptions.customFilename });
   if (formatOptions.descFormat && formatOptions.descFormat !== 'none' && mediaInfo.description) items.push({ icon: '📄', label: `${t('sumDesc')}${formatOptions.descFormat}` });
 
-  // RESULTADO mostra SÓ escolhas do usuário: nada derivado/estático aqui
-  // (merge/copy, estimativa de tamanho e duração da mídia não são opções —
-  // poluíam o painel com itens que o usuário nunca selecionou).
+  // Mostra só escolhas do usuário (nada derivado/estático).
 
   if (items.length === 0) return null;
 

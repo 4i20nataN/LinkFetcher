@@ -1,22 +1,15 @@
-//! Builder canônico de argv do yt-dlp — porte literal de
-//! `YtDlpSpawn.ts:78-177` (spec §6). `DownloadEngine.buildArgs` (divergente,
-//! congelado) NÃO é usado aqui.
-//!
-//! Flags verificadas contra o binário real yt-dlp 2026.08.19 (`--help`):
-//! todas existem, exceto `--fps-max`, que o código converte para
-//! `--format-sort fps:N` (nunca passado literalmente).
+//! Builder canônico de argv do yt-dlp (porte de `YtDlpSpawn.ts`).
+//! `--fps-max` vira `--format-sort fps:N`; nunca passado literal.
 
 use std::path::Path;
 
 const DEFAULT_FORMAT: &str = "bestvideo+bestaudio/best";
 
-/// Template de progresso — `YtDlpSpawn.ts:85`. O parser de `download.rs`
-/// depende deste formato exato (`download:<pct>|<speed>|<eta>`).
+/// Template de progresso; o parser depende deste formato exato.
 pub const PROGRESS_TEMPLATE: &str =
     "download:LF_PROG:%(progress._percent_str)s|%(progress.speed)s|%(progress.eta)s|%(progress.downloaded_bytes)s|%(progress.total_bytes)s";
 
-/// Parâmetros do comando `ytdlp_download` — mesmos campos aceitos pelo
-/// handler `electron/main.cjs:437-467` incluindo `id` para tracking.
+/// Parâmetros do `ytdlp_download` (inclui `id` p/ tracking).
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadParams {
@@ -40,14 +33,10 @@ pub struct DownloadParams {
     pub sub_format: Option<String>,
     #[serde(default)]
     pub embed_subs: Option<bool>,
-    /// Interno (nunca vem do frontend): motivo da 1ª falha por legendas.
-    /// Quando Some, o download re-executa sem flags de legenda (GAP1: um
-    /// acessório 429 não pode anular o vídeo) e o `complete` carrega o aviso.
+    /// Interno: motivo da falha de legendas; re-executa sem elas e avisa no `complete`.
     #[serde(default)]
     pub subs_fallback: Option<String>,
-    /// Interno (nunca vem do frontend): player client alternativo após 403
-    /// na mídia (ex. `android`). Quando Some, o download re-executa com
-    /// `--extractor-args youtube:player_client=<valor>`.
+    /// Interno: client alternativo (ex. `android`) após 403 na mídia.
     #[serde(default)]
     pub client_fallback: Option<String>,
     #[serde(default)]
@@ -86,13 +75,11 @@ pub struct DownloadParams {
     pub concurrent_fragments: Option<f64>,
     #[serde(default)]
     pub retries: Option<f64>,
-    /// Android: título p/ a notificação nativa de progresso/conclusão.
-    /// Não vira argv. Desktop ignora (lido só no `cfg android`).
+    /// Android: título p/ notificação nativa. Não vira argv.
     #[serde(default)]
     #[allow(dead_code)]
     pub title: Option<String>,
-    /// Android: subpasta pública de destino (MediaStore). Não vira argv —
-    /// só repassada ao plugin Kotlin. Desktop ignora (lido só no `cfg android`).
+    /// Android: subpasta pública de destino. Não vira argv.
     #[serde(default)]
     #[allow(dead_code)]
     pub mobile_public_subdir: Option<String>,
@@ -119,8 +106,7 @@ fn is_digit(b: u8) -> bool {
     b.is_ascii_digit()
 }
 
-/// Substitui `d{1,2}:d{2}:d{2}` por `$1h$2m$3s` (todas as ocorrências,
-/// como o `/g` de `sanitizeFilename`).
+/// Substitui `d{1,2}:d{2}:d{2}` por `$1h$2m$3s`.
 fn replace_hms(input: &str) -> String {
     let b = input.as_bytes();
     let mut out = String::with_capacity(input.len());
@@ -173,7 +159,7 @@ fn replace_hms(input: &str) -> String {
     out
 }
 
-/// Substitui `d{1,2}:d{2}` por `$1m$2s` (roda DEPOIS do hms, como no TS).
+/// Substitui `d{1,2}:d{2}` por `$1m$2s` (roda após o hms).
 fn replace_ms(input: &str) -> String {
     let b = input.as_bytes();
     let mut out = String::with_capacity(input.len());
@@ -272,7 +258,7 @@ fn replace_date(input: &str) -> String {
     out
 }
 
-/// Porte de `sanitizeFilename` (`YtDlpSpawn.ts:18-31`).
+/// Porte de `sanitizeFilename`.
 pub fn sanitize_filename(name: &str, strict: bool) -> String {
     let mut s = replace_hms(name);
     s = replace_ms(&s);
@@ -285,7 +271,6 @@ pub fn sanitize_filename(name: &str, strict: bool) -> String {
             _ => c,
         })
         .collect();
-    // A 4ª regra do TS (`/\\/g → _`) já foi absorvida acima.
     if strict {
         let mut t: String = s
             .chars()
@@ -297,7 +282,6 @@ pub fn sanitize_filename(name: &str, strict: bool) -> String {
                 }
             })
             .collect();
-        // `/_+/g → _` + trim de `_` nas bordas.
         let mut u = String::with_capacity(t.len());
         let mut prev_underscore = false;
         for c in t.chars() {
@@ -317,11 +301,9 @@ pub fn sanitize_filename(name: &str, strict: bool) -> String {
     s
 }
 
-/// Transform `videoOnly` (`YtDlpSpawn.ts:90-97`): remove faixas de áudio do
-/// seletor na mesma ordem das 4 substituições + fallback `bv*`.
+/// Remove faixas de áudio do seletor (+ fallback `bv*`).
 fn video_only_format(format: &str) -> String {
     let mut f = format.to_owned();
-    // `\+ba\[ext=\w+\]` → ''
     while let Some(start) = f.find("+ba[ext=") {
         let rest = &f[start + "+ba[ext=".len()..];
         let word_len = rest
@@ -346,10 +328,7 @@ fn video_only_format(format: &str) -> String {
     }
 }
 
-/// Injeta `[fps<=N]` nos seletores de vídeo (`bv*[...]` e `bestvideo` puro).
-/// Os fallbacks (`/b`, `/best`) ficam intactos para degradar preservando a
-/// resolução. Roda DEPOIS de `video_only_format`. Aspas dentro dos colchetes
-/// (ex. `vcodec~="^(avc|h264)"`) são respeitadas no balanceamento.
+/// Injeta `[fps<=N]` em `bv*`/`bestvideo`; fallbacks intactos p/ degradar com resolução.
 fn inject_fps_filter(format: &str, fps: f64) -> String {
     let tag = format!("[fps<={}]", fmt_num(fps));
     let mut out = String::with_capacity(format.len() + 16);
@@ -404,8 +383,7 @@ fn inject_fps_filter(format: &str, fps: f64) -> String {
     out
 }
 
-/// Monta o argv — ordem idêntica a `YtDlpSpawn.ts:78-177`, mais
-/// `--no-cache-dir` (honestidade: zero resíduo fora da pasta de downloads).
+/// Monta o argv (+ `--no-cache-dir`: zero resíduo fora dos downloads).
 pub fn build_args(
     params: &DownloadParams,
     output_dir: &Path,
@@ -429,8 +407,7 @@ pub fn build_args(
     if is_true(&params.video_only) {
         final_format = video_only_format(&final_format);
     }
-    // Teto rígido de FPS no seletor (não sort): a resolução mantém prioridade.
-    // Fallbacks (/b, /best) ficam sem o filtro para degradar com resolução.
+    // Teto de FPS no seletor; fallbacks sem filtro p/ degradar com resolução.
     if !is_true(&params.audio_only) {
         if let Some(fps) = params.fps_max {
             if fps > 0.0 {
@@ -441,10 +418,7 @@ pub fn build_args(
     args.push("--format".to_owned());
     args.push(final_format);
 
-    // Fallback de cliente (403 na mídia): segunda tentativa extrai as URLs
-    // de outro pool (`android`), que o YouTube não bloqueou. Só existe no
-    // retry interno — a 1ª tentativa sempre usa os defaults (`visionos,web`,
-    // formatos máximos).
+    // Retry 403: re-extrai URLs com o client alternativo.
     if let Some(c) = non_empty(&params.client_fallback) {
         args.push("--extractor-args".to_owned());
         args.push(format!("youtube:player_client={c}"));
@@ -475,10 +449,7 @@ pub fn build_args(
     if is_true(&params.write_auto_subs) {
         args.push("--write-auto-subs".to_owned());
     }
-    // `--sub-langs`/`--sub-format` sem nenhuma flag de escrita são ignorados
-    // pelo yt-dlp (`process_subtitles` retorna None) — virariam placebo
-    // silencioso (ex. master desligado mantendo idioma escolhido). Só emite
-    // quando há escrita (`--embed-subs` implica escrita no próprio yt-dlp).
+    // `--sub-langs`/`--sub-format` sem escrita são ignorados pelo yt-dlp; só emite com escrita.
     let subs_active =
         is_true(&params.write_subs) || is_true(&params.write_auto_subs) || is_true(&params.embed_subs);
     if subs_active {
@@ -546,9 +517,7 @@ pub fn build_args(
         args.push(format!("vcodec:{v}"));
     }
 
-    // Áudio compatível no merge: webm exige opus/vorbis e o sort padrão prefere
-    // m4a — sem isso o merge quebra. flv já prefere aac/m4a por padrão.
-    // (video-only empatam no aext; sem opus disponível, mantém a ordem padrão.)
+    // Merge webm exige opus; sem isso o merge quebra.
     if !is_true(&params.audio_only) {
         if let Some(m) = non_empty(&params.merge_output_format) {
             if m == "webm" {
@@ -599,8 +568,7 @@ pub fn build_args(
         args.push(ff.to_string_lossy().into_owned());
     }
 
-    // Separador anti-flag: a URL posicional nunca pode ser lida como opção
-    // (S11). O desktop reinsere o `--` colado na URL após o js-runtime.
+    // `--` colado na URL: impede leitura da URL como opção.
     args.push("--".to_owned());
     args.push(params.url.clone());
     args

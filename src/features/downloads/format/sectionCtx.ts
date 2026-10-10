@@ -1,6 +1,4 @@
-// Props compartilhadas das seções do seletor de formato.
-// Um único objeto `ctx` (montado no FormatSelector) evita furar ~20 props
-// em cada seção. Seções leem `settings`/`t` via hooks, não pelo ctx.
+// Contexto único das seções: evita furar ~20 props em cada uma.
 import type { RefObject } from 'react';
 import type { MediaInfo } from '../../../types';
 import type { FormatOptions } from '../FormatOptions';

@@ -1,4 +1,5 @@
-// Utilidades do analisador (extraídas do LinkAnalyzer). Puras e testáveis.
+// Utilidades puras do analisador (formato de referência + opções neutras
+// do download gratuito, datas, URLs).
 import type { MediaFormat, MediaInfo } from '../../types';
 import type { FormatOptions } from '../downloads/FormatOptions';
 
@@ -18,9 +19,8 @@ export const sanitizeUrl = (rawUrl: string): string => {
   }
 };
 
-// Formato de referência do download rápido (total inicial do card, antes do
-// backend corrigir pelo progresso real): áudio = primeira faixa de áudio;
-// vídeo = maior faixa de vídeo. null = sem formatos (o handler mostra erro).
+// Referência do gratuito (total inicial do card): áudio = 1ª faixa;
+// vídeo = maior faixa. null = sem formatos (o handler mostra erro).
 export function pickQuickRefFormat(mediaInfo: MediaInfo, kind: 'audio' | 'video'): MediaFormat | null {
   if (!mediaInfo || mediaInfo.formats.length === 0) return null;
   if (kind === 'audio') {
@@ -30,14 +30,8 @@ export function pickQuickRefFormat(mediaInfo: MediaInfo, kind: 'audio' | 'video'
     ?? mediaInfo.formats[0];
 }
 
-// Opções do download rápido — doc oficial do yt-dlp, sem chute:
-// VÍDEO = base default (`bv*+ba/b`) com teto 1080p60 + merge mp4 copy.
-// Combinado-primeiro FOI TESTADO e rejeitado: `b[ext=mp4]` colapsa p/ 360p
-// (itag 18) quando só há combinado baixo — e YouTube NÃO tem progressivo
-// 1080p, então 1080p sempre funde 2 faixas. Sem --format-sort vcodec nem --ppa.
-// Todo o resto NEUTRO: sem legendas, capa, metadados, cortes, sponsorblock,
-// re-encode, limite de banda herdado — e 1 fragmento concorrente (o default
-// do FormatSelector é 8 e multiplica 429/403 num IP já limitado).
+// Gratuito = base default 1080p60 + merge mp4 (vídeo) ou MP3 máxima (áudio).
+// Resto neutro + 1 fragmento (8 paralelos multiplica 429 em IP limitado).
 export function buildQuickOptions(base: FormatOptions, kind: 'audio' | 'video'): FormatOptions {
   return {
     ...base,
@@ -61,8 +55,7 @@ export function buildQuickOptions(base: FormatOptions, kind: 'audio' | 'video'):
     sponsorblockRemove: '',
     concurrentFragments: 1,
     bandLimit: 0,
-    // Vídeo rápido: teto 1080p60 (fps via fpsMax, o backend injeta [fps<=N]
-    // nos ramos bv* — testado), merge mp4 copy, codecs originais.
+    // Teto 1080p60 via fpsMax + merge mp4 copy.
     ...(kind === 'video' ? {
       fpsMax: 60,
       videoFormat: 'mp4',

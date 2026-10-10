@@ -32,29 +32,20 @@ class DownloadEngineClass {
   private items: DownloadItem[] = [];
   private listeners: Set<EngineListener> = new Set();
 
-  // Map download id → kill nativo. Recebe `cleanup` explícito: `true` =
-  // cancelamento definitivo (apaga .part), `false` = pausa (preserva .part
-  // p/ resume). Explícito de propósito: a versão anterior lia `item.status`
-  // dentro do closure, mas o status só era ajustado DEPOIS da chamada — todo
-  // cancel chegava ao nativo como pausa (sem cleanup, notificação de
-  // "pausado" no Android e .part órfão). Quem chama decide, sem adivinhar.
+  // Kill nativo por download. `cleanup` explícito: `true` = cancela e apaga
+  // o .part; `false` = pausa e preserva p/ resume. Quem chama decide.
   private cancelFns = new Map<string, (cleanup: boolean) => void>();
-  // Throttle de renders: último notify de progresso por download (ms)
+  // Último notify de progresso por download (throttle de renders, ms).
   private lastProgressNotify = new Map<string, number>();
-  // Último evento recebido por download: sem evento há muito tempo + volta
-  // ao foreground = `complete` perdido com WebView suspenso → reconcilia.
+  // Último evento por download (base do reconcile pós-background).
   private lastEventAt = new Map<string, number>();
-  // Assinatura do último evento aplicado por download: o transporte é DUPLO
-  // (trigger + CustomEvent) e a duplicata chegava a dobrar os renders —
-  // no armv7 isso afogava o WebView (card minutos atrasado). Iguais seguidos
-  // não mudam nada visível: descarta.
+  // Assinatura do último evento aplicado: o transporte é duplo e a duplicata
+  // não muda nada visível — descarta.
   private lastEventSig = new Map<string, string>();
-  // Unlisten do `listen('yt-dlp-progress')` por download: desfecho aplicado
-  // via reconcile também precisa soltar o listener (senão vaza).
+  // Unlisten do `listen('yt-dlp-progress')` por download (soltar no settle).
   private unlistenFns = new Map<string, () => void>();
-  // Poll de segurança por download (só Android, 1x/s): push (trigger +
-  // CustomEvent) já falhou das duas formas — poll via invoke é
-  // request/response e anda mesmo com listener morto. Mata no settle.
+  // Poll de segurança por download (só Android, 1x/s, request/response).
+  // Mata no settle.
   private pollTimers = new Map<string, ReturnType<typeof setInterval>>();
 
   private stopPoll(id: string) {
@@ -112,14 +103,12 @@ class DownloadEngineClass {
     }
   }
 
-  // Android WebView localStorage is capped at ~5MB — keep only the most recent
-  // finished entries so a long history doesn't blow the quota. Active items
-  // (queued/downloading/paused) are never trimmed.
+  // localStorage do WebView é ~5MB: persiste no máx. 300 concluídos.
+  // Ativos (queued/downloading/paused) nunca são cortados.
   private static readonly MAX_PERSISTED_FINISHED = 300;
 
-  // Progresso notifica até 4x/s: JSON.stringify + localStorage na main thread
-  // a cada tick derruba o scroll no WebKitGTK por software. Persiste no máx.
-  // 1x/2s durante atividade; transições de estado forçam persistência.
+  // Progresso notifica até 4x/s: persiste no máx. 1x/2s em atividade;
+  // transições de estado forçam persistência.
   private static readonly PERSIST_THROTTLE_MS = 2000;
   private lastPersistedAt = 0;
 
@@ -157,22 +146,16 @@ class DownloadEngineClass {
     this.saveState(persist);
   }
 
-  // Troca a referência do item (update imutável): a UI memoiza cards por
-  // identidade (`prev.item === next.item`) e pula re-render de quem não
-  // mudou — sem isso, cada tick de progresso re-renderiza a lista inteira
-  // (mutação in-place mantém a ref e o memo nunca dispara). Chamar em todo
-  // ponto que muta um item antes do notify.
+  // Troca a ref do item (update imutável): o memo dos cards compara por
+  // identidade — sem isso cada tick re-renderiza a lista inteira.
   private touch(id: string) {
     const i = this.items.findIndex(x => x.id === id);
     if (i >= 0) this.items[i] = { ...this.items[i] };
   }
 
   addDownload(media: MediaInfo, format: MediaFormat, formatOptions?: FormatOptions | null) {
-    // Repetidos permitidos: sufixo (1), (2)... no nome para não sobrescrever
-    // o arquivo no disco (o yt-dlp sobrescreveria silenciosamente) nem colocar
-    // dois processos ao vivo brigando pelo mesmo .part/saída (→ Errno 2).
-    // A chave é url + container de saída + base do nome: qualidades diferentes
-    // do mesmo container resolvem para o mesmo caminho no disco.
+    // Repetidos permitidos com sufixo (1), (2)...: evita sobrescrever o
+    // arquivo no disco e dois processos brigando pelo mesmo .part.
     const outContainerOf = (audioOnly?: boolean, audioFormat?: string, mergeFmt?: string, ext?: string) =>
       audioOnly ? (audioFormat || 'mp3') : (mergeFmt || ext || '');
     const familyBaseOf = (name?: string) =>
@@ -254,16 +237,13 @@ class DownloadEngineClass {
     this.processQueue();
   }
 
-  // advanceQueue: pausa unica libera o slot p/ o proximo; bulk (pauseAll)
-  // mantem false p/ nao ressuscitar a fila no meio do loop.
+  // advanceQueue: pausa única libera o slot; bulk (pauseAll) mantém false.
   pauseDownload(id: string, advanceQueue = false) {
     const item = this.items.find(i => i.id === id);
     if (!item || item.status !== 'downloading') return;
 
-    // Estado primeiro: o kill abaixo é fire-and-forget e o `catch` do
-    // startTauriDownload decide entre "intenção do usuário" vs "failed" pelo
-    // status. Com a ordem inversa, o kill viajava como `downloading` e um
-    // erro de corrida virava "failed" indevido.
+    // Estado primeiro: o kill é fire-and-forget e o `catch` decide
+    // "intenção do usuário" vs "failed" pelo status.
     item.status = 'paused';
     item.speed = 0;
     item.eta = 0;
@@ -301,17 +281,15 @@ class DownloadEngineClass {
     this.processQueue();
   }
 
-  // Limpeza post-mortem de parciais (.part/.ytdl/.cuttmp/-Frag*). O backend
-  // só apaga artefatos temporários dentro da pasta de downloads — o arquivo
-  // final nunca é tocado, então é seguro chamar para qualquer status.
+  // Limpeza de parciais (.part/.ytdl/.cuttmp/-Frag*). Nunca toca o arquivo
+  // final — seguro p/ qualquer status.
   private fireCleanup(id: string, filePath?: string) {
     import('@tauri-apps/api/core').then(({ invoke }) =>
       invoke('ytdlp_cleanup', { id, filePath }).catch(() => {})
     ).catch(() => {});
   }
 
-  // advanceQueue: cancelamento unico avanca a fila; bulk (cancelAll)
-  // mantem false p/ nao iniciar queued no meio do loop.
+  // advanceQueue: cancelamento único avança a fila; bulk mantém false.
   cancelDownload(id: string, advanceQueue = false) {
     const item = this.items.find(i => i.id === id);
     if (!item) return;
@@ -345,12 +323,9 @@ class DownloadEngineClass {
     if (advanceQueue) this.processQueue();
   }
 
-  // Excluir da lista: ativo PRECISA parar o nativo ANTES de sumir — sem
-  // isso o card some mas o yt-dlp continua em background (sintoma do
-  // SM-A107M). Ordem: marca cancelled → kill com cleanup=true → limpa
-  // listeners/poll → apaga .part → remove da lista → avança a fila.
-  // Finalizado (completed/failed/cancelled) só remove o registro: o arquivo
-  // final em disco nunca é tocado.
+  // Excluir: ativo primeiro para o nativo (kill com cleanup) e só então
+  // some da lista — senão o yt-dlp segue em background. Finalizado só
+  // remove o registro (arquivo em disco intacto).
   removeDownload(id: string) {
     const item = this.items.find(i => i.id === id);
     if (!item) return;
@@ -443,9 +418,8 @@ class DownloadEngineClass {
     const item = this.items.find(i => i.id === id);
     if (!item || !['failed', 'cancelled'].includes(item.status)) return;
 
-    // Regenera com o preset anterior: todos os campos de opção do item são
-    // reaproveitados no argv (nada se perde). Zera os contadores p/ não exibir
-    // bytes obsoletos enquanto o yt-dlp retoma o .part.
+    // Reaproveita o preset anterior no argv; zera contadores p/ não exibir
+    // bytes obsoletos enquanto retoma o .part.
     item.status = 'queued';
     item.progress = 0;
     item.speed = 0;
@@ -584,8 +558,8 @@ class DownloadEngineClass {
             live.processing = true;
             live.speed = 0;
             live.eta = 0;
-            // Rótulo visível da fase silenciosa (merge/recode/extract): sem
-            // ele a barra congela no último % com velocidade fantasma.
+            // Rótulo da fase silenciosa (merge/recode/extract): sem ele a
+            // barra congela no último % com velocidade fantasma.
             live.activity = this.settings.language === 'en' ? 'Merging…' : 'Mesclando…';
             this.touch(live.id);
             this.notify();
@@ -605,9 +579,8 @@ class DownloadEngineClass {
         }
       };
 
-      // Listen for yt-dlp-progress events (transporte DUPLO no Android:
-      // `trigger()` via Tauri-listen + CustomEvent via evaluateJavascript —
-      // regressão v1.4.0 provou que só-trigger não entrega no SM-A107M).
+      // Transporte duplo no Android (Tauri-listen + CustomEvent): só um
+      // deles já falhou em campo — os dois ficam.
       const unlisten = await listen('yt-dlp-progress', (event) => {
         handleProgressData(event.payload);
       });
@@ -625,8 +598,8 @@ class DownloadEngineClass {
           window.removeEventListener('yt-dlp-progress', onCustomProgress);
         }
       });
-      // Poll de segurança (só Android): 1x/s puxa o snapshot do Kotlin.
-      // Push pode morrer nos dois transportes; poll é request/response.
+      // Poll de segurança (só Android, 1x/s): request/response sobrevive
+      // onde o push morre.
       if (typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)) {
         this.stopPoll(item.id);
         const timer = setInterval(() => {
@@ -644,9 +617,8 @@ class DownloadEngineClass {
         this.unlistenFns.delete(item.id);
       };
 
-      // Store unlisten and kill hook for cancel/pause. `cleanup` é
-      // explícito (não lido do status): pause=false preserva o .part p/
-      // resume, cancel/delete=true apaga. Ver comentário do cancelFns.
+      // Kill hook p/ cancel/pausa. `cleanup` explícito: pause=false
+      // preserva o .part; cancel/delete=true apaga.
       this.cancelFns.set(item.id, (cleanup: boolean) => {
         finish();
         this.lastProgressNotify.delete(item.id);
@@ -717,8 +689,7 @@ class DownloadEngineClass {
     }
   }
 
-  // Reordena por id (não por índice): a UI filtra a lista, então o índice
-  // visível não corresponde ao array interno — índice movia o item errado.
+  // Reordena por id: o índice visível é da lista filtrada, não do interno.
   moveQueuedItem(id: string, delta: -1 | 1): void {
     const queued = this.items.filter(i => i.status === 'queued');
     const from = queued.findIndex(i => i.id === id);
@@ -729,7 +700,7 @@ class DownloadEngineClass {
     const [moved] = queued.splice(from, 1);
     queued.splice(to, 0, moved);
 
-    // Rebuild items array keeping non-queued items in place
+    // Não-queued mantêm lugar; só a ordem dos queued muda.
     const nonQueued = this.items.filter(i => i.status !== 'queued');
     this.items = [...queued, ...nonQueued];
     this.notify();
@@ -744,14 +715,9 @@ class DownloadEngineClass {
     this.notify();
   }
 
-  // Aplica um evento terminal (complete/error) no item VIVO (find por id).
-  // O closure de startTauriDownload captura a ref ANTERIOR ao `touch` de
-  // startDownload — sem o re-find, o estado terminal ia para um objeto órfão
-  // e o `touch` seguinte republicava a lista sem a transição: card travado
-  // em `downloading` com o arquivo pronto em disco (regressão do memo
-  // 48f01b3; progresso funcionava porque applyProgressEvent já rebuscava).
-  // Retorna true numa transição real (chamador avança a fila); guards
-  // (pausado/cancelado/dedupe/id ausente) retornam false sem tocar em nada.
+  // Terminal (complete/error) no item VIVO (find por id): o closure é
+  // anterior ao `touch` — sem o re-find a transição ia para um órfão.
+  // Retorna true numa transição real (chamador avança a fila).
   private applyTerminalEvent(id: string, data: any): boolean {
     const live = this.items.find(i => i.id === id);
     if (!live) return false;
@@ -821,9 +787,8 @@ class DownloadEngineClass {
     }
   }
 
-  // Poll de segurança (só Android, 1x/s por download ativo): puxa o snapshot
-  // do Kotlin via invoke (request/response). Se o job sumiu, reconcilia na
-  // hora em vez de esperar o foreground. Erro/reject = tenta no próximo tick.
+  // Poll de segurança (só Android): se o job sumiu, reconcilia na hora.
+  // Erro = tenta no próximo tick.
   private async pollProgress(id: string) {
     const item = this.items.find(i => i.id === id);
     if (!item || item.status !== 'downloading') {
@@ -856,14 +821,8 @@ class DownloadEngineClass {
     });
   }
 
-  // Reconciliação pós-background (Android): o `trigger()` do Kotlin não
-  // enfileira — evento emitido com o WebView suspenso (minimizar/sair) é
-  // descartado e o `complete` nunca chega: o item trava em `downloading`
-  // com o arquivo já em disco (sintoma: notificação "Concluído" + arquivo
-  // publicado, UI parada em 0%). Na volta ao foreground, pergunta o
-  // desfecho ao Kotlin (`ytdlp_job_state`) e aplica SEM reiniciar nada.
-  // Seguro por padrão: `running`/`unknown`/erro = não age (nunca duplica o
-  // processo); idempotente (só aplica se ainda estiver `downloading`).
+  // Pós-background (Android): evento com WebView suspenso é descartado.
+  // Na volta, consulta o desfecho ao Kotlin sem reiniciar (só `finished`).
   async reconcileStuck() {
     if (typeof navigator === 'undefined' || !/Android/i.test(navigator.userAgent)) return;
     const STALE_MS = 20_000;

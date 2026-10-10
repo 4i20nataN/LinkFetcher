@@ -1,6 +1,4 @@
-// Bump único de versão: `npm run bump -- 1.4.2`.
-// Atualiza os 4 lugares que precisam andar juntos (release quebra se
-// divergirem): package.json, tauri.conf.json, Cargo.toml e Cargo.lock.
+// Bump único de versão (package.json, tauri.conf, Cargo.toml/lock).
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const next = process.argv[2];

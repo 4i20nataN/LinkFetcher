@@ -1,11 +1,6 @@
-/**
- * Pure playlist utility functions — zero Node.js dependencies.
- * Safe to import in browser renderer (Vite-compatible).
- */
+/** Utilidades puras de playlist (sem Node; seguro no renderer). */
 
-/**
- * Detect if a URL is a playlist (contains `list=` parameter or known playlist path).
- */
+/** Detecta playlist (parâmetro `list=` ou path conhecido). */
 export function isPlaylistUrl(url: string): boolean {
   try {
     const parsed = new URL(url);

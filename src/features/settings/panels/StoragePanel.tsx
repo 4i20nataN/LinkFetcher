@@ -1,5 +1,4 @@
-// Painel "Armazenamento" (extraído do SettingsView): só pasta de destino.
-// Idioma e notificações moravam aqui por acidente e ganharam casa própria.
+// Painel "Armazenamento": pasta de destino.
 import { HardDrive, FolderOpen, FolderPlus } from 'lucide-react';
 import type { AppSettings } from '../../../types';
 import { useTranslation } from '../../../core/i18n';

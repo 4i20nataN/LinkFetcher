@@ -1,7 +1,4 @@
-// Emissão de chaves no servidor — MESMO formato de scripts/mint-key.mjs e
-// src/core/license/license.ts (ver+plan+exp+nome | ECDSA P-256 | base32).
-// A PRIVADA vive só aqui (env LICENSE_PRIVATE_JWK, JWK com d) — nunca no
-// app, nunca no repo.
+// Emite chaves LF1 (mesmo formato do app); privada só via env.
 import { webcrypto } from 'node:crypto';
 
 const { subtle } = webcrypto;

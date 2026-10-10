@@ -1,22 +1,16 @@
-/**
- * clipboard.ts — leitura da área de transferência no desktop Tauri.
- * Usa o plugin nativo (sem prompt de permissão do navegador); cai para
- * `navigator.clipboard` quando o plugin não está disponível.
- */
+/** Leitura da área de transferência (plugin Tauri + fallback Web). */
 
 export async function readClipboardText(): Promise<string> {
   try {
     const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
     return (await readText()) || '';
   } catch {
-    // ignore — tenta a API do navegador
   }
   try {
     if (navigator.clipboard?.readText) {
       return (await navigator.clipboard.readText()) || '';
     }
   } catch {
-    // permissão negada ou indisponível
   }
   return '';
 }

@@ -38,7 +38,7 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
   const [view, setView] = useState<'buy' | 'activate' | 'auto'>('buy');
   const [qr, setQr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  // Compra automática (Mercado Pago): e-mail → Pix → poll → ativa sozinho.
+  // Compra automática: e-mail → Pix → poll → ativa sozinho.
   const [autoEmail, setAutoEmail] = useState('');
   const [autoBusy, setAutoBusy] = useState(false);
   const [autoCheckout, setAutoCheckout] = useState<AutoCheckout | null>(null);
@@ -47,9 +47,8 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
   const [contact, setContact] = useState('');
   const [ctype, setCtype] = useState<'wa' | 'mail'>('wa');
   const contactOk = ctype === 'wa' ? validPhone(contact) : validEmail(contact);
-  // QR só brota após o clique em Comprar PRO (com contato válido).
+  // QR do Pix manual após Comprar PRO; campo da chave após contato válido.
   const [buyIntent, setBuyIntent] = useState(false);
-  // Campo da chave libera após contato confirmado (é pra onde a chave vai).
   const keyUnlocked = contactOk;
   const pixPayload = !(active && lic) && view === 'buy' ? buildPixPayload() : '';
 
@@ -88,10 +87,8 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
     }
   };
 
-  // Poll da chave: pago → verifica assinatura → salva → fecha sozinho.
-  // Para em estados terminais (pago, rejeitado, cancelado, divergente,
-  // expirado): sem isso pesquisava a cada 5s para sempre, mesmo após os
-  // 35min do Pix, e falhas ficavam no "Aguardando…" mudo.
+  // Poll da chave: pago → verifica → salva → fecha. Para nos estados
+  // terminais (pago/rejeitado/cancelado/divergente/expirado).
   useEffect(() => {
     if (view !== 'auto' || !autoCheckout) return;
     const terminalMsg: Record<string, string> = {
@@ -152,7 +149,6 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
         expiresAt: chk.expiresAt ?? 0,
         activatedAt: new Date().toISOString(),
       });
-      // Chave com assinatura válida = pagamento reconhecido. Libera na hora.
       onClose();
     } finally {
       setBusy(false);

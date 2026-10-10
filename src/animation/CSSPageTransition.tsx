@@ -1,7 +1,4 @@
-/**
- * CSSPageTransition — zero-motion replacement for AnimatePresence + AnimatedCard.
- * Uses CSS @keyframes for enter/exit animations. No JS layout reads.
- */
+/** Transição de página via CSS (sem leituras de layout JS). */
 
 import React from 'react';
 

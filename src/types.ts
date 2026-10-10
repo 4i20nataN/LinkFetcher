@@ -1,4 +1,4 @@
-// Re-export all types from the barrel for backward compatibility
+// Barrel: reexporta tipos públicos.
 export type { PlatformId, PlatformConfig } from './types/platform';
 export type { MediaType, MediaFormat, MediaInfo } from './types/media';
 export type { DownloadItem } from './types/download';

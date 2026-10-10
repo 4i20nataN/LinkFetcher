@@ -1,10 +1,5 @@
-// Lista de downloads (extraída do DownloadManager): empty state, cards e
-// "mostrar mais". Memoizada por ASSINATURA (ids+status): ticks de progresso
-// (2x/s) mudam só números quentes — a lista pula a reconciliação inteira e
-// cada card se atualiza via LiveDownloadStats (DOM direto). Transições de
-// status/entrada/saída mudam a assinatura e re-renderizam normalmente.
-// Handlers são excluídos do comparador de propósito: são estáveis por
-// construção (só engine/setState, ou cobertos por `settings`).
+// Lista memoizada por assinatura (ids+status): ticks quentes pulam a reconciliação.
+// Handlers fora do comparador: estáveis por construção.
 import React from 'react';
 import { DownloadItem, type AppSettings } from '../../../types';
 import { useTranslation } from '../../../core/i18n';
@@ -37,11 +32,9 @@ export const DownloadList = React.memo(function DownloadList({
   onMoveUp, onMoveDown, onOpenFolder, onShare, onPreview, onRequestDelete,
 }: DownloadListProps) {
   return (
-    // Padding inferior folgado: no Android edge-to-edge a barra de gestos do
-    // sistema sobrepunha os botões do último card (print SM-A107M).
+    // Padding folgado: a barra de gestos cobre o último card.
     <div className="space-y-3.5 pb-[max(5rem,env(safe-area-inset-bottom))]">
       {filteredDownloads.length === 0 ? (
-        /* Empty State */
         <div className="p-12 text-center rounded-2xl lf-surface/10 border border-dashed lf-border flex flex-col items-center justify-center space-y-3">
           <div className="p-3 rounded-2xl lf-surface/60 lf-text-muted">
             {settings.iconStyle === 'emoji' ? <span className="text-2xl">⏳</span> : <Clock size={28} className={getAccentTextClass(settings)} />}
@@ -54,7 +47,6 @@ export const DownloadList = React.memo(function DownloadList({
           </div>
         </div>
       ) : (
-        /* Downloads Grid and List */
         <>
         <AnimatedList initial={false}>
           {filteredDownloads.slice(0, visibleCount).map((item) => {

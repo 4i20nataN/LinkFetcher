@@ -22,7 +22,6 @@ export const DownloadLaterView: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 py-2 md:py-6 px-4">
-      {/* Title Header */}
       <div className="text-center md:text-left space-y-2">
         <h2 className="font-display font-extrabold text-3xl md:text-4xl text-white tracking-tight">
           {t('laterTitle')}
@@ -33,7 +32,6 @@ export const DownloadLaterView: React.FC = () => {
       </div>
 
       {downloadLater.length === 0 ? (
-        /* Empty State */
         <div className="p-16 text-center rounded-3xl glass-card border-dashed flex flex-col items-center justify-center space-y-4">
           <div className="p-4 rounded-2xl lf-surface-raised/60 lf-text-muted">
             {settings.iconStyle === 'emoji' ? <span className="text-3xl">⏰</span> : <Clock size={32} className={getAccentTextClass(settings)} />}
@@ -46,7 +44,6 @@ export const DownloadLaterView: React.FC = () => {
           </div>
         </div>
       ) : (
-        /* Download Later list */
         <div className="space-y-3">
           <AnimatedList initial={false}>
             {downloadLater.map((item) => {
@@ -59,7 +56,6 @@ export const DownloadLaterView: React.FC = () => {
                   className="p-3.5 rounded-2xl glass-card flex flex-col sm:flex-row gap-4 justify-between sm:items-center group hover:bg-white/10 transition-colors"
                 >
                   <div className="flex gap-4 items-center min-w-0">
-                    {/* Thumbnail */}
                     <div className="relative w-20 aspect-video rounded-lg overflow-hidden border lf-border lf-surface shrink-0">
                       <img
                         src={item.thumbnailUrl}
@@ -74,7 +70,6 @@ export const DownloadLaterView: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Metadata detail summary */}
                     <div className="min-w-0">
                       <h4 className="font-semibold text-xs text-white leading-snug truncate pr-2 group-hover:text-zinc-200 transition-colors">
                         {item.title}
@@ -86,7 +81,6 @@ export const DownloadLaterView: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Actions Toolbelt buttons */}
                   <div className="flex items-center gap-2 justify-end pt-3 sm:pt-0 border-t sm:border-t-0 lf-border">
                     <button
                       onClick={() => removeFromDownloadLater(item.url)}

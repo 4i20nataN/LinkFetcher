@@ -74,8 +74,7 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
   const { settings, updateSettings } = useApp();
   const { t } = useTranslation(settings);
   const [activeTab, setActiveTab] = useState<TabId>('media');
-  // Refs dos inputs manuais de recorte: o pareamento start/end usava
-  // querySelector no placeholder (quebrava ao traduzir). Refs são à prova.
+  // Refs no recorte: querySelector quebrava ao traduzir.
   const trimStartRef = useRef<HTMLInputElement>(null);
   const trimEndRef = useRef<HTMLInputElement>(null);
   const [showSubs, setShowSubs] = useState(!!(formatOptions?.writeSubs || formatOptions?.writeAutoSubs));
@@ -102,10 +101,7 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
     writeThumbnail: false,
     embedThumbnail: false,
     embedMetadata: false,
-    // 8 fragmentos paralelos (padrão do yt-dlp é 1): satura melhor links
-    // rápidos e dilui o throttle por conexão do YouTube (se 1 trava, as
-    // outras 7 seguram o agregado). Moderado p/ não forçar 429 em IP
-    // já limitado; limite de banda continua opt-in (bandLimit = 0).
+    // 8 fragmentos: diluem o throttle por conexão (padrão yt-dlp é 1).
     concurrentFragments: 8,
     retries: 0,
     restrictFilenames: false,
@@ -187,7 +183,7 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
     }
   }, [trimStart, trimEnd, update]);
 
-  // Altura-alvo do preset atual (para compatibilidade FPS × resolução)
+  // Altura-alvo do preset (compat FPS × resolução).
   const selectedTargetHeight = useMemo(() => {
     const presetMatch = VIDEO_PRESETS.find(p => p.format === options.format);
     const heightFromFormat = options.format?.match(/height<=(\d+)/)?.[1];
@@ -195,8 +191,7 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
     return h && h !== Infinity ? h : undefined;
   }, [options.format]);
 
-  // FPS disponível para a resolução selecionada: existe formato no teto da
-  // resolução com esse fps (fps desconhecido conta como compatível).
+  // FPS vale se há formato no teto com esse fps (desconhecido conta).
   const isFpsAvailable = useCallback((fps: number): boolean => {
     if (fps === 0) return true;
     if (options.audioOnly) return true;
@@ -211,7 +206,7 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
     return pool.some(f => parseFormatHeight(f.quality) === top && (f.fps == null || f.fps <= fps));
   }, [mediaInfo.formats, options.audioOnly, selectedTargetHeight]);
 
-  // Se a resolução mudou e o FPS atual não existe nela, volta para Original
+  // Resolução nova sem o FPS atual: volta p/ Original.
   useEffect(() => {
     if (options.fpsMax && options.fpsMax > 0 && !isFpsAvailable(options.fpsMax)) {
       update({ fpsMax: 0 });
@@ -241,8 +236,7 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
       update({ videoFormat: '' });
     }
   }, [options.audioOnly, allowedContainers, options.videoFormat, update]);
-  // Embutir legendas só vale em mp4/webm/mkv com vídeo (yt-dlp rejeita em áudio)
-  // e nunca com ALL (GAP3: embutir ~150 faixas incha o mux e pode falhar).
+  // Embutir legendas só vale em mp4/webm/mkv com vídeo (nunca com ALL).
   useEffect(() => {
     if (options.embedSubs && (options.audioOnly || options.subLangs === 'all' || (options.videoFormat && !['mp4', 'webm', 'mkv'].includes(options.videoFormat)))) {
       update({ embedSubs: false });
@@ -273,7 +267,6 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
     const origExt = mediaInfo.originalUrl?.split('.').pop()?.split('?')[0]?.toLowerCase() || '';
     return (
       <div className="space-y-3">
-        {/* Preview card */}
         <div className="flex items-center gap-3 p-3 rounded-xl lf-surface-40 lf-border">
           <div className="w-16 h-16 rounded-lg overflow-hidden lf-border-strong lf-surface shrink-0">
             <img src={mediaInfo.thumbnailUrl || mediaInfo.originalUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" crossOrigin="anonymous" loading="lazy" decoding="async" />
@@ -330,8 +323,7 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
   );
   const isOverMaxRes = selectedPreset && selectedPreset.height !== Infinity && maxRes > 0 && selectedPreset.height > maxRes;
 
-  // Presets pesados: avisa antes de baixar (4K, áudio sem perda, preset acima
-  // do real). Vende o PRO com honestidade — sem bloquear, só informar.
+  // Presets pesados avisam antes de baixar (informa, sem bloquear).
   const heavyReason = (() => {
     const isEn = settings.language === 'en';
     if (isOverMaxRes) return isEn
@@ -346,7 +338,7 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
     return null;
   })();
 
-  // Vitrine: travado, cada aba vende o que libera (sempre visível e clicável).
+  // Travada, cada aba anuncia o que o PRO libera.
   const proPitch = activeTab === 'media'
     ? (settings.language === 'en'
       ? 'With PRO: up to 4K resolution, heavy files and specific codecs.'
@@ -365,7 +357,6 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
     });
   }, []);
 
-  // Contexto único das seções (format/): evita furar ~20 props em cada uma.
   const ctx: FormatSectionCtx = {
     options, update, mediaInfo, openSections, toggleSection, accentBg, maxRes,
     allowedCodecs, allowedContainers, isFpsAvailable, selectedTargetHeight,
@@ -376,7 +367,6 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
 
   return (
     <div className="space-y-3" style={{ '--ui-scale': uiScale } as React.CSSProperties}>
-      {/* Download rápido: vídeo 1080p60 mp4 (merge copy) / MP3 máxima */}
       <p className="font-bold text-white text-center text-base pt-4 mb-5">
         {settings.language === 'en' ? '📥 Free Download' : '📥 Download Gratuito'}
       </p>
@@ -396,7 +386,6 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
           {settings.language === 'en' ? 'MP3 Audio' : 'Áudio MP3'}
         </button>
       </div>
-      {/* Divisor: download personalizado em bloco próprio abaixo */}
       <div className="border-t lf-border pt-4 mt-5">
       <div className="text-center mb-3">
         <p className="font-bold text-white text-base">

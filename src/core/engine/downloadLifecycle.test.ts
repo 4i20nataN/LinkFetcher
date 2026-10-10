@@ -1,9 +1,5 @@
-// Regressão do bug "card some mas o download continua" (SM-A107M):
-// o kill nativo recebia `cleanup` lido do status DENTRO do closure, mas o
-// status só era ajustado depois — todo cancel viajava como pausa
-// (sem cleanup, .part órfão + notificação de "pausado" no Android).
-// Estes testes travam o contrato: quem chama decide o cleanup, e remover
-// ativo sempre mata com cleanup=true antes de tirar da lista.
+// Kill nativo com `cleanup` explícito: quem chama decide (pausa preserva o
+// .part, cancel apaga). Remover ativo sempre mata antes de tirar da lista.
 import { describe, expect, it, beforeEach } from 'vitest';
 import { DownloadEngine } from './DownloadEngine';
 import type { DownloadItem } from '../../types';

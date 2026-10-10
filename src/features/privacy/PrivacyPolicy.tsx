@@ -40,7 +40,6 @@ export function PrivacyPolicy() {
 
   return (
     <div className="min-h-screen flex flex-col items-center py-10 px-4 md:px-8 relative">
-      {/* Floating header bar */}
       <div className="w-full max-w-[1000px] mb-6">
         <button
           onClick={() => setActiveTab('settings')}
@@ -55,7 +54,6 @@ export function PrivacyPolicy() {
         </button>
       </div>
 
-      {/* Main container — glassmorphism */}
       <div
         className={`w-full max-w-[1000px] rounded-3xl p-8 md:p-10 relative z-10
           ${isLight
@@ -63,7 +61,6 @@ export function PrivacyPolicy() {
             : 'bg-white/[0.03] backdrop-blur-xl border border-white/[0.07] shadow-2xl'
           }`}
       >
-        {/* Header */}
         <div className={`flex items-center justify-between pb-6 mb-7 border-b lf-border flex-wrap gap-5`}>
           <div className="flex items-center gap-3.5">
             <div
@@ -86,9 +83,7 @@ export function PrivacyPolicy() {
           </div>
         </div>
 
-        {/* Content */}
         <div className="flex flex-col gap-7">
-          {/* Title + intro */}
           <div>
             <h2
               className={`text-2xl font-semibold tracking-tight mb-1.5 bg-gradient-to-br from-current to-zinc-400 bg-clip-text
@@ -108,7 +103,6 @@ export function PrivacyPolicy() {
             </p>
           </div>
 
-          {/* Policy cards grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4.5">
             {POLICY_CARDS.map((card) => (
               <div
@@ -139,7 +133,6 @@ export function PrivacyPolicy() {
             ))}
           </div>
 
-          {/* User rights card */}
           <div
             className={`rounded-2xl p-6 transition-all duration-300 cv-auto
               ${isLight
@@ -165,7 +158,6 @@ export function PrivacyPolicy() {
             </ul>
           </div>
 
-          {/* Commitment note */}
           <p
             className={`mt-2.5 text-[13px] border-l-2 pl-4.5
               ${isLight ? 'text-zinc-500 border-blue-500' : 'lf-text-secondary border-blue-500'}`}
@@ -174,7 +166,6 @@ export function PrivacyPolicy() {
           </p>
         </div>
 
-        {/* Footer */}
         <div
           className={`mt-8 pt-5 border-t flex justify-between items-center flex-wrap gap-3.5 text-xs
             ${isLight ? 'border-zinc-200/50 lf-text-secondary' : 'lf-border lf-text-secondary'}`}

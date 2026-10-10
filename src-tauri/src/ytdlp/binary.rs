@@ -1,10 +1,5 @@
-//! Resolução e auto-download de yt-dlp + ffmpeg.
-//! Contrato: docs/reference/media-binaries.md (zero-config, SHA + rename atômico).
-//!
-//! Pins verificados em 2026-09-18 (Step 1 do plano):
-//! - yt-dlp tag fixa `2026.08.19` (release imutável; verificado no SHA2-512SUMS).
-//! - BtbN só publica a tag rolante `latest` → ffmpeg confere no checksums.sha256
-//!   da hora (pins só de fallback; re-pin não trava mais release).
+//! Resolução e auto-download de yt-dlp + ffmpeg (zero-config, SHA + rename atômico).
+//! Contrato: docs/reference/media-binaries.md.
 
 use std::path::{Path, PathBuf};
 use sha2::Digest;
@@ -42,13 +37,13 @@ const FFPROBE_BIN: &str = "ffprobe.exe";
 #[cfg(not(target_os = "windows"))]
 const FFPROBE_BIN: &str = "ffprobe";
 
-// Tamanhos do release imutável yt-dlp 2026.08.19 (checagem de tamanho do reference).
+// Tamanho esperado do yt-dlp p/ checagem rápida.
 #[cfg(target_os = "windows")]
 const YTDLP_EXPECTED_SIZE: u64 = 17_840_399;
 #[cfg(not(target_os = "windows"))]
 const YTDLP_EXPECTED_SIZE: u64 = 40_446_224;
 
-/// Teto anti-exaustão de disco durante o streaming (ffmpeg ~195 MB; folga 3x).
+/// Teto anti-exaustão de disco no streaming (folga 3x do ffmpeg).
 const MAX_BYTES: u64 = 600 * 1024 * 1024;
 
 const ALLOWED_HOSTS: &[&str] = &[
@@ -75,7 +70,7 @@ pub struct BinStatus {
     pub missing: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub binary_path: Option<String>,
-    /// Versão do extrator (diagnóstico de bitrot na UI; ausente = desconhecida).
+    /// Versão do extrator (diagnóstico na UI; ausente = desconhecida).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
 }
@@ -113,9 +108,7 @@ pub fn ffmpeg_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(bin_dir(app)?.join(FFMPEG_BIN))
 }
 
-/// ffprobe precisa estar ao lado do ffmpeg: o yt-dlp o descobre no mesmo
-/// diretório e o usa em SponsorBlock/capítulos/thumbnail (sem ele:
-/// "Unable to determine video duration: ffprobe not found").
+/// ffprobe precisa estar ao lado do ffmpeg (SponsorBlock/capítulos/thumbnail).
 pub fn ffprobe_path(app: &AppHandle) -> Result<PathBuf, String> {
     if let Some(p) = env_override("FFPROBE_PATH") {
         return Ok(p);
@@ -123,7 +116,7 @@ pub fn ffprobe_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(bin_dir(app)?.join(FFPROBE_BIN))
 }
 
-/// Localiza um executável no PATH (sem depender do `which`).
+/// Localiza executável no PATH.
 #[cfg(unix)]
 fn find_in_path(name: &str) -> Option<PathBuf> {
     let path = std::env::var_os("PATH")?;
@@ -160,10 +153,8 @@ fn find_in_path(name: &str) -> Option<PathBuf> {
     None
 }
 
-/// Runtime JS para o yt-dlp (extração moderna do YouTube exige; sem ele:
-/// "some formats may be missing"). Ordem de prioridade do próprio yt-dlp.
-/// Retorna `["--js-runtimes", "nome:/caminho"]` ou vazio (argv intacto).
-/// Só detecta o que já existe no sistema — nada é baixado.
+/// Runtime JS p/ extração moderna do YouTube; vazio = extração degradada.
+// Só detecta o que já existe no sistema.
 pub fn js_runtime_args() -> Vec<String> {
     for name in ["deno", "node", "quickjs", "bun"] {
         if let Some(p) = find_in_path(name) {
@@ -178,8 +169,7 @@ pub fn js_runtime_args() -> Vec<String> {
     Vec::new()
 }
 
-/// `ytdlp_status` — `{ready, missing, binaryPath}` (superconjunto do contrato do
-/// overlay `{ready}`, do reference `{ready, missing}` e do spec `{ready, binaryPath}`).
+/// `{ready, missing, binaryPath}` p/ overlay/reference/spec.
 #[cfg(target_os = "android")]
 #[tauri::command]
 pub async fn ytdlp_status(app: AppHandle) -> Result<BinStatus, String> {
@@ -279,12 +269,7 @@ fn emit_progress(
     );
 }
 
-/// Download com progresso via evento `binary-download`; grava em `.part`.
-/// Se `hasher` for Some, alimenta o SHA-256 incremental por chunk (evita
-/// reler o arquivo inteiro depois só para conferir integridade).
-/// Retoma (HTTP Range) de `.part` parcial: o hash existente é recalculado
-/// do prefixo em disco antes de continuar, então o digest final cobre o
-/// arquivo inteiro. Servidor sem Range → recomeça do zero (hash zerado).
+/// Download com progresso em `.part`; retoma via Range e alimenta SHA incremental.
 async fn download_streamed(
     client: &reqwest::Client,
     app: &AppHandle,
@@ -293,7 +278,6 @@ async fn download_streamed(
     part: &Path,
     mut hasher: Option<&mut sha2::Sha256>,
 ) -> Result<u64, String> {
-    // Prefixo já baixado (tentativa anterior interrompida).
     let mut resume_from: u64 = 0;
     if part.is_file() {
         resume_from = std::fs::metadata(part).map(|m| m.len()).unwrap_or(0);
@@ -309,7 +293,7 @@ async fn download_streamed(
         req = req.header("Range", format!("bytes={resume_from}-"));
     }
     let mut resp = req.send().await.map_err(|e| format!("download {file}: {e}"))?;
-    // 416 = o .part já está completo; 200 com Range = servidor ignorou → recomeça.
+    // 416 = `.part` completo; 200 com Range = servidor ignorou, recomeça.
     if resp.status() == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
         return Ok(resume_from);
     }
@@ -380,7 +364,7 @@ fn sha512_file(path: &Path) -> Result<String, String> {
     Ok(hex::encode(hasher.finalize()))
 }
 
-/// Extrai o hash do asset de um arquivo de somas estilo GNU (`<hex> [*]<nome>`).
+/// Extrai o hash do asset de somas estilo GNU.
 fn parse_sums(text: &str, asset: &str) -> Option<String> {
     text.lines().find_map(|line| {
         let mut it = line.split_whitespace();
@@ -394,15 +378,13 @@ fn parse_sums(text: &str, asset: &str) -> Option<String> {
     })
 }
 
-/// SHA pinado: fallback se o checksums publicado não vier. Pode envelhecer
-/// (tag rolante) — o caminho primário é sempre a lista da hora.
+/// SHA pinado de fallback (primário é a lista publicada na hora).
 #[cfg(target_os = "windows")]
 fn pinned_ffmpeg_sha() -> &'static str {
     FFMPEG_WIN_SHA256
 }
 
-/// SHA pinado: fallback se o checksums publicado não vier. Pode envelhecer
-/// (tag rolante) — o caminho primário é sempre a lista da hora.
+/// SHA pinado de fallback (primário é a lista publicada na hora).
 #[cfg(not(target_os = "windows"))]
 fn pinned_ffmpeg_sha() -> &'static str {
     FFMPEG_LINUX_SHA256
@@ -425,7 +407,7 @@ fn make_executable(_p: &Path) -> Result<(), String> {
 }
 
 async fn smoke(bin: &Path, file: &str) -> Result<(), String> {
-    // ffmpeg/ffprobe documentam `-version`; yt-dlp documenta `--version`.
+    // ffmpeg/ffprobe usam `-version`; yt-dlp usa `--version`.
     let flag = if file == "ffmpeg" || file == "ffprobe" {
         "-version"
     } else {
@@ -448,7 +430,7 @@ async fn smoke(bin: &Path, file: &str) -> Result<(), String> {
 
 async fn ensure_ytdlp(client: &reqwest::Client, app: &AppHandle) -> Result<PathBuf, String> {
     let dest = ytdlp_path(app)?;
-    // Cache válido: smoke passa → sem rede na segunda abertura.
+    // Cache válido: smoke passa, sem rede.
     if dest.is_file() {
         if smoke(&dest, "yt-dlp").await.is_ok() {
             emit_progress(app, "done", "yt-dlp", 1, 1, None, None);
@@ -472,7 +454,7 @@ async fn ensure_ytdlp(client: &reqwest::Client, app: &AppHandle) -> Result<PathB
             "yt-dlp: tamanho {received} != esperado {YTDLP_EXPECTED_SIZE}"
         )));
     }
-    // SHA-512 contra o SHA2-512SUMS do próprio release (disciplina do reference).
+    // Confere SHA-512 contra o SUMS do release.
     emit_progress(app, "progress", "yt-dlp", received, received, Some("Verificando integridade do yt-dlp…"), None);
     let sums_url = format!(
         "https://github.com/yt-dlp/yt-dlp/releases/download/{YTDLP_TAG}/SHA2-512SUMS"
@@ -541,8 +523,7 @@ fn install_ffmpeg(
     Ok(())
 }
 
-/// Reader que conta bytes e emite progresso (fase de extração, onde o
-/// percentual do download já está em 100%).
+/// Conta bytes e emite progresso na extração.
 struct ProgressReader<R> {
     inner: R,
     app: AppHandle,
@@ -594,9 +575,7 @@ fn install_ffmpeg(
     app: &AppHandle,
     total: u64,
 ) -> Result<(), String> {
-    // Stream direto xz → tar (xz2/liblzma em C + sem .tar temporário de
-    // ~500 MB): menos ~1 GB de IO em disco e decode multix mais rápido.
-    // Progresso real pelos bytes de entrada lidos.
+    // Extração em stream xz→tar (sem `.tar` temporário).
     let src = match std::fs::File::open(part) {
         Ok(f) => f,
         Err(e) => return Err(e.to_string()),
@@ -672,16 +651,13 @@ async fn ensure_ffmpeg(client: &reqwest::Client, app: &AppHandle) -> Result<Path
         let _ = std::fs::remove_file(&part);
         e
     };
-    // Tag `latest` é rolante: integridade via SHA-256 pinado (sem tamanho exato).
-    // O hash é alimentado durante o download — sem reler os ~150 MB depois.
+    // Tag rolante: SHA incremental durante o download, sem reler depois.
     let mut hasher = sha2::Sha256::new();
     let received = download_streamed(client, app, "ffmpeg", &url, &part, Some(&mut hasher))
         .await
         .map_err(fail)?;
     emit_progress(app, "progress", "ffmpeg", received, received, Some("Verificando integridade do ffmpeg…"), None);
-    // Tag `latest` é rolante: confere contra o checksums.sha256 publicado na
-    // hora (mesma disciplina do SHA2-512SUMS do yt-dlp); pinado só de fallback
-    // se a lista não vier — pin nunca mais trava release nova.
+    // Confere contra o checksums da hora; pinado só de fallback.
     let sums_url = format!(
         "https://github.com/BtbN/FFmpeg-Builds/releases/download/{FFMPEG_TAG}/checksums.sha256"
     );
@@ -697,7 +673,7 @@ async fn ensure_ffmpeg(client: &reqwest::Client, app: &AppHandle) -> Result<Path
     if actual != expected_sha.to_lowercase() {
         return Err(fail("ffmpeg: SHA-256 não confere".into()));
     }
-    // Extrai para temp + rename atômico pós-hash, como no reference.
+    // Extrai p/ temp + rename atômico pós-hash.
     let tmp = dest.with_extension("new");
     let probe_tmp = probe_dest.with_extension("new");
     emit_progress(app, "progress", "ffmpeg", received, received, Some("Extraindo ffmpeg…"), None);
@@ -727,18 +703,17 @@ async fn ensure_ffmpeg(client: &reqwest::Client, app: &AppHandle) -> Result<Path
 
 async fn ensure_binaries(app: &AppHandle) -> Result<(), String> {
     let client = build_client()?;
-    // Sequencial: yt-dlp primeiro (pequeno, libera probe rápido), ffmpeg depois.
+    // Sequencial: yt-dlp primeiro, ffmpeg depois.
     ensure_ytdlp(&client, app).await?;
     ensure_ffmpeg(&client, app).await?;
     Ok(())
 }
 
-/// Trava anti-duplo: cliques repetidos / remontes colapsam numa única execução.
+/// Trava anti-duplo: colapsa execuções concorrentes numa só.
 static ENSURE_RUNNING: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
-/// Dispara `ensure_binaries` em background e retorna na hora.
-/// Progresso/erro chegam pelo evento `binary-download`. Usado pelo overlay.
+/// Dispara `ensure_binaries` em background; progresso via evento.
 #[cfg(target_os = "android")]
 #[tauri::command]
 pub async fn ytdlp_ensure_binaries(_app: AppHandle) -> Result<(), String> {

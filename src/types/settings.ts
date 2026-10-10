@@ -1,13 +1,13 @@
 export interface AppSettings {
   themeMode: 'light' | 'dark' | 'gray' | 'white';
-  accentColor: string; // e.g., 'indigo', 'emerald', 'amber', 'rose', 'violet', 'sky', 'teal', 'fuchsia'
+  accentColor: string; // ex.: 'indigo', 'emerald', 'amber', 'rose', 'violet', 'sky', 'teal', 'fuchsia'
   iconStyle: 'emoji' | 'lucide-mono' | 'lucide-color';
   language: 'pt' | 'en';
   defaultDir: string;
   /** Android: subpasta dentro de Downloads públicos (MediaStore). Opcional —
       ausente = "LinkFetcher". Path arbitrário é bloqueado pelo scoped storage. */
   mobilePublicSubdir?: string;
-  bandLimit: number; // KB/s, 0 = unlimited
+  bandLimit: number; // KB/s, 0 = ilimitado
   maxConcurrent: number;
   autoDownload: boolean;
   notifications: boolean;

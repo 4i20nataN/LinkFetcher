@@ -1,5 +1,4 @@
-// Painel "Sistema" (extraído do SettingsView): notificações e atualização.
-// Moravam dentro do card de armazenamento sem ser armazenamento.
+// Painel "Sistema": notificações e atualização.
 import { Bell } from 'lucide-react';
 import type { AppSettings } from '../../../types';
 import { useTranslation } from '../../../core/i18n';
@@ -30,8 +29,7 @@ export function SystemPanel({ settings, updateSettings, t, isAndroid }: SystemPa
           <Toggle value={settings.notifications} onChange={() => updateSettings({ notifications: !settings.notifications })} settings={settings} />
         </div>
 
-        {/* Auto-update: desktop usa o updater Tauri; no Android (sem Play
-            Store) o update é sideload via releases do GitHub. */}
+        {/* Desktop: updater Tauri; Android: sideload via GitHub. */}
         {!isAndroid ? (
         <div className="flex items-center justify-between p-3 rounded-xl lf-surface-40 lf-border">
           <div className="space-y-0.5">

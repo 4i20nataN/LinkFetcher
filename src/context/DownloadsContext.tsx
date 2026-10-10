@@ -17,14 +17,12 @@ const DownloadsContext = createContext<DownloadsContextType | undefined>(undefin
 
 export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
-  // Ids já vistos: evita notificar itens concluídos antes do boot (histórico
-  // restaurado) e duplicar aviso no mesmo item.
+  // Ids já vistos: evita notificar o histórico restaurado no boot.
   const seenIds = useRef<Set<string> | null>(null);
 
   const { settings } = useSettings();
-  // Settings via ref: o handler roda a cada tick de progresso (2x/s) e ler
-  // `localStorage + JSON.parse` ali congela a main thread aos poucos.
-  // Settings muda raramente — o ref acompanha sem re-assinar o listener.
+  // Settings via ref: o handler roda a cada tick — ler da store ali custa;
+  // o ref acompanha sem re-assinar o listener.
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
@@ -40,8 +38,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         for (const i of items) seenIds.current.add(i.id);
         return;
       }
-      // No Android o Kotlin emite notificações nativas (progresso + conclusão
-      // + falha): o caminho JS duplicaria o aviso — desktop apenas.
+      // No Android o Kotlin já notifica: o caminho JS duplicaria o aviso.
       if (isAndroid()) {
         for (const i of items) seenIds.current.add(i.id);
         return;
@@ -68,9 +65,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     };
     DownloadEngine.addListener(handleUpdate);
-    // Volta ao foreground: reconcilia downloads cujo `complete` se perdeu
-    // com o WebView suspenso (travariam em `downloading` com arquivo em
-    // disco). Fire-and-forget; o engine filtra (só Android, só stale).
+    // Volta ao foreground: reconcilia `complete` perdido com WebView suspenso.
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
         DownloadEngine.reconcileStuck().catch(() => {});
@@ -103,8 +98,8 @@ export const useDownloads = () => {
 };
 
 /**
- * Contador barato p/ badges: reassina o engine e só propaga quando a
- * CONTAGEM muda — não re-renderiza a cada tick de progresso (4x/s).
+ * Contador barato p/ badges: só propaga quando a CONTAGEM muda (não a cada
+ * tick de progresso).
  */
 export const useDownloadCount = (statuses: string[]): number => {
   const key = statuses.join(',');

@@ -40,11 +40,8 @@ export default function UpdateBanner() {
 
   const tauriUpdateRef = useRef<Update | null>(null);
 
-  // Verificação inicial ao carregar o aplicativo (com delay suave de 2.5s),
-  // só se o toggle de auto-update estiver ativo. Opt-out: `false` explícito
-  // desliga; ausente (perfil antigo) mantém verificando.
-  // No Android o plugin updater nem é registrado (só desktop): nem tenta.
-  // Import dinâmico: evita avaliar o binding nativo no boot mobile (warns).
+  // Verificação inicial com delay (só se auto-update ativo; Android pula).
+  // Import dinâmico: fora do boot mobile (opt-out com `false` explícito).
   useEffect(() => {
     if (settings.updates === false) return;
     if (isAndroid()) return;
@@ -59,7 +56,6 @@ export default function UpdateBanner() {
     setStage('checking');
     setErrorMsg('');
 
-    // Tauri Desktop v2 Auto-updater (import dinâmico: fora do boot mobile)
     try {
       const { check } = await import('@tauri-apps/plugin-updater');
       const update = await check();
@@ -76,7 +72,7 @@ export default function UpdateBanner() {
         setStage('idle');
       }
     } catch {
-      // Em dev local ou sem conexão de rede, não alarma o usuário no startup
+      // Em dev/sem rede, não alarma no startup.
       setStage('idle');
     }
   }, [stage]);
@@ -89,7 +85,6 @@ export default function UpdateBanner() {
     setTotalBytes(0);
     setErrorMsg('');
 
-    // Tauri Desktop
     const update = tauriUpdateRef.current;
     if (!update) {
       setErrorMsg(t('updNoInstance'));
@@ -119,13 +114,12 @@ export default function UpdateBanner() {
       });
 
       setStage('ready');
-      // Relaunch imediato ou após 1 segundo para feedback visual limpo
+      // Relaunch após 1s p/ feedback limpo.
       setTimeout(async () => {
         try {
           const { relaunch } = await import('@tauri-apps/plugin-process');
           await relaunch();
         } catch {
-          // Se falhar o relaunch automático, o botão "Reiniciar" permite acionar manualmente
         }
       }, 1200);
     } catch (err: unknown) {
@@ -159,7 +153,6 @@ export default function UpdateBanner() {
         variant={bannerEntry}
         className="mb-6 relative z-30"
       >
-        {/* State: Checking (apenas visível se triggered) */}
         {stage === 'checking' && (
           <div className="flex items-center gap-3 px-4 py-3 rounded-xl lf-surface border lf-border backdrop-blur-md">
             <Loader2 size={16} className="animate-spin text-emerald-400" />
@@ -167,18 +160,15 @@ export default function UpdateBanner() {
           </div>
         )}
 
-        {/* State: Update Available - Popup com Changelog e Botões */}
         {stage === 'available' && updateInfo && (
           <AnimatedCard
             animateKey="update-available-modal"
             variant={scaleIn}
             className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-b from-emerald-500/10 via-emerald-950/20 to-transparent backdrop-blur-xl shadow-2xl shadow-emerald-500/10 p-5"
           >
-            {/* Linha de brilho superior */}
             <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent" />
 
             <div className="flex flex-col gap-4">
-              {/* Header do popup */}
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3.5">
                   <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0 shadow-inner">
@@ -204,7 +194,6 @@ export default function UpdateBanner() {
                   </div>
                 </div>
 
-                {/* Botão X para dispensar */}
                 <button
                   onClick={dismiss}
                   className="p-1.5 rounded-lg lf-text-muted hover:text-white hover:bg-white/10 transition-colors"
@@ -215,7 +204,6 @@ export default function UpdateBanner() {
                 </button>
               </div>
 
-              {/* Notas de atualização (Changelog do GitHub) */}
               {updateInfo.body && (
                 <div className="rounded-xl bg-black/40 border border-white/5 p-3.5 text-xs text-zinc-200">
                   <div
@@ -238,7 +226,6 @@ export default function UpdateBanner() {
                 </div>
               )}
 
-              {/* Ações: Atualizar e Reiniciar vs Mais Tarde */}
               <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/5">
                 <button
                   type="button"
@@ -261,7 +248,6 @@ export default function UpdateBanner() {
           </AnimatedCard>
         )}
 
-        {/* State: Downloading com barra de progresso elegante */}
         {stage === 'downloading' && (
           <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-b from-emerald-950/40 to-black/60 backdrop-blur-xl p-5 shadow-2xl">
             <div className="flex items-center justify-between mb-3">
@@ -286,7 +272,6 @@ export default function UpdateBanner() {
               </div>
             </div>
 
-            {/* Barra de progresso */}
             <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden relative">
               <div
                 className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-full w-full origin-left transition-transform duration-300 rounded-full"
@@ -296,7 +281,6 @@ export default function UpdateBanner() {
           </div>
         )}
 
-        {/* State: Ready (reiniciando) */}
         {stage === 'ready' && (
           <AnimatedCard
             animateKey="ready"
@@ -326,7 +310,6 @@ export default function UpdateBanner() {
           </AnimatedCard>
         )}
 
-        {/* State: Error */}
         {stage === 'error' && (
           <div className="relative overflow-hidden rounded-2xl border border-rose-500/30 bg-gradient-to-r from-rose-950/40 to-black/60 backdrop-blur-xl p-4 shadow-xl">
             <div className="flex items-center justify-between gap-3">

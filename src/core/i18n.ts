@@ -2,7 +2,6 @@ import { AppSettings } from '../types';
 
 export const translations = {
   pt: {
-    // Sidebar
     analyzeLink: 'Analisar Link',
     analyzeDesc: 'Cole e baixe mídias',
     onlineSearch: 'Busca Online',
@@ -22,7 +21,6 @@ export const translations = {
     activeDriver: 'Motor Ativo',
     adminRole: 'ADMIN / ARQUITETO',
 
-    // Analyzer View
     mainPlaceholder: 'Cole o link aqui (ex: https://youtube.com/watch?v=...)',
     supportedPlats: 'SUPORTADOS:',
     btnAnalyze: 'Analisar',
@@ -44,7 +42,6 @@ export const translations = {
     authorLabel: 'Autor:',
     unknown: 'Não especificado',
 
-    // Features Cards
     feat1Title: 'Análise Instantânea',
     feat1Desc: 'Motor de decodificação automatizado de alta velocidade.',
     feat2Title: 'Download Seguro',
@@ -52,7 +49,6 @@ export const translations = {
     feat3Title: 'Compatibilidade Ampla',
     feat3Desc: 'Suporte estendido para as principais mídias e formatos.',
 
-    // Search View
     searchTitle: 'Busca Online Integrada',
     searchSubtitle: 'Pesquise e analise mídias diretamente sem sair do aplicativo.',
     searchPlaceholder: 'Pesquise por títulos, palavras-chave ou canais...',
@@ -60,7 +56,6 @@ export const translations = {
     btnAnalyzeVideo: 'Analisar',
     views: 'visualizações',
 
-    // Downloads View
     downloadsTitle: 'Gerenciador de Downloads',
     downloadsSubtitle: 'Monitore sua fila de transferências ativas e histórico em tempo real.',
     generalProgress: 'Progresso Geral',
@@ -78,7 +73,6 @@ export const translations = {
     kbps: 'KB/s',
     mbps: 'MB/s',
 
-    // Favorites View
     favoritesTitle: 'Links Favoritos',
     favoritesSubtitle: 'Seus links favoritos salvos para download rápido.',
     noFavorites: 'Nenhum favorito ainda',
@@ -86,14 +80,12 @@ export const translations = {
     notesPlaceholder: 'Adicione anotações sobre este link...',
     dateAdded: 'Adicionado em:',
 
-    // Download Later View
     laterTitle: 'Baixar Depois',
     laterSubtitle: 'Links que você salvou para baixar em um momento mais oportuno.',
     noLater: 'Nenhum link na fila',
     noLaterDesc: 'Salve mídias para baixar depois enquanto navega.',
     btnStartDownload: 'Analisar para Baixar',
 
-    // Settings View
     settingsTitle: 'Configurações do Sistema',
     settingsSubtitle: 'Ajuste as preferências de visualização, limites de rede e configurações do sistema de download.',
     visualPrefs: 'Personalização Visual',
@@ -126,7 +118,6 @@ export const translations = {
     updatesLabel: 'Buscar atualizações automaticamente',
     updatesDesc: 'Verifica novas versões do app no GitHub ao iniciar.',
     
-    // Format Selector
     selectFormat: 'Selecionar Formato',
     presetBest: 'Melhor Qualidade',
     preset720p: '720p',
@@ -150,7 +141,6 @@ export const translations = {
     applyFormat: 'Aplicar Formato',
     advancedOptions: 'Opções Avançadas',
 
-    // Binary setup overlay
     setupTitle: 'Preparando o motor de downloads',
     setupDesc: 'Na primeira abertura baixamos o yt-dlp e o ffmpeg oficiais (~190 MB, só desta vez).',
     setupChecking: 'Verificando…',
@@ -185,7 +175,6 @@ export const translations = {
     noteExtractFfmpeg: 'Extraindo ffmpeg…',
     noteTestFfmpeg: 'Testando ffmpeg…',
 
-    // Update banner
     updChecking: 'Verificando novas atualizações com o repositório oficial...',
     updAvailable: 'Nova Atualização Disponível!',
     updCurrent: 'Versão atual:',
@@ -208,7 +197,6 @@ export const translations = {
     updNoInstance: 'Instância de atualização não encontrada',
     updFailGeneric: 'Falha ao baixar e aplicar atualização criptografada.',
 
-    // Privacy policy
     privBack: 'Voltar para Configurações',
     privTitle: 'Política de Privacidade',
     privUpdated: 'Última atualização: 22 de setembro de 2026',
@@ -244,7 +232,6 @@ export const translations = {
     privCommitText: 'A LinkFetcher é construída com foco em privacidade desde a origem. Seus links nunca saem da sua máquina, exceto para os próprios sites de origem.',
     privFooterTag: '🔐 Privacidade em primeiro lugar',
 
-    // Format selector (hardcoded titles/hints)
     fmtMediaTab: 'Mídia',
     fmtAdvancedTab: 'Avançado',
     fmtResolution: 'Resolução',
@@ -314,7 +301,6 @@ export const translations = {
     fmtCodec: 'Codec',
     fmtOff: 'Desligado',
 
-    // Analyzer summary + download badges
     sumBest: 'Melhor',
     sumBestQuality: 'Melhor qualidade',
     sumAll: 'Tudo',
@@ -324,7 +310,6 @@ export const translations = {
     badgeCut: 'Cortado',
     badgeImageUrl: 'Imagem URL',
 
-    // Format selector batch 2 (tips, presets, tags)
     fmtPreset360: '360 Baixa',
     fmtTipAuto: 'Escolher automaticamente o melhor codec',
     fmtTipH264: 'Mais compativel. Funciona em todos os dispositivos',
@@ -349,7 +334,6 @@ export const translations = {
     fmtRemoveAll: 'Remover Tudo',
     fmtNoLimit: 'Sem limite',
 
-    // Accents
     indigo: 'Índigo',
     emerald: 'Esmeralda',
     amber: 'Âmbar',
@@ -366,7 +350,6 @@ export const translations = {
     slate: 'Aço',
   },
   en: {
-    // Sidebar
     analyzeLink: 'Analyze Link',
     analyzeDesc: 'Paste and download media',
     onlineSearch: 'Online Search',
@@ -386,7 +369,6 @@ export const translations = {
     activeDriver: 'Engine Active',
     adminRole: 'ADMIN / ARCHITECT',
 
-    // Analyzer View
     mainPlaceholder: 'Paste link here (e.g. https://youtube.com/watch?v=...)',
     supportedPlats: 'SUPPORTED:',
     btnAnalyze: 'Analyze',
@@ -408,7 +390,6 @@ export const translations = {
     authorLabel: 'Author:',
     unknown: 'Not specified',
 
-    // Features Cards
     feat1Title: 'Instant Analysis',
     feat1Desc: 'Automated high-speed media decoding engine.',
     feat2Title: 'Secure Download',
@@ -416,7 +397,6 @@ export const translations = {
     feat3Title: 'Wide Compatibility',
     feat3Desc: 'Extended support for major media formats and servers.',
 
-    // Search View
     searchTitle: 'Integrated Online Search',
     searchSubtitle: 'Search and analyze media directly without leaving the app.',
     searchPlaceholder: 'Search by titles, keywords, or channels...',
@@ -424,7 +404,6 @@ export const translations = {
     btnAnalyzeVideo: 'Analyze',
     views: 'views',
 
-    // Downloads View
     downloadsTitle: 'Download Manager',
     downloadsSubtitle: 'Monitor your active download queue and history in real-time.',
     generalProgress: 'General Progress',
@@ -442,7 +421,6 @@ export const translations = {
     kbps: 'KB/s',
     mbps: 'MB/s',
 
-    // Favorites View
     favoritesTitle: 'Favorite Links',
     favoritesSubtitle: 'Your favorite links saved for quick access and download.',
     noFavorites: 'No favorites yet',
@@ -450,14 +428,12 @@ export const translations = {
     notesPlaceholder: 'Add notes about this link...',
     dateAdded: 'Added on:',
 
-    // Download Later View
     laterTitle: 'Download Later',
     laterSubtitle: 'Links you saved to download at a more convenient time.',
     noLater: 'No links in queue',
     noLaterDesc: 'Save media to download later while you browse.',
     btnStartDownload: 'Analyze to Download',
 
-    // Settings View
     settingsTitle: 'System Settings',
     settingsSubtitle: 'Adjust viewing preferences, network limits, and download system settings.',
     visualPrefs: 'Visual Customization',
@@ -490,7 +466,6 @@ export const translations = {
     updatesLabel: 'Check for updates automatically',
     updatesDesc: 'Checks GitHub for new app releases on startup.',
 
-    // Format Selector
     selectFormat: 'Select Format',
     presetBest: 'Best Quality',
     preset720p: '720p',
@@ -514,7 +489,6 @@ export const translations = {
     applyFormat: 'Apply Format',
     advancedOptions: 'Advanced Options',
 
-    // Binary setup overlay
     setupTitle: 'Preparing the download engine',
     setupDesc: 'On first launch we download official yt-dlp and ffmpeg (~190 MB, one time only).',
     setupChecking: 'Checking…',
@@ -549,7 +523,6 @@ export const translations = {
     noteExtractFfmpeg: 'Extracting ffmpeg…',
     noteTestFfmpeg: 'Testing ffmpeg…',
 
-    // Update banner
     updChecking: 'Checking the official repository for updates...',
     updAvailable: 'New Update Available!',
     updCurrent: 'Current version:',
@@ -572,7 +545,6 @@ export const translations = {
     updNoInstance: 'Update instance not found',
     updFailGeneric: 'Failed to download and apply the encrypted update.',
 
-    // Privacy policy
     privBack: 'Back to Settings',
     privTitle: 'Privacy Policy',
     privUpdated: 'Last updated: September 22, 2026',
@@ -608,7 +580,6 @@ export const translations = {
     privCommitText: 'LinkFetcher is built privacy-first from the ground up. Your links never leave your machine, except to the source sites themselves.',
     privFooterTag: '🔐 Privacy first',
 
-    // Format selector (hardcoded titles/hints)
     fmtMediaTab: 'Media',
     fmtAdvancedTab: 'Advanced',
     fmtResolution: 'Resolution',
@@ -678,7 +649,6 @@ export const translations = {
     fmtCodec: 'Codec',
     fmtOff: 'Off',
 
-    // Analyzer summary + download badges
     sumBest: 'Best',
     sumBestQuality: 'Best quality',
     sumAll: 'All',
@@ -688,7 +658,6 @@ export const translations = {
     badgeCut: 'Cut',
     badgeImageUrl: 'Image URL',
 
-    // Format selector batch 2 (tips, presets, tags)
     fmtPreset360: '360 Low',
     fmtTipAuto: 'Automatically pick the best codec',
     fmtTipH264: 'Most compatible. Works on all devices',
@@ -713,7 +682,6 @@ export const translations = {
     fmtRemoveAll: 'Remove All',
     fmtNoLimit: 'No limit',
 
-    // Accents
     indigo: 'Indigo',
     emerald: 'Emerald',
     amber: 'Amber',

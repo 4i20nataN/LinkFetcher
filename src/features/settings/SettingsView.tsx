@@ -42,7 +42,7 @@ export const SettingsView: React.FC = () => {
     }
   }, []);
 
-  // Sync auto-update preference to main process
+  // Sincroniza o auto-update com o processo principal.
   useEffect(() => {
     if (isDesktop && window.electron?.setAutoCheck) {
       window.electron.setAutoCheck(settings.updates);
@@ -51,8 +51,7 @@ export const SettingsView: React.FC = () => {
 
   const handleOpenFolder = async () => {
     if (isAndroid) {
-      // No Android abre a pasta do app (resolve na hora). `defaultDir` é
-      // ignorado no mobile (scoped storage) — nunca cai no fluxo desktop.
+      // No Android abre a pasta do app (`defaultDir` é ignorado).
       try {
         const { invoke } = await import('@tauri-apps/api/core');
         const dir = mobileDir || await invoke<string>('fs_get_downloads_path');

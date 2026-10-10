@@ -52,7 +52,6 @@ export const FavoritesView: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 py-2 md:py-6 px-4">
-      {/* Title Header with Export Button */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b lf-border pb-4">
         <div className="text-center md:text-left space-y-1">
           <h2 className="font-display font-extrabold text-3xl md:text-4xl text-white tracking-tight">
@@ -78,7 +77,6 @@ export const FavoritesView: React.FC = () => {
       </div>
 
       {favorites.length === 0 ? (
-        /* Empty State */
         <div className="p-16 text-center rounded-3xl glass-card border-dashed flex flex-col items-center justify-center space-y-4">
           <div className="p-4 rounded-2xl lf-surface-raised lf-text-muted">
             {settings.iconStyle === 'emoji' ? <span className="text-3xl">⭐</span> : <Star size={32} className={getAccentTextClass(settings)} />}
@@ -91,7 +89,6 @@ export const FavoritesView: React.FC = () => {
           </div>
         </div>
       ) : (
-        /* Favorites Grid */
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <AnimatedList initial={false}>
             {favorites.map((fav) => {
@@ -105,7 +102,6 @@ export const FavoritesView: React.FC = () => {
                   className="p-4 rounded-2xl glass-card flex flex-col justify-between space-y-4 group hover:bg-white/10 transition-colors"
                 >
                   <div className="flex gap-4">
-                    {/* Thumbnail */}
                     <div className="relative w-24 h-24 rounded-lg overflow-hidden border lf-border lf-surface shrink-0">
                       <img
                         src={fav.thumbnailUrl}
@@ -120,7 +116,6 @@ export const FavoritesView: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Metadata details */}
                     <div className="min-w-0 flex-1 space-y-1">
                       <span className="text-[9px] font-semibold lf-text-muted block font-mono uppercase tracking-wider">
                         {t('dateAdded')} {new Date(fav.dateAdded).toLocaleDateString()}
@@ -134,7 +129,6 @@ export const FavoritesView: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Notes Segment */}
                   <div className="p-3 rounded-lg bg-white/5 border lf-border">
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-[9px] font-bold lf-text-muted font-mono uppercase flex items-center gap-1">
@@ -180,7 +174,6 @@ export const FavoritesView: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Card bottom footer actions */}
                   <div className="pt-2 border-t lf-border flex justify-between items-center text-xs">
                     <button
                       onClick={() => toggleFavorite({ id: fav.id, title: fav.title, url: fav.url, platform: fav.platform, thumbnailUrl: fav.thumbnailUrl })}

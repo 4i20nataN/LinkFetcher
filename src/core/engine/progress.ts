@@ -1,13 +1,10 @@
-// Helpers puros do caminho de progresso (Kotlin → engine → card).
-//
-// Extraídos do DownloadEngine para serem testáveis sem WebView/Tauri:
-// toda a decisão (dedupe, texto de atividade, smoothing, throttle) mora
-// aqui; o engine só aplica. Se o payload do Kotlin mudar, o teste de
-// contrato em `progress.test.ts` quebra de propósito.
+// Helpers puros do caminho de progresso (transporte → engine → card).
+// Toda a decisão (dedupe, atividade, smoothing, throttle) mora aqui e é
+// testável sem WebView/Tauri; o engine só aplica.
 
-/** Campos do payload que compõem a assinatura de dedupe. Contrato com o
- *  `emitOnUi("yt-dlp-progress")` do YtDlpPlugin.kt: ao adicionar um campo
- *  novo no Kotlin, adicione aqui (e no teste) ou o dedupe ignora a mudança. */
+/** Assinatura de dedupe: eventos push duplicados (transporte duplo) geram a
+ *  mesma string e são descartados. Ao adicionar um campo no emissor, some
+ *  aqui (e no teste) ou o dedupe ignora a mudança. */
 export const PROGRESS_EVENT_SIGNATURE_FIELDS = [
   'type',
   'percent',
@@ -74,10 +71,9 @@ export function shouldNotifyProgress(now: number, last: number, isAndroid: boole
   return now - last >= progressThrottleMs(isAndroid);
 }
 
-/** Houve movimento real (bytes ou % > 0)? Linha de progresso zerada num
- *  stall (throttle/429/403) NÃO pode apagar a prova de vida (`activity` /
- *  `processing`): sem isso o card congela em `0 KB/s` com a barra parada e
- *  parece morto — embora o yt-dlp siga tentando em background. */
+/** Houve movimento real (bytes ou % > 0)? Linha zerada num stall (throttle)
+ *  não apaga a prova de vida (`activity`/`processing`) — senão o card
+ *  congela em `0 KB/s` parecendo morto com o yt-dlp ainda tentando. */
 export function progressShowsMovement(downloaded: unknown, percent: number): boolean {
   if (typeof percent === 'number' && percent > 0) return true;
   return parseIpcNumber(downloaded) > 0;

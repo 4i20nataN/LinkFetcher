@@ -1,6 +1,5 @@
-// Guarda local da licença PRO (localStorage): a assinatura é verificada UMA vez
-// na ativação (verifyLicenseKey); aqui vale só presença + expiração. Adulterar
-// o próprio localStorage só afeta a própria máquina — sem risco sistêmico.
+// Guarda local da licença PRO (localStorage): a assinatura é verificada UMA
+// vez na ativação; aqui vale presença + expiração.
 import { useSyncExternalStore } from 'react';
 
 export interface LicenseRecord {

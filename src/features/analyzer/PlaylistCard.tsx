@@ -1,5 +1,4 @@
-// Card de playlist (extraído do LinkAnalyzer): loading + preview dos itens
-// + download de todos com progresso/cancelamento do pool de probes.
+// Card de playlist: loading + preview + download de todos.
 import { useApp } from '../../context/AppContext';
 import {
   getAccentBgClass, getAccentTextClass
@@ -27,7 +26,6 @@ export function PlaylistCard({
   const { settings } = useApp();
   return (
     <>
-      {/* PLAYLIST LOADING STATE */}
       {playlistLoading && (
         <div className="p-6 rounded-3xl glass-card text-center space-y-3">
           <div className="animate-spin w-8 h-8 border-2 border-t-transparent rounded-full mx-auto" />
@@ -37,14 +35,12 @@ export function PlaylistCard({
         </div>
       )}
 
-      {/* PLAYLIST PREVIEW CARD */}
       <AnimatedList>
         {playlistInfo && !playlistLoading && (
           <AnimatedCard
             variant={slideUpStrong}
             className="p-5 rounded-3xl glass-card shadow-2xl space-y-4"
           >
-            {/* Playlist Header */}
             <div className="flex items-start gap-4">
               <div className="w-14 h-14 rounded-xl bg-indigo-600/20 flex items-center justify-center shrink-0">
                 <ListMusic size={24} className={getAccentTextClass(settings)} />
@@ -66,7 +62,6 @@ export function PlaylistCard({
               </div>
             </div>
 
-            {/* Preview items (first 5) */}
             <div className="space-y-1.5">
               {playlistInfo.items.slice(0, playlistExpanded ? playlistInfo.items.length : 5).map((item, idx) => (
                 <div
@@ -88,7 +83,6 @@ export function PlaylistCard({
               ))}
             </div>
 
-            {/* Expand/Collapse */}
             {playlistInfo.items.length > 5 && (
               <button
                 onClick={() => setPlaylistExpanded(!playlistExpanded)}
@@ -101,7 +95,6 @@ export function PlaylistCard({
               </button>
             )}
 
-            {/* Download All Button (com progresso + cancelar durante o pool) */}
             {enqueueProgress ? (
               <div className="space-y-2">
                 <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">

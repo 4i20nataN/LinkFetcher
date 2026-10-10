@@ -1,5 +1,4 @@
-// Constantes do seletor de formato (extraídas do FormatSelector).
-// Só dados — nenhuma lógica, nenhum JSX.
+// Constantes do seletor de formato (só dados).
 import type { TranslationKey } from '../../../core/i18n';
 
 export const VIDEO_PRESETS = [
@@ -20,17 +19,14 @@ export const VIDEO_CODECS = [
   { id: 'vp9', label: 'VP9', tip: 'Codec Google. Bom para YouTube, compressao eficiente' },
   { id: 'av01', label: 'AV1', tip: 'Codec moderno. Maior compressao. Suporte crescente' },
 ] as const;
-// Filtro [vcodec~=] usa regex search contra strings reais (avc1.*, hev1.*, vp9, av01.*).
-// h264/h265 precisam de alternância — valor puro nunca casa com avc1/hev1.
+// [vcodec~=] é regex: h264/h265 exigem alternância (puro não casa).
 export const CODEC_FILTER: Record<string, string> = {
   h264: '"^(avc|h264)"',
   h265: '"^(hev|hvc|h265)"',
   vp9: 'vp9',
   av01: 'av01',
 };
-// Compat container × codec de vídeo no merge (-c copy): o Auto é imprevisível
-// (pode cair em codec incompatível), então containers restritos exigem codec
-// explícito. A faixa de áudio (bestaudio) o app não escolhe — risco residual.
+// Merge (-c copy): Auto é imprevisível; container restrito exige codec explícito.
 export const CODECS_FOR_CONTAINER: Record<string, string[]> = {
   webm: ['', 'vp9', 'av01'],
   flv: ['', 'h264'],
@@ -58,7 +54,6 @@ export const SUB_LANGS = [
   { id: 'all', label: 'ALL' },
 ] as const;
 
-// Tips de codec por id (labels ficam no render via t()).
 export const CODEC_TIPS: Record<string, TranslationKey> = {
   '': 'fmtTipAuto',
   h264: 'fmtTipH264',

@@ -1,8 +1,6 @@
-// Venda PRO via Pix (semi-automática, sem servidor): o app exibe QR +
-// copia-e-cola gerados na hora (padrão BR Code/EMV do Banco Central) e um
-// botão de WhatsApp com mensagem pronta. Você confere o pagamento e vende a
-// chave com: node scripts/mint-key.mjs "Nome do Cliente" 30
-// (mensal = 30 dias; vitalícia = sem o número).
+// Venda PRO via Pix (semi-automática, sem servidor): QR + copia-e-cola
+// (BR Code/EMV) e botão de WhatsApp. Conferido o pagamento, a chave sai com:
+// node scripts/mint-key.mjs "Nome do Cliente" 30  (sem nº = vitalícia).
 
 export const PRO_PLAN = {
   label: 'PRO mensal',

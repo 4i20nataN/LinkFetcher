@@ -3,13 +3,7 @@ import { RefreshCw, Download, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Toggle } from '../../components/Toggle';
 import { useApp } from '../../context/AppContext';
 
-/**
- * AndroidUpdater — auto-update sideload (sem Play Store).
- * Consulta a latest do GitHub, compara com a versão instalada e baixa o APK
- * via DownloadManager nativo (comando `updateDownload` do plugin Kotlin),
- * que abre o instalador ao concluir. Sem dependência nova, sem Rust novo:
- * o plugin já está registrado como `ytdlp`.
- */
+/** Sideload de APK via releases do GitHub (o DownloadManager nativo instala). */
 
 const OWNER = '4i20nataN';
 const REPO = 'LinkFatcher';
@@ -58,7 +52,7 @@ export function AndroidUpdater() {
       const rel = await res.json();
       const tag: string = rel.tag_name || '';
       const assets: any[] = rel.assets || [];
-      // APK da ABI do aparelho (leve); fallback: universal (completo).
+      // APK da ABI do aparelho; fallback universal.
       let name = 'LinkFetcher.apk';
       try {
         const { invoke } = await import('@tauri-apps/api/core');
@@ -66,7 +60,6 @@ export function AndroidUpdater() {
         const perAbi = abi ? `LinkFetcher-${abi}.apk` : '';
         if (perAbi && assets.some(a => a?.name === perAbi)) name = perAbi;
       } catch {
-        // sem ABI (ou comando indisponível): universal
       }
       setApkName(name);
       const apk = assets.find((a: any) => typeof a?.name === 'string' && a.name === name);
@@ -102,7 +95,6 @@ export function AndroidUpdater() {
       const { invoke } = await import('@tauri-apps/api/core');
       const fileName = apkName;
       await invoke('plugin:ytdlp|updateDownload', { url: apkUrl, fileName });
-      // O DownloadManager do sistema assume daqui (notificação + instalador).
     } catch (e: any) {
       const msg = typeof e === 'string' ? e : e?.message;
       setError(msg || (en ? 'Download failed' : 'Falha no download'));

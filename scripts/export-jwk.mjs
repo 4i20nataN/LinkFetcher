@@ -1,6 +1,4 @@
-// Exporta a JWK privada p/ LICENSE_PRIVATE_JWK (stdout, linha única).
-// Uso: node scripts/export-jwk.mjs  → cole a saída no .env do SERVIDOR.
-// Nunca commitar a saída (é o segredo de emissão). Roda de qualquer cwd.
+// Exporta a JWK privada p/ LICENSE_PRIVATE_JWK (stdout). Não commitar.
 import { readFile } from 'node:fs/promises';
 
 const url = new URL('../signing-keys/license.key', import.meta.url);

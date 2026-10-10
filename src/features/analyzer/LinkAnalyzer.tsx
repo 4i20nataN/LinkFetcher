@@ -46,10 +46,7 @@ export const LinkAnalyzer: React.FC = () => {
   const [mediaInfo, setMediaInfo] = useState<MediaInfo | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<MediaFormat | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  // Sequência da análise: o FormatSelector é remontado a cada nova análise
-  // (key) para o painel interno nunca exibir seleções obsoletas de outro
-  // vídeo enquanto o RESULTADO lê o estado zerado — mesma URL reanalisada
-  // também conta (id do probe seria igual).
+  // Remonta o seletor a cada análise p/ descartar seleções obsoletas.
   const [analysisSeq, setAnalysisSeq] = useState(0);
 
   const [probeLoading, setProbeLoading] = useState(false);
@@ -79,11 +76,10 @@ export const LinkAnalyzer: React.FC = () => {
     bandLimit: 0,
   });
 
-  // Auto-analyze URL from search / download later trigger
   useEffect(() => {
     if (selectedUrl) {
       setUrl(selectedUrl);
-      setSelectedUrl(''); // Clear
+      setSelectedUrl('');
       const trimmed = selectedUrl.trim();
       if (trimmed && /^https?:\/\/.+/i.test(trimmed)) {
         const clean = sanitizeUrl(trimmed);
@@ -92,7 +88,6 @@ export const LinkAnalyzer: React.FC = () => {
     }
   }, [selectedUrl]);
 
-  // Listen for clipboard-detected URL from popup
   useEffect(() => {
     const handler = (e: Event) => {
       const url = (e as CustomEvent).detail?.url;
@@ -109,7 +104,6 @@ export const LinkAnalyzer: React.FC = () => {
     return () => window.removeEventListener('clipboard:analyze', handler);
   }, []);
 
-  // Persist analyzer state to localStorage
   useEffect(() => {
     const saved = localStorage.getItem('universal_downloader_analyzer_state');
     if (saved) {
@@ -119,18 +113,17 @@ export const LinkAnalyzer: React.FC = () => {
         if (state.mediaInfo) setMediaInfo(state.mediaInfo);
         if (state.selectedFormat) setSelectedFormat(state.selectedFormat);
         if (state.formatOptions) setFormatOptions(state.formatOptions);
-      } catch { /* ignore */ }
+      } catch {}
     }
   }, []);
 
-  // Persist com debounce: o estado inclui o dump parseado (100KB–1MB) e o
-  // efeito anterior serializava a cada tecla/seleção na main thread.
+  // Persiste com debounce: o dump (100KB–1MB) trava a main thread.
   useEffect(() => {
     const t = setTimeout(() => {
       try {
         const state = { url, mediaInfo, selectedFormat, formatOptions };
         localStorage.setItem('universal_downloader_analyzer_state', JSON.stringify(state));
-      } catch { /* quota cheia: estado volátil, sem quebrar a análise */ }
+      } catch {}
     }, 800);
     return () => clearTimeout(t);
   }, [url, mediaInfo, selectedFormat, formatOptions]);
@@ -165,7 +158,6 @@ export const LinkAnalyzer: React.FC = () => {
     setProbeError(null);
     setPlaylistInfo(null);
 
-    // Check if URL is a playlist
     if (isPlaylistUrl(targetUrl)) {
       setPlaylistLoading(true);
       try {
@@ -177,7 +169,6 @@ export const LinkAnalyzer: React.FC = () => {
       } catch (err: any) {
         setPlaylistLoading(false);
         setPlaylistInfo(null);
-        // Fall through to normal analysis if playlist probe fails
       }
     }
 
@@ -188,7 +179,7 @@ export const LinkAnalyzer: React.FC = () => {
       setMediaInfo(info);
       setAnalysisSeq(s => s + 1);
       if (info.formats && info.formats.length > 0) {
-        setSelectedFormat(info.formats[0]); // Default to first format
+        setSelectedFormat(info.formats[0]);
       }
     } catch (err: any) {
       setError(adapterErrorMessage(err, settings.language === 'en' ? 'Error analyzing link. Please verify if link is correct.' : 'Erro ao analisar o link. Verifique se o link está correto.'));
@@ -207,12 +198,11 @@ export const LinkAnalyzer: React.FC = () => {
     }
     
     trimmed = sanitizeUrl(trimmed);
-    setUrl(trimmed); // Atualiza o input visualmente com a URL limpa
+    setUrl(trimmed);
 
     await handleAnalyze(trimmed);
   };
 
-  // Limpa o formulário e o estado da análise (era o × dentro do input).
   const handleClearForm = () => {
     setUrl('');
     setMediaInfo(null);
@@ -261,8 +251,7 @@ export const LinkAnalyzer: React.FC = () => {
       setError(settings.language === 'en' ? 'No format selected. Please wait for analysis to complete.' : 'Nenhum formato selecionado. Aguarde a analise completar.');
       return;
     }
-    // Download personalizado é PRO: sem licença, o caminho é o Download Gratuito
-    // (fecha o bypass de baixar 4K pelos defaults com o painel travado).
+    // Personalizado exige licença (sem bypass pelos defaults).
     if (!isLicenseActive(getLicense())) {
       setError(settings.language === 'en' ? 'Custom download is PRO — use Free Download or activate your key in the Custom Download panel.' : 'Download personalizado é PRO — use o Download Gratuito ou ative sua chave no painel Download Personalizado.');
       return;
@@ -274,8 +263,7 @@ export const LinkAnalyzer: React.FC = () => {
       formatOptions
     );
 
-    // Download description if format selected and description exists
-    // ('none' é truthy — precisa do !== explícito, senão cai no else e grava .txt)
+    // 'none' é truthy: o !== explícito evita gravar .txt indevido.
     if (formatOptions.descFormat && formatOptions.descFormat !== 'none' && mediaInfo.description) {
       const fmt = formatOptions.descFormat;
       const title = mediaInfo.title || 'video';
@@ -313,7 +301,6 @@ export const LinkAnalyzer: React.FC = () => {
 
     setSuccessMsg(settings.language === 'en' ? `Added to queue: ${mediaInfo.title.substring(0, 45)}...` : `Adicionado a fila: ${mediaInfo.title.substring(0, 45)}...`);
     
-    // Auto-redirect to downloads manager
     setTimeout(() => {
       setActiveTab('manager');
     }, 1200);
@@ -330,10 +317,7 @@ export const LinkAnalyzer: React.FC = () => {
       return;
     }
     const quickOptions = buildQuickOptions(formatOptions, kind);
-    // Fire-and-forget de propósito: NÃO publica no estado compartilhado.
-    // setFormatOptions/setSelectedFormat aqui vazavam o preset rápido
-    // (fpsMax 60, merge MP4, ~556 MB) para o painel personalizado e o
-    // RESULTADO passava a exibir opções que o usuário nunca selecionou.
+    // Fire-and-forget: não publica no estado (não vaza o preset rápido).
     DownloadEngine.addDownload(mediaInfo, refFormat, quickOptions);
     setSuccessMsg(settings.language === 'en' ? `Added to queue: ${mediaInfo.title.substring(0, 45)}...` : `Adicionado a fila: ${mediaInfo.title.substring(0, 45)}...`);
     setTimeout(() => {
@@ -344,9 +328,7 @@ export const LinkAnalyzer: React.FC = () => {
   const handleDownloadAllPlaylist = async () => {
     if (!playlistInfo || playlistInfo.items.length === 0 || enqueueProgress) return;
 
-    // Pool de 3 probes concorrentes (sequencial levava N×~5-10s no armv7);
-    // cancelável pelo botão. `next` é seguro: JS é single-thread e o
-    // incremento ocorre de forma síncrona entre awaits.
+    // Pool de 3 probes cancelável; `next` é seguro (síncrono entre awaits).
     enqueueCancelRef.current = false;
     const items = playlistInfo.items;
     setEnqueueProgress({ done: 0, total: items.length });
@@ -411,20 +393,18 @@ export const LinkAnalyzer: React.FC = () => {
 
   const handleDownloadThumbnail = async (targetExt?: 'jpg' | 'png' | 'webp') => {
     if (!mediaInfo || !mediaInfo.thumbnailUrl) return;
-    // Baixar capa é PRO (mesma barreira do download personalizado).
+    // Baixar capa exige licença ativa.
     if (!isLicenseActive(getLicense())) {
       setError(settings.language === 'en' ? 'Cover download is PRO — activate your key in the Custom Download panel.' : 'Baixar capa é PRO — ative sua chave no painel Download Personalizado.');
       return;
     }
-    // Sem formato escolhido: abre o seletor
     if (!targetExt) {
       setShowCoverFormats(v => !v);
       return;
     }
     setShowCoverFormats(false);
     const titleBase = ((mediaInfo.title || 'video').replace(/[<>:"/\\|?*]/g, '_').substring(0, 80));
-    // Converte bytes (já em mãos) para o formato do botão via blob: limpo:
-    // blob: é same-origin, então o canvas nunca é contaminado — sem CORS.
+    // blob: é same-origin: o canvas nunca contamina (sem CORS).
     const convertCoverBytes = (raw: Uint8Array, srcMime: string, target: 'jpg' | 'png' | 'webp'): Promise<Uint8Array> =>
       new Promise((resolve, reject) => {
         const objUrl = URL.createObjectURL(new Blob([raw as BlobPart], { type: srcMime }));
@@ -463,16 +443,14 @@ export const LinkAnalyzer: React.FC = () => {
       const isTauri = typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window);
       if (isTauri) {
         const { invoke } = await import('@tauri-apps/api/core');
-        // 1. Bytes via backend (sem CORS): vi_webp não envia ACAO, então
-        // carregar por <img> com crossOrigin jamais funcionaria aqui.
+        // 1. Bytes via backend (sem CORS: <img> com crossOrigin falharia).
         const fetched = await invoke<{ success: boolean; data: string; ext: string; size: number }>(
           'fs_fetch_cover',
           { url: mediaInfo.thumbnailUrl },
         );
         const raw = Uint8Array.from(atob(fetched.data), (c) => c.charCodeAt(0));
         const realExt = (fetched.ext || 'jpg').toLowerCase();
-        // 2. Respeita o botão: converte para o formato escolhido; se a
-        // conversão falhar, entrega os bytes originais com a extensão real.
+        // 2. Converte p/ o formato do botão; se falhar, entrega o original.
         let outBytes = raw;
         let outExt = realExt;
         if (targetExt !== realExt) {
@@ -484,7 +462,6 @@ export const LinkAnalyzer: React.FC = () => {
             outExt = realExt;
           }
         }
-        // 3. Salva e registra nas Downloads como item concluído.
         const { writeFile } = await import('@tauri-apps/plugin-fs');
         const { join } = await import('@tauri-apps/api/path');
         let dir = settings.defaultDir || '';
@@ -515,7 +492,6 @@ export const LinkAnalyzer: React.FC = () => {
         setTimeout(() => setSuccessMsg(null), 2000);
         return;
       }
-      // Web (sem Tauri): caminho antigo por canvas direto da URL.
       const mime = targetExt === 'jpg' ? 'image/jpeg' : targetExt === 'png' ? 'image/png' : 'image/webp';
       const quality = targetExt === 'png' ? undefined : 0.92;
       const filename = `${titleBase}_capa.${targetExt}`;
@@ -556,7 +532,6 @@ export const LinkAnalyzer: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 py-2 md:py-6 px-4">
-      {/* Title Header */}
       <div className="text-center md:text-left space-y-2">
         <p className="lf-text-secondary text-sm md:text-base">
           {settings.language === 'en' 
@@ -574,7 +549,6 @@ export const LinkAnalyzer: React.FC = () => {
         onClear={handleClearForm}
       />
 
-      {/* Error View */}
       {error && (
         <AnimatedCard
           variant={fadeIn}
@@ -588,7 +562,6 @@ export const LinkAnalyzer: React.FC = () => {
         </AnimatedCard>
       )}
 
-      {/* Success Notification pop */}
       {successMsg && (
         <AnimatedCard
           variant={scaleIn}
@@ -599,7 +572,6 @@ export const LinkAnalyzer: React.FC = () => {
         </AnimatedCard>
       )}
 
-      {/* Skeleton Loading Card */}
       {loading && (
         <div className="p-4 md:p-6 rounded-2xl lf-surface-40 border lf-border animate-pulse space-y-6">
           <div className="flex flex-col md:flex-row gap-6">
@@ -636,7 +608,6 @@ export const LinkAnalyzer: React.FC = () => {
         onDownloadAll={handleDownloadAllPlaylist}
       />
 
-      {/* RICH CONTENT CARD */}
       {mediaInfo && !loading && (
         <MediaResultCard
           mediaInfo={mediaInfo}
@@ -658,7 +629,6 @@ export const LinkAnalyzer: React.FC = () => {
         />
       )}
 
-      {/* Safety & Performance assurances info cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
           { title: t('feat1Title'), icon: RefreshCw, desc: t('feat1Desc') },

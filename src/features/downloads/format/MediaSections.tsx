@@ -1,5 +1,4 @@
-// Seções da aba "Mídia" do seletor de formato (extraídas do FormatSelector).
-// Cada seção recebe o ctx compartilhado e lê `settings`/`t` via hooks.
+// Seções da aba "Mídia" do seletor de formato.
 import { useApp } from '../../../context/AppContext';
 import { useTranslation } from '../../../core/i18n';
 import { BlockIcon, BlockTitle } from '../../../components/BlockIcon';
@@ -31,7 +30,6 @@ import type { FormatSectionCtx } from './sectionCtx';
 
 type Ctx = { ctx: FormatSectionCtx };
 
-/* ── Resolução ── */
 export function ResolutionSection({ ctx }: Ctx) {
   const { options, update, maxRes, openSections, toggleSection, accentBg } = ctx;
   const { settings } = useApp();
@@ -79,7 +77,6 @@ export function ResolutionSection({ ctx }: Ctx) {
   );
 }
 
-/* ── Formato Video + Codecs ── */
 export function VideoFormatSection({ ctx }: Ctx) {
   const { options, update, openSections, toggleSection, accentBg, allowedCodecs, allowedContainers } = ctx;
   const { settings } = useApp();
@@ -169,7 +166,6 @@ export function VideoFormatSection({ ctx }: Ctx) {
   );
 }
 
-/* ── Áudio ── */
 export function AudioSection({ ctx }: Ctx) {
   const { options, update, openSections, toggleSection, accentBg } = ctx;
   const { settings } = useApp();
@@ -231,7 +227,6 @@ export function AudioSection({ ctx }: Ctx) {
   );
 }
 
-/* ── Descrição ── */
 export function DescriptionSection({ ctx }: Ctx) {
   const { options, update, mediaInfo, openSections, toggleSection, accentBg, descExpanded, setDescExpanded } = ctx;
   const { settings } = useApp();
@@ -267,7 +262,6 @@ export function DescriptionSection({ ctx }: Ctx) {
   );
 }
 
-/* ── Legendas ── */
 export function SubtitlesSection({ ctx }: Ctx) {
   const { options, update, mediaInfo, openSections, toggleSection, accentBg, showSubs, setShowSubs, showSubsPicker, setShowSubsPicker } = ctx;
   const { settings } = useApp();
@@ -288,8 +282,7 @@ export function SubtitlesSection({ ctx }: Ctx) {
         />
         {showSubs && (
           <AnimatedAccordion isOpen={showSubs} className="space-y-3 pl-2 border-l-2 border-zinc-800">
-            {/* Disponibilidade real segundo o probe: resumo compacto +
-                modal com busca; o clique escolhe o idioma exato. */}
+            {/* Idiomas reais do probe (resumo + modal de busca). */}
             {(() => {
               const manual = mediaInfo.subtitleLangs?.manual ?? [];
               const auto = mediaInfo.subtitleLangs?.auto ?? [];
@@ -300,8 +293,7 @@ export function SubtitlesSection({ ctx }: Ctx) {
                   </div>
                 );
               }
-              // Picker único de idioma (atalhos vivem dentro do modal):
-              // mostra a seleção atual com × para limpar.
+              // Picker único: mostra a seleção com × p/ limpar.
               const picked = options.subLangs || '';
               return (
                 <>
@@ -396,7 +388,6 @@ export function SubtitlesSection({ ctx }: Ctx) {
   );
 }
 
-/* ── Nome do Arquivo + Nome Limpo ── */
 export function FilenameSection({ ctx }: Ctx) {
   const { options, update, mediaInfo, useUnderscore, setUseUnderscore } = ctx;
   const { settings } = useApp();
@@ -425,9 +416,7 @@ export function FilenameSection({ ctx }: Ctx) {
           { resolved: fmtDate(mediaInfo.publishDate || '', true), label: t('fmtTagDate') },
           { resolved: fmtDuration(mediaInfo.duration || ''), label: t('fmtTagDuration') },
         ].filter(tag => tag.resolved).map(tag => {
-          // Anti-spam: cada token entra no máximo 1x. Se o valor já
-          // está no nome (click anterior ou digitação), o botão
-          // desliga em vez de duplicar o título até o infinito.
+          // Anti-spam: cada token entra 1x (botão desliga em vez de duplicar).
           const cur = options.customFilename || '';
           const val = useUnderscore ? tag.resolved.replace(/ /g, '_') : tag.resolved;
           const added = val !== '' && cur.includes(val);

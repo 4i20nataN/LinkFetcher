@@ -1,7 +1,5 @@
-// Popup de confirmação ao parar/excluir: ativo (queued/downloading/paused)
-// oferece Pausar/Retomar, Cancelar (mantém o registro) e Excluir (para o
-// processo nativo de verdade + remove da lista + limpa .part). Finalizado
-// só confirma a remoção do registro — o arquivo em disco nunca é apagado.
+// Ao parar/excluir item ativo: pausar/cancelar/excluir (limpa .part).
+// Finalizado só remove o registro; o arquivo em disco é mantido.
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { DownloadItem, type AppSettings } from '../../../types';
@@ -25,7 +23,6 @@ export function DeleteConfirm({ item, settings, onClose, showToast }: DeleteConf
   const act = (fn: () => void, msg: string) => () => { fn(); showToast(msg); onClose(); };
   const baseBtn = 'px-4 py-3 min-h-[48px] text-xs font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5 active:scale-[0.98]';
 
-  // Fecha com Escape (desktop/teclado BT no Android).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -40,8 +37,7 @@ export function DeleteConfirm({ item, settings, onClose, showToast }: DeleteConf
         ? (langEn ? 'Paused' : 'Pausado')
         : st;
 
-  // Portal no body: ancestral com transform/filter (cards animados) sequestra
-  // o `fixed` e o modal ancora no meio da lista em vez da tela.
+  // Portal no body: ancestral animado sequestra o `fixed`.
   return createPortal((
     <div
       className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"

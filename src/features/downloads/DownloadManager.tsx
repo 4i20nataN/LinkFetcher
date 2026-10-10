@@ -25,8 +25,7 @@ export const DownloadManager: React.FC = () => {
   const { t } = useTranslation(settings);
   const [mediaFilter, setMediaFilter] = useState<'all' | 'audio' | 'video' | 'image' | 'playlist'>('all');
   const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set());
-  // Cap de render: 300 itens com cards animados derrubam o scroll no armv7.
-  // Contadores/filtros usam a lista cheia; só o DOM é paginado.
+  // Cap de render: cards animados derrubam o scroll (só o DOM é paginado).
   const LIST_PAGE = 60;
   const [visibleCount, setVisibleCount] = useState(LIST_PAGE);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -40,7 +39,6 @@ export const DownloadManager: React.FC = () => {
     }, 2000);
   }, []);
 
-  // Bulk queue operations
   const handlePauseAll = () => {
     downloads.forEach(d => {
       if (d.status === 'downloading') {
@@ -72,8 +70,7 @@ export const DownloadManager: React.FC = () => {
     setStatusFilters(new Set());
   };
 
-  // Reordering helpers — por id: o índice visível é da lista filtrada e não
-  // corresponde ao array interno do engine (só-queued).
+  // Reordena por id: o índice visível é da lista filtrada.
   const handleMoveUp = (id: string) => {
     DownloadEngine.moveQueuedItem(id, -1);
   };
@@ -82,7 +79,6 @@ export const DownloadManager: React.FC = () => {
     DownloadEngine.moveQueuedItem(id, 1);
   };
 
-  // Toggle status filter (multi-select OR)
   const toggleStatus = (status: string) => {
     setStatusFilters(prev => {
       const next = new Set(prev);
@@ -98,7 +94,7 @@ export const DownloadManager: React.FC = () => {
       try {
         await navigator.share({ title: item.title, url: item.url });
       } catch (err: any) {
-        // AbortError = user dismissed the native share sheet, not a real failure
+        // AbortError = usuário fechou o share; não é falha.
         if (err?.name !== 'AbortError') {
           showToast(settings.language === 'en' ? 'Failed to share link.' : 'Falha ao compartilhar link.');
         }
@@ -114,8 +110,7 @@ export const DownloadManager: React.FC = () => {
   };
 
   const handleOpenFolder = async (item: DownloadItem) => {
-    // No Tauri (desktop + Android) `window.electron` é o shim p/ `fs_open_path`
-    // (Kotlin `openFile` no mobile). Sem ele, avisa em vez de no-op mudo.
+    // Sem o shim, abrir arquivo avisa em vez de no-op mudo.
     if (!window.electron?.invoke) {
       showToast(settings.language === 'en' ? 'Open not available in this environment.' : 'Abertura indisponível neste ambiente.');
       return;
@@ -123,15 +118,13 @@ export const DownloadManager: React.FC = () => {
     const target = item.filePath || settings.defaultDir || await window.electron.invoke('shell:getDownloadsPath');
     if (target) {
       window.electron.invoke('shell:openPath', target).catch((err: any) => {
-        // Erro real no toast (não genérico): sem isso o "não abre" é mudo e
-        // impossível de diagnosticar sem logcat.
+        // Erro real no toast: genérico deixava o "não abre" mudo.
         const detail = typeof err === 'string' ? err : err?.message;
         showToast((settings.language === 'en' ? 'Failed to open: ' : 'Falha ao abrir: ') + (detail || target));
       });
     }
   };
 
-  // Calculate global summary states
   const activeDownloads = useMemo(() => downloads.filter(d => d.status === 'downloading'), [downloads]);
   const totalSpeed = useMemo(() => activeDownloads.reduce((sum, d) => sum + d.speed, 0), [activeDownloads]);
   
@@ -140,13 +133,10 @@ export const DownloadManager: React.FC = () => {
     ? Math.floor(downloadingOrQueued.reduce((sum, d) => sum + d.progress, 0) / downloadingOrQueued.length)
     : 0;
 
-  // Filter list: media type (AND) + status (OR)
   const filteredDownloads = useMemo(() => downloads.filter(item => {
-    // Media type filter (AND)
     if (mediaFilter !== 'all') {
       if (getMediaType(item) !== mediaFilter) return false;
     }
-    // Status filter (OR) — if none active, show all
     if (statusFilters.size > 0) {
       if (!statusFilters.has(item.status)) return false;
     }
@@ -159,7 +149,6 @@ export const DownloadManager: React.FC = () => {
   return (
     <LayoutGroup>
     <div className="max-w-4xl mx-auto space-y-6 py-2 md:py-6 px-4 relative">
-      {/* Toast alert popup */}
       <AnimatedList>
         {toastMsg && (
           <AnimatedCard
@@ -172,7 +161,6 @@ export const DownloadManager: React.FC = () => {
         )}
       </AnimatedList>
 
-      {/* Header Info */}
       <div className="text-center md:text-left space-y-2">
         <h2 className="font-display font-extrabold text-2xl md:text-4xl text-white tracking-tight leading-tight break-words">
           {t('downloadsTitle')}
@@ -182,13 +170,11 @@ export const DownloadManager: React.FC = () => {
         </p>
       </div>
 
-      {/* Global Progress Dashboard Stats */}
       {downloadingOrQueued.length > 0 && (
         <AnimatedCard
           variant={fadeIn}
           className="p-5 rounded-2xl glass-card shadow-lg grid grid-cols-1 md:grid-cols-3 gap-6 items-center"
         >
-          {/* Progress circle info */}
           <div className="flex items-center gap-4">
             <div className="relative w-16 h-16 shrink-0 flex items-center justify-center">
               <svg className="absolute w-full h-full -rotate-90">
@@ -202,7 +188,7 @@ export const DownloadManager: React.FC = () => {
                   fill="none" 
                   strokeDasharray={175} 
                   strokeDashoffset={175 - (175 * overallProgress) / 100}
-                  /* Sem transition: atualiza 4x/s e interpolar em loop repinta sem parar */
+                  /* Sem transition: atualiza 4x/s (interpolar repinta sem parar). */
                 />
               </svg>
               <span className="font-display font-bold text-sm text-white">{overallProgress}%</span>
@@ -215,10 +201,9 @@ export const DownloadManager: React.FC = () => {
             </div>
           </div>
 
-          {/* Speed stats */}
           <div className="flex items-center gap-3.5 border-y md:border-y-0 md:border-x lf-border py-4 md:py-0 md:px-6">
             <div className={`p-2 rounded-xl lf-surface ${getAccentTextClass(settings)} shrink-0`}>
-              {/* Sem bounce: animação infinita decorativa repinta sem parar */}
+              {/* Sem bounce: animação infinita repinta sem parar. */}
               <TrendingUp size={20} />
             </div>
             <div>
@@ -227,7 +212,6 @@ export const DownloadManager: React.FC = () => {
             </div>
           </div>
 
-          {/* Bulk actions tools */}
           <div className="flex flex-wrap gap-2 justify-start md:justify-end">
             <button 
               onClick={handlePauseAll}
@@ -251,9 +235,7 @@ export const DownloadManager: React.FC = () => {
           </AnimatedCard>
       )}
 
-      {/* Media Type Tabs + Status Chips */}
       <div className="space-y-2">
-        {/* Row 1: Media type tabs (underline style, full width) */}
         <div className="flex items-center gap-1 border-b lf-border overflow-x-auto overscroll-contain">
           {[
             { id: 'all', label: settings.language === 'en' ? 'All' : 'Todos', icon: null },
@@ -292,7 +274,6 @@ export const DownloadManager: React.FC = () => {
           })}
         </div>
 
-        {/* Row 2: Status filter chips (discrete) */}
         <div className="flex flex-wrap items-center gap-2 px-1">
           <span className="text-xs lf-text-muted font-medium mr-1">
             {settings.language === 'en' ? 'Status:' : 'Filtros:'}
@@ -323,7 +304,6 @@ export const DownloadManager: React.FC = () => {
             );
           })}
 
-          {/* Clear status filters button */}
           {statusFilters.size > 0 && (
             <>
               <div className="w-px h-4 bg-white/10 mx-1" />
@@ -337,7 +317,7 @@ export const DownloadManager: React.FC = () => {
           )}
         </div>
       </div>
-      {/* Queue items list (memo por assinatura: ticks não reconciliam) */}
+      // Lista memoizada por assinatura: ticks não reconciliam.
       <DownloadList
         items={filteredDownloads}
         visibleCount={visibleCount}

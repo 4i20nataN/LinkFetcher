@@ -10,7 +10,7 @@ export interface SearchResult {
   title: string;
   url: string;
   thumbnail: string;
-  duration: number;          // seconds
+  duration: number;          // segundos
   duration_string: string;   // "12:45"
   view_count: number;
   uploader: string;

@@ -1,7 +1,4 @@
-// Contrato do caminho quente: o que pode mudar sem re-render (números
-// vivos, atualizados via DOM direto) vs o que EXIGE re-render (transições).
-// Se alguém incluir um campo quente no comparador, o lag volta; se excluir
-// um campo de transição, o card congela — estes testes travam os dois erros.
+// Contrato do caminho quente: campos quentes (DOM) vs transições (re-render).
 import { describe, expect, it } from 'vitest';
 import { isCardStaticEqual } from './DownloadCard';
 import { listSignature } from './DownloadList';
@@ -13,8 +10,7 @@ function base(): DownloadItem {
     title: 'Video',
     thumbnailUrl: 'https://x/y.jpg',
     platform: 'youtube',
-    // Mesmo objeto entre chamadas: o engine nunca troca a ref de `format`
-    // (touch é shallow), então o comparador usa identidade aqui de propósito.
+    // `format` compara por identidade (o engine nunca troca a ref).
     format: sharedFormat,
     sizeTotal: 100,
     sizeDownloaded: 10,

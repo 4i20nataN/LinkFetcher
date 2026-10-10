@@ -1,8 +1,4 @@
-// Card de download (extraído do DownloadManager). Memoizado por identidade
-// do item: o engine troca a ref (touch) só do item que mudou — cards intactos
-// pulam o re-render (antes, cada tick de progresso re-renderizava a lista
-// inteira). settings/queue entram no compare para tema/idioma/fila
-// continuarem propagando.
+// Card memoizado por identidade do item; ticks quentes vão ao DOM direto.
 import React from 'react';
 import { DownloadItem, type AppSettings } from '../../../types';
 import { DownloadEngine } from '../../../core/engine/DownloadEngine';
@@ -21,13 +17,8 @@ import { ProviderRegistry } from '../../../core/plugins/Providers';
 import { PlatformBadge } from '../../../components/PlatformBadge';
 import { LiveDownloadStats } from './LiveDownloadStats';
 
-// Recorte (download_sections): o backend baixa o arquivo CHEIO pelo yt-dlp
-// nativo (progresso real, resume) e corta local com ffmpeg (`-c copy`) ao
-// final — delegar `--download-sections` ao yt-dlp faria o fetch via ffmpeg
-// remoto (lento/403 no YouTube, stdout mudo, sem resume). Efeito colateral
-// honesto: o total exibido é o do vídeo completo; o trecho é extraído no
-// fim (fase `processing`). Por isso a linha de tamanho identifica o total
-// como original quando há `downloadSections`.
+// Recorte: baixa o vídeo cheio e corta local (fetch remoto é lento/403, sem resume).
+// O total exibido é do vídeo completo; o trecho sai na fase `processing`.
 
 export interface DownloadCardProps {
   item: DownloadItem;
@@ -52,7 +43,6 @@ export const DownloadCard = React.memo(function DownloadCard({
               const isPaused = item.status === 'paused';
               const isCompleted = item.status === 'completed';
               const isFailed = ['failed', 'cancelled'].includes(item.status);
-              // Posição na fila real (só-queued): setas desabilitadas nos extremos.
 
               return (
                 <AnimatedCard
@@ -60,12 +50,10 @@ export const DownloadCard = React.memo(function DownloadCard({
                   variant={slideExitLeft}
                   className="p-4 rounded-xl glass-card flex flex-col md:flex-row gap-4 items-start md:items-center relative overflow-hidden group hover:bg-white/10 transition-colors"
                 >
-                  {/* Status left indicator colored bar */}
                   <div className={`absolute left-0 top-0 bottom-0 w-1 ${
                     isCompleted ? 'bg-emerald-500' : isFailed ? 'bg-rose-500' : isPaused ? 'bg-amber-500' : 'bg-indigo-500'
                   }`} />
 
-                  {/* Thumbnail */}
                   <div className="relative w-full md:w-28 aspect-video rounded-lg overflow-hidden border lf-border lf-surface shrink-0">
                     <img
                       src={item.thumbnailUrl}
@@ -80,7 +68,6 @@ export const DownloadCard = React.memo(function DownloadCard({
                     </span>
                   </div>
 
-                  {/* Info contents details */}
                   <div className="flex-1 min-w-0 space-y-1.5 w-full">
                     <div className="flex flex-col sm:flex-row justify-between gap-1">
                       <h4 className="font-semibold text-xs text-white truncate pr-4" title={item.title}>
@@ -88,15 +75,11 @@ export const DownloadCard = React.memo(function DownloadCard({
                       </h4>
                     </div>
 
-                    {/* Feature tags row */}
                     <div className="flex flex-wrap gap-1">
-                      {/* Platform badge */}
                       {platform && (
                         <PlatformBadge platformId={item.platform} name={platform.name} color={platform.color} variant="inline" />
                       )}
-                      {/* Format ext chip — concluído: extensão do ARQUIVO real
-                          (stream único ignora --merge-output-format, ex. webm
-                          com tag MP4); pendente: container prometido */}
+                      {/* Concluído: extensão do arquivo real; pendente: container prometido. */}
                       {(() => {
                         const doneExt = item.status === 'completed' && item.filePath
                           ? (item.filePath.split('.').pop() || '')
@@ -111,7 +94,6 @@ export const DownloadCard = React.memo(function DownloadCard({
                           </span>
                         ) : null;
                       })()}
-                      {/* Image source badge */}
                       {item.imageSource && (
                         <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-semibold border ${
                           item.imageSource === 'user-link'
@@ -121,21 +103,18 @@ export const DownloadCard = React.memo(function DownloadCard({
                           {item.imageSource === 'user-link' ? `🔗 ${t('badgeImageUrl')}` : '🖼️ Thumbnail'}
                         </span>
                       )}
-                      {/* Subtitles */}
                       {(item.writeSubs || item.writeAutoSubs) && (
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-semibold bg-blue-900/60 text-blue-300 border border-blue-800/40">
                           <Subtitles size={8} />
                           {item.subLangs || 'EN'}
                         </span>
                       )}
-                      {/* SponsorBlock */}
                       {item.sponsorblockRemove && item.sponsorblockRemove !== '' && (
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-semibold bg-purple-900/60 text-purple-300 border border-purple-800/40">
                           <Shield size={8} />
                           Sponsor
                         </span>
                       )}
-                      {/* Trimmed */}
                       {item.downloadSections && item.downloadSections !== '' && (
                         <span
                           className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-semibold bg-amber-900/60 text-amber-300 border border-amber-800/40"
@@ -145,7 +124,6 @@ export const DownloadCard = React.memo(function DownloadCard({
                           {t('badgeCut')}
                         </span>
                       )}
-                      {/* Audio Only */}
                       {item.audioOnly && (
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-semibold bg-emerald-900/60 text-emerald-300 border border-emerald-800/40">
                           <Tag size={8} />
@@ -160,11 +138,7 @@ export const DownloadCard = React.memo(function DownloadCard({
                     <LiveDownloadStats item={item} settings={settings} />
                   </div>
 
-                  {/* Quick controls Toolbelt block */}
                   <div className="flex items-center gap-2 justify-end w-full md:w-auto shrink-0 pt-2 md:pt-0 border-t md:border-t-0 lf-border flex-wrap">
-                    {/* Reordering Controls (Only for queue/active lists).
-                        No touch não há hover: setas sempre visíveis no mobile,
-                        só auto-ocultam no desktop (lg). */}
                     {['queued', 'downloading', 'paused'].includes(item.status) && (
                       <div className="flex flex-col gap-1 mr-2 border-r lf-border pr-2 transition-opacity duration-300 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-within:opacity-100">
                         <button
@@ -188,9 +162,7 @@ export const DownloadCard = React.memo(function DownloadCard({
                       </div>
                     )}
 
-                    {/* Main Action Toggles — pausa/retomar são reversíveis:
-                        ação imediata. Parar/excluir é destrutivo: abre o
-                        popup de confirmação (onRequestDelete). */}
+                    {/* Pausar/retomar é imediato; parar/excluir pede confirmação. */}
                     {isDownloading && (
                       <button
                         onClick={() => DownloadEngine.pauseDownload(item.id)}
@@ -232,7 +204,6 @@ export const DownloadCard = React.memo(function DownloadCard({
                       </button>
                     )}
 
-                    {/* Common / Helper Utilities */}
                     {isCompleted && (
                       <button
                         onClick={() => onOpenFolder(item)}
@@ -274,10 +245,8 @@ export const DownloadCard = React.memo(function DownloadCard({
         </AnimatedCard>
               );
 }, (prev, next) => {
-  // Comparador de caminho quente: ignora os números que mudam a cada tick
-  // (progress/sizeDownloaded/speed/eta) — o LiveDownloadStats os escreve
-  // direto no DOM sem render. Todo o resto re-renderiza normalmente.
-  // Exceção: cruzamento 0→>0 troca indeterminado→barra (ramificação).
+  // Compara tudo exceto os números do tick (vão ao DOM direto).
+  // Exceção: cruzar 0→>0 troca indeterminado→barra.
   if (prev.settings !== next.settings) return false;
   if (prev.queuePos !== next.queuePos || prev.queuedTotal !== next.queuedTotal) return false;
   return isCardStaticEqual(prev.item, next.item);

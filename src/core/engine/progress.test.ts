@@ -11,9 +11,8 @@ import {
   withRateLimitHint,
 } from './progress';
 
-// Contrato Kotlin ↔ frontend: payload de `yt-dlp-progress` que o card usa
-// para mostrar % e concluído. Se o Kotlin mudar o shape, este teste lembra
-// de atualizar o dedupe (foi assim que a 1.4.0 quebrou silenciosamente).
+// Contrato do payload `yt-dlp-progress`: se o emissor mudar o shape,
+// este teste lembra de atualizar o dedupe.
 describe('contrato de progresso (regressão v1.4.0)', () => {
   it('assinatura cobre todos os campos emitidos pelo Kotlin', () => {
     expect([...PROGRESS_EVENT_SIGNATURE_FIELDS].sort()).toEqual(

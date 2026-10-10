@@ -1,8 +1,5 @@
-// Transição pending→paid centralizada (webhook OU refresh do poll).
-// Extraído de server.mjs p/ ser testável (server.mjs escuta na importação).
-// Idempotente: 2º processamento do mesmo pagamento não minta de novo.
-// Preço/dias vêm do REGISTRO (congelados na criação): mudar PRICE/PLAN_DAYS
-// no env não quebra voos em curso. Dependências injetáveis p/ teste.
+// Transição pending→paid (webhook ou poll); idempotente e testável.
+// Preço/dias vêm do registro; deps injetáveis p/ teste.
 import { getPayment as defaultGetPayment } from './mp.mjs';
 import { mintKeyFor as defaultMint } from './mint.mjs';
 import { sendKeyEmail as defaultSend } from './email.mjs';
@@ -36,8 +33,7 @@ export async function settleCheckout(db, checkout, deps = {}) {
   checkout.status = 'paid';
   checkout.paidAt = new Date().toISOString();
   checkout.updatedAt = checkout.paidAt;
-  // Entrega automática: e-mail vai com a chave (WhatsApp cobre via poll no
-  // próprio aparelho). Falha aqui não quebra a venda (poll entrega).
+  // E-mail leva a chave; falha não quebra a venda (poll entrega).
   if (/@/.test(checkout.email || '')) {
     const r = await sendKeyEmail({ to: checkout.email, key: checkout.key, days });
     checkout.emailSent = r.sent;

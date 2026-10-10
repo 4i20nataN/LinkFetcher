@@ -1,8 +1,5 @@
-// Fonte canônica do plugin Android: `src-tauri/android-plugin/*.kt`.
-// Copia para `gen/.../app/` (o `android init` do Tauri apaga customização
-// manual de lá — edite o canônico, nunca o `gen/`).
-// Uso: `npm run android:sync` (aplica) / `--check` (CI: falha se o gen/
-// estiver dessincronizado).
+// Espelha src-tauri/android-plugin/*.kt em gen/... (edite o canônico).
+// Uso: `npm run android:sync` / `--check` (CI falha se dessincronizar).
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

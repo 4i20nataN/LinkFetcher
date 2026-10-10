@@ -1,4 +1,4 @@
-// Caixa de entrada do link + faixa de plataformas (extraída do LinkAnalyzer).
+// Entrada do link + faixa de plataformas.
 import { useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useTranslation } from '../../core/i18n';
@@ -56,7 +56,6 @@ export function AnalyzeForm({ url, setUrl, loading, onPaste, onSubmit, onClear }
 
   return (
     <>
-      {/* Supported platforms strip */}
       <div
         className="slider-container"
         onMouseEnter={(e) => {

@@ -1,6 +1,4 @@
-// Widgets compartilhados das seções do seletor de formato
-// (extraídos do FormatSelector). Auto-suficientes: leem settings via
-// contexto em vez de receber por props.
+// Widgets das seções do seletor (leem settings via contexto).
 import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../../context/AppContext';
 import { useTranslation } from '../../../core/i18n';
@@ -15,9 +13,7 @@ import { ChevronDown, X } from 'lucide-react';
 import { SUB_LANGS } from './formatData';
 import { formatTime, parseTimeInput } from './formatUtils';
 
-// Modal flutuante de idiomas do probe: busca + clique escolhe (define
-// `subLangs`; clicar no já escolhido limpa). Escopo de arquivo para não
-// remontar a cada render do seletor (preserva o texto da busca).
+// Modal de idiomas em escopo de arquivo (preserva a busca entre renders).
 export function SubsPickerModal({ manual, auto, selected, onPick, onClose }: {
   manual: string[];
   auto: string[];
@@ -331,8 +327,6 @@ export const AccordionSection = React.memo<AccordionSectionProps>(({ title, bloc
 ));
 AccordionSection.displayName = 'AccordionSection';
 
-// Primitivos das seções (extraídos do corpo do FormatSelector, onde eram
-// closures recriadas a cada render). `settings` vem do contexto.
 export const Btn: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode; className?: string; disabled?: boolean }> = ({ active, onClick, children, className = '', disabled = false }) => {
   const baseClasses = 'lf-opt relative !overflow-visible rounded-xl px-3 py-1.5 fs-sm font-bold transition-all text-center cursor-pointer';
   const stateClasses = active ? 'z-10 active' : 'z-0';

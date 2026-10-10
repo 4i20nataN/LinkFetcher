@@ -1,4 +1,4 @@
-// Modal de preview do comando yt-dlp (extraído do DownloadManager).
+// Preview do comando yt-dlp.
 import { createPortal } from 'react-dom';
 import { DownloadItem, type AppSettings } from '../../../types';
 import { buildArgsPreview } from '../../../core/ytdlp/buildArgsPreview';
@@ -15,8 +15,7 @@ export interface CommandPreviewProps {
 }
 
 export function CommandPreview({ item: commandPreview, settings, onClose, showToast }: CommandPreviewProps) {
-  // Portal no body (mesmo motivo do DeleteConfirm): `fixed` sob ancestral
-  // animado ancora no meio da lista.
+  // Portal no body: ancestral animado sequestra o `fixed`.
   return createPortal((
     <AnimatedCard
       variant={fadeIn}

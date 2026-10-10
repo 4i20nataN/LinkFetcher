@@ -46,9 +46,7 @@ export function getThemeLogo(settings: { themeMode: string }): string {
   return THEME_LOGOS[settings.themeMode] ?? THEME_LOGOS.dark;
 }
 
-// Fundo chapado do perfil efficient: bitmap fullscreen de ~1MB repintado a
-// cada frame de scroll no raster por software. Cor sólida + glow estático
-// (abaixo) preservam a identidade com custo de paint mínimo.
+// Perfil efficient: cor sólida + glow estático (bitmap trava o raster).
 const EFFICIENT_FLAT_BG: Record<string, string> = {
   light: '#f4f0e6',
   dark: '#0a0c12',
@@ -84,7 +82,6 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
           style={{ backgroundColor: EFFICIENT_FLAT_BG[settings.themeMode] ?? EFFICIENT_FLAT_BG.dark }}
         />
       ) : (
-        /* Background estático de altíssima performance — zero consumo de CPU/GPU */
         <div
           className="absolute inset-0 z-[0] pointer-events-none bg-cover bg-center bg-no-repeat transition-all duration-500"
           style={{
@@ -93,10 +90,7 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
         />
       )}
 
-      {/* Ambient glow — colored radials behind glass elements (reference: bg-glow-container).
-          Efficient profile: same gradients, static (no blur filter, no bgmove
-          animation). A full-screen blur(120px) repainted every frame pins a CPU
-          core on software-rendered webviews; static is visually identical at rest. */}
+      {/* Glow estático no efficient (blur animado trava o raster). */}
       {(settings.themeMode !== 'light' && settings.themeMode !== 'white') && (
         <div className="absolute inset-0 z-[1] pointer-events-none overflow-hidden">
           <div
@@ -119,7 +113,6 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
         </div>
       )}
 
-      {/* Content wrapper */}
       <div className="relative h-full z-[2]">
         {children}
       </div>
@@ -127,7 +120,7 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-// Global Helper to return background class for active accent
+// Fundo do accent ativo.
 export function getAccentBgClass(settings: { accentColor: string }) {
   switch (settings.accentColor) {
     case 'emerald': return 'bg-emerald-500 hover:bg-emerald-600';
@@ -149,7 +142,7 @@ export function getAccentBgClass(settings: { accentColor: string }) {
   }
 }
 
-// Global Helper to return text class for active accent
+// Texto do accent ativo.
 export function getAccentTextClass(settings: { accentColor: string }) {
   switch (settings.accentColor) {
     case 'emerald': return 'text-emerald-500';
@@ -171,7 +164,7 @@ export function getAccentTextClass(settings: { accentColor: string }) {
   }
 }
 
-// Global Helper to return border class for active accent
+// Borda do accent ativo.
 export function getAccentBorderClass(settings: { accentColor: string }) {
   switch (settings.accentColor) {
     case 'emerald': return 'border-emerald-500';
@@ -193,7 +186,7 @@ export function getAccentBorderClass(settings: { accentColor: string }) {
   }
 }
 
-// Global Helper to return ring class for active accent
+// Anel do accent ativo.
 export function getAccentRingClass(settings: { accentColor: string }) {
   switch (settings.accentColor) {
     case 'emerald': return 'focus:ring-emerald-500/30';
@@ -215,9 +208,9 @@ export function getAccentRingClass(settings: { accentColor: string }) {
   }
 }
 
-// Global Helper to return text color class for active accent background (white or dark)
+// Texto sobre o fundo do accent.
 export function getAccentTextOnBgClass(settings: { accentColor: string }) {
-  // Colors where 500 shade is too light for white text
+  // Tons 500 claros usam texto escuro.
   const darkTextColors = ['amber', 'lime', 'slate'];
   return darkTextColors.includes(settings.accentColor) ? 'text-zinc-900' : 'text-white';
 }

@@ -4,7 +4,6 @@ import { probeUrlWithAdapter, probePlaylistWithAdapter } from '../ytdlp/YtDlpAda
 import { PLATFORM_REGISTRY, matchPlatformForUrl, type PlatformConfig } from './platformConfigs';
 import { YtDlpProvider } from './YtDlpProvider';
 
-// Helper to generate a random number within a range
 const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 async function probeWithYtdlp(url: string, options?: { proxy?: string }): Promise<Record<string, unknown>> {
@@ -16,7 +15,7 @@ function resolveFormatSize(f: Record<string, unknown>, totalDuration: number): {
   const approx = (f.filesize_approx as number) || 0;
   let bytes = raw || approx;
 
-  // Fallback: compute from total bitrate (tbr, in kbps) * duration
+  // Sem tamanho: estima via bitrate total × duração.
   if (!bytes && totalDuration > 0) {
     const tbr = (f.tbr as number) || 0;
     if (tbr > 0) {
@@ -36,8 +35,7 @@ function resolveFormatSize(f: Record<string, unknown>, totalDuration: number): {
 
 function buildMediaInfoFromProbe(metadata: Record<string, unknown>, url: string, platform: PlatformId): MediaInfo {
   const totalDuration = (metadata.duration as number) || 0;
-  // Idiomas de legenda do probe (`subtitles` = manuais,
-  // `automatic_captions` = geradas). Chaves ordenadas, minúsculas.
+  // Legendas do probe: manuais (`subtitles`) + geradas (`automatic_captions`).
   const probeSubLangs = (v: unknown): string[] => {
     if (!v || typeof v !== 'object') return [];
     return Object.keys(v as Record<string, unknown>)
@@ -51,12 +49,7 @@ function buildMediaInfoFromProbe(metadata: Record<string, unknown>, url: string,
       const formatNote = ((f.format_note as string) || '').toLowerCase();
       const vcodec = (f.vcodec as string) || 'none';
       const acodec = (f.acodec as string) || 'none';
-      // Exclude storyboards (YouTube's scrubber-preview thumbnail sprites, ext
-      // "mhtml") and any other format that carries neither video nor audio —
-      // these aren't real downloadable media, but nothing filtered them out
-      // before, so a storyboard entry sorting first in the array (formats[0]
-      // is used as the default selection) would make the app try to download
-      // it instead of the actual video.
+      // Filtra storyboards/mídia vazia: senão viram a seleção padrão (formats[0]).
       if (ext === 'mhtml' || formatNote === 'storyboard') return false;
       if (vcodec === 'none' && acodec === 'none') return false;
       return true;
@@ -108,7 +101,7 @@ function buildMediaInfoFromProbe(metadata: Record<string, unknown>, url: string,
   };
 }
 
-// Direct File Provider (Images, Audio, Video files) - Genuinely unique logic
+// Provider de arquivo direto (imagem/áudio/vídeo por extensão ou host).
 export class DirectFileProvider implements MediaProvider {
   id: PlatformId = 'generic';
   name = 'Arquivo Direto';
@@ -281,7 +274,7 @@ export class DirectFileProvider implements MediaProvider {
   }
 }
 
-// Fallback Provider for unmatched links - Genuinely unique logic
+// Fallback: tenta yt-dlp e gera item genérico se falhar.
 export class GenericProvider implements MediaProvider {
   id: PlatformId = 'generic';
   name = 'Link Web Genérico';
@@ -296,12 +289,12 @@ export class GenericProvider implements MediaProvider {
       || url.toLowerCase().includes('image') || url.toLowerCase().includes('photo')
       || url.toLowerCase().includes('pic') || url.startsWith('data:image/');
 
-    // Skip yt-dlp for direct image URLs — it doesn't handle them
+    // yt-dlp não lida com imagem direta: pula o probe.
     if (!isImage) {
       try {
         const metadata = await probeWithYtdlp(url);
         return buildMediaInfoFromProbe(metadata, url, 'generic');
-      } catch { /* fall through to fallback */ }
+      } catch {}
     }
 
     const domains = ['youtube', 'tiktok', 'instagram', 'facebook', 'x', 'reddit', 'soundcloud', 'spotify', 'twitch', 'pinterest', 'threads', 'vimeo'];
@@ -330,13 +323,11 @@ export class GenericProvider implements MediaProvider {
       codec = 'Imagem';
       thumbnailUrl = url.startsWith('data:') ? url : '';
 
-      // Detect real resolution via Image element
       try {
         await new Promise<void>((resolve) => {
           const img = new Image();
           img.onload = () => {
             resolution = `${img.naturalWidth}\u00d7${img.naturalHeight}`;
-            // Use actual image as thumbnail if we got it
             if (!thumbnailUrl) thumbnailUrl = url;
             resolve();
           };
@@ -411,7 +402,6 @@ export class GenericProvider implements MediaProvider {
   }
 }
 
-// Registry Manager - Now uses data-driven architecture
 export class ProviderRegistry {
   private static providers: MediaProvider[] = [
     new DirectFileProvider(),
@@ -449,17 +439,13 @@ export class ProviderRegistry {
   }
 }
 
-/**
- * Probe a playlist URL and return structured PlaylistInfo with items.
- * Used by LinkAnalyzer to display playlist preview before download.
- */
+/** Sonda a playlist e devolve o preview estruturado. */
 export async function probePlaylistFull(
   url: string,
   options?: { proxy?: string }
 ): Promise<PlaylistInfo> {
   const result = await probePlaylistWithAdapter({ url, ...options });
 
-  // Detect platform from URL using provider registry
   const provider = ProviderRegistry.getProviderForUrl(url);
   const platform = (provider as any).platform as PlatformId || 'generic';
 

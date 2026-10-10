@@ -1,6 +1,5 @@
-// Persistência mínima: um JSON com escrita atômica (tmp + rename).
-// Volume baixo (vendas/dia) — quando crescer, trocar por SQLite/Postgres
-// mantendo a mesma interface (loadAll/saveAll).
+// Checkouts em JSON com escrita atômica (tmp+rename).
+// Mantém a interface (loadAll/saveAll) se migrar p/ SQLite.
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 
@@ -24,11 +23,8 @@ export function saveAll(db) {
   renameSync(tmp, FILE);
 }
 
-// Mutex em memória p/ seções loadAll→saveAll: sem ele, dois webhooks/polls
-// concorrentes intercalam nos awaits intermediários e um saveAll apaga o
-// outro (venda liquidada volta a pending / chave mintada se perde). Node é
-// single-thread, então fila de promises basta. Vale p/ 1 réplica — com
-// horizontal, externalizar o lock (ou um checkout por arquivo).
+// Mutex em memória p/ loadAll→saveAll (fila de promises; 1 réplica).
+// Com réplicas, externalizar o lock.
 let tail = Promise.resolve();
 export function withStoreLock(fn) {
   const task = tail.then(fn, fn);

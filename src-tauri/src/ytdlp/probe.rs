@@ -10,8 +10,7 @@ pub struct ProbeOptions {
     pub proxy: Option<String>,
 }
 
-/// Probe no Android: encaminha ao yt-dlp embarcado (Kotlin). Retorna o
-/// dump-json completo, igual ao desktop.
+/// Probe no Android via yt-dlp embarcado.
 #[cfg(target_os = "android")]
 #[tauri::command]
 pub async fn ytdlp_probe(
@@ -40,8 +39,7 @@ fn common_auth(args: &mut Vec<String>, proxy: &Option<String>) {
     }
 }
 
-/// probeUrl — YtDlpProbe.ts:27-42. Retorna o JSON bruto; Providers.ts parseia no renderer.
-/// `--no-playlist`: paridade com o Kotlin no Android (vídeo único, sem expandir playlist).
+/// Retorna o JSON bruto; `--no-playlist` mantém paridade com o Android.
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub async fn ytdlp_probe(
@@ -66,7 +64,7 @@ pub struct PlaylistResult {
     pub title: Option<String>,
 }
 
-/// probePlaylist no Android: NDJSON parseado no Kotlin, mesmo formato.
+/// Playlist no Android via Kotlin, mesmo formato.
 #[cfg(target_os = "android")]
 #[tauri::command]
 pub async fn ytdlp_probe_playlist(
@@ -76,8 +74,7 @@ pub async fn ytdlp_probe_playlist(
     crate::mobile_ytdlp::call_mobile(&app, "probePlaylist", &options).await
 }
 
-/// probePlaylist — YtDlpProbe.ts:52-94, mesma regra NDJSON
-/// (linha playlist: `_type == "playlist"` ou tem `playlist_count`).
+/// Playlist em NDJSON (linha playlist tem `_type == "playlist"` ou `playlist_count`).
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub async fn ytdlp_probe_playlist(
