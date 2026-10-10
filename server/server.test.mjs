@@ -42,13 +42,65 @@ describe('webhook', () => {
 
 describe('settle (valor exato + idempotência)', () => {
   it('só aprova approved + R$ exatos em BRL e não minta 2x', async () => {
-    // Dublês: injeta fetch fake no mp.mjs via cache de módulo é inviável sem
-    // DI — então testa-se a regra pura aqui (a fiação usa settleCheckout).
-    const PRICE = 9.99;
-    const amountOk = (v, cur) => Math.abs(Number(v) - PRICE) < 0.005 && cur === 'BRL';
-    assert.equal(amountOk(9.99, 'BRL'), true);
-    assert.equal(amountOk(9.9, 'BRL'), false); // centavo a menos = recusado
-    assert.equal(amountOk(9.99, 'USD'), false);
+    const { settleCheckout } = await import('./settle.mjs');
+    let mints = 0;
+    let mailed = null;
+    const deps = {
+      getPayment: async () => ({ status: 'approved', transaction_amount: 9.99, currency_id: 'BRL' }),
+      mintKeyFor: async () => { mints++; return 'LF1-TESTE'; },
+      sendKeyEmail: async (m) => { mailed = m; return { sent: true }; },
+    };
+    const mk = (over = {}) => ({
+      mpId: 'pay_1', email: 'a@b.com', contactName: 'cli',
+      price: 9.99, days: 30, status: 'pending', ...over,
+    });
+    const c1 = mk();
+    await settleCheckout({}, c1, deps);
+    assert.equal(c1.status, 'paid');
+    assert.equal(c1.key, 'LF1-TESTE');
+    assert.equal(mints, 1);
+    assert.equal(mailed.to, 'a@b.com');
+    await settleCheckout({}, c1, deps); // 2º processamento: no-op
+    assert.equal(mints, 1);
+  });
+
+  it('recusa centavo a menos, outra moeda e rejeitado', async () => {
+    const { settleCheckout } = await import('./settle.mjs');
+    const withAmount = (a, cur = 'BRL', st = 'approved') => ({
+      getPayment: async () => ({ status: st, transaction_amount: a, currency_id: cur }),
+      mintKeyFor: async () => { throw new Error('não devia mintar'); },
+      sendKeyEmail: async () => ({ sent: false }),
+    });
+    const mk = () => ({ mpId: 'p', email: 'a@b.com', price: 9.99, days: 30, status: 'pending' });
+    const c1 = mk();
+    await settleCheckout({}, c1, withAmount(9.9));
+    assert.equal(c1.status, 'amount_mismatch');
+    const c2 = mk();
+    await settleCheckout({}, c2, withAmount(9.99, 'USD'));
+    assert.equal(c2.status, 'amount_mismatch');
+    const c3 = mk();
+    await settleCheckout({}, c3, withAmount(9.99, 'BRL', 'rejected'));
+    assert.equal(c3.status, 'rejected');
+  });
+
+  it('honra o preço gravado no checkout (troca de PRICE não quebra voo)', async () => {
+    const { settleCheckout } = await import('./settle.mjs');
+    process.env.PRICE = '19.99'; // mudou depois da criação
+    try {
+      let minted = false;
+      const c = {
+        mpId: 'p', email: 'a@b.com', price: 9.99, days: 30, status: 'pending',
+      };
+      await settleCheckout({}, c, {
+        getPayment: async () => ({ status: 'approved', transaction_amount: 9.99, currency_id: 'BRL' }),
+        mintKeyFor: async () => { minted = true; return 'LF1-X'; },
+        sendKeyEmail: async () => ({ sent: false }),
+      });
+      assert.equal(c.status, 'paid');
+      assert.equal(minted, true);
+    } finally {
+      delete process.env.PRICE;
+    }
   });
 });
 

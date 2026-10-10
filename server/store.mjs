@@ -23,3 +23,15 @@ export function saveAll(db) {
   writeFileSync(tmp, JSON.stringify(db));
   renameSync(tmp, FILE);
 }
+
+// Mutex em memória p/ seções loadAll→saveAll: sem ele, dois webhooks/polls
+// concorrentes intercalam nos awaits intermediários e um saveAll apaga o
+// outro (venda liquidada volta a pending / chave mintada se perde). Node é
+// single-thread, então fila de promises basta. Vale p/ 1 réplica — com
+// horizontal, externalizar o lock (ou um checkout por arquivo).
+let tail = Promise.resolve();
+export function withStoreLock(fn) {
+  const task = tail.then(fn, fn);
+  tail = task.catch(() => {});
+  return task;
+}

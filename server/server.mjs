@@ -14,11 +14,10 @@
 // Segredos SÓ via env (nunca no repo): ver .env.example.
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { createPixPayment, getPayment } from './mp.mjs';
+import { createPixPayment } from './mp.mjs';
 import { verifySignature, extractPaymentId } from './webhook.mjs';
-import { mintKeyFor } from './mint.mjs';
-import { sendKeyEmail } from './email.mjs';
-import { loadAll, saveAll } from './store.mjs';
+import { loadAll, saveAll, withStoreLock } from './store.mjs';
+import { settleCheckout } from './settle.mjs';
 
 const PORT = Number(process.env.PORT || 8787);
 const PRICE = Number(process.env.PRICE || '9.99');
@@ -45,36 +44,6 @@ function rateOk(ip) {
   arr.push(now);
   hits.set(ip, arr);
   return arr.length <= 20;
-}
-
-// Transição pending→paid centralizada (webhook OU refresh do poll).
-// Idempotente: 2º processamento do mesmo pagamento não minta de novo.
-async function settleCheckout(db, checkout) {
-  if (checkout.status === 'paid' && checkout.key) return checkout;
-  const pay = await getPayment(checkout.mpId);
-  if (!pay || pay.status !== 'approved') {
-    checkout.status = pay?.status === 'rejected' || pay?.status === 'cancelled' ? pay.status : 'pending';
-    checkout.updatedAt = new Date().toISOString();
-    return checkout;
-  }
-  // Valor exato exigido: transação tem que ser R$ PRICE em BRL.
-  const amountOk = Math.abs(Number(pay.transaction_amount) - PRICE) < 0.005 && pay.currency_id === 'BRL';
-  if (!amountOk) {
-    checkout.status = 'amount_mismatch';
-    checkout.updatedAt = new Date().toISOString();
-    return checkout;
-  }
-  checkout.key = await mintKeyFor(checkout.contactName || checkout.email, PLAN_DAYS);
-  checkout.status = 'paid';
-  checkout.paidAt = new Date().toISOString();
-  checkout.updatedAt = checkout.paidAt;
-  // Entrega automática: e-mail vai com a chave (WhatsApp cobre via poll no
-  // próprio aparelho). Falha aqui não quebra a venda (poll entrega).
-  if (/@/.test(checkout.email || '')) {
-    const r = await sendKeyEmail({ to: checkout.email, key: checkout.key, days: PLAN_DAYS });
-    checkout.emailSent = r.sent;
-  }
-  return checkout;
 }
 
 const server = createServer(async (req, res) => {
@@ -124,21 +93,25 @@ const server = createServer(async (req, res) => {
     // ---- Poll da chave (só entrega p/ o contato da compra) ----
     const keyMatch = url.pathname.match(/^\/api\/key\/([A-Za-z0-9-]+)$/);
     if (req.method === 'GET' && keyMatch) {
-      const db = loadAll();
-      const checkout = db.checkouts[keyMatch[1]];
-      if (!checkout) return json(res, 404, { error: 'not-found' });
-      const who = String(url.searchParams.get('contact') || '').trim().toLowerCase();
-      const same = who && (who === String(checkout.email).toLowerCase()
-        || who === String(checkout.contactName).toLowerCase());
-      // Fallback anti-webhook-perdido: revalida no MP a cada 45s.
-      if (checkout.status === 'pending' && Date.now() - (checkout.lastMpCheck || 0) > 45_000) {
-        checkout.lastMpCheck = Date.now();
-        await settleCheckout(db, checkout);
-        saveAll(db);
-      }
-      if (checkout.status !== 'paid') return json(res, 200, { status: checkout.status });
-      if (!same) return json(res, 403, { error: 'contact-mismatch' });
-      return json(res, 200, { status: 'paid', key: checkout.key });
+      // Lock: o refresh revalida no MP (await) antes de salvar.
+      const out = await withStoreLock(async () => {
+        const db = loadAll();
+        const checkout = db.checkouts[keyMatch[1]];
+        if (!checkout) return { code: 404, body: { error: 'not-found' } };
+        const who = String(url.searchParams.get('contact') || '').trim().toLowerCase();
+        const same = who && (who === String(checkout.email).toLowerCase()
+          || who === String(checkout.contactName).toLowerCase());
+        // Fallback anti-webhook-perdido: revalida no MP a cada 45s.
+        if (checkout.status === 'pending' && Date.now() - (checkout.lastMpCheck || 0) > 45_000) {
+          checkout.lastMpCheck = Date.now();
+          await settleCheckout(db, checkout);
+          saveAll(db);
+        }
+        if (checkout.status !== 'paid') return { code: 200, body: { status: checkout.status } };
+        if (!same) return { code: 403, body: { error: 'contact-mismatch' } };
+        return { code: 200, body: { status: 'paid', key: checkout.key } };
+      });
+      return json(res, out.code, out.body);
     }
 
     // ---- Webhook do Mercado Pago ----
@@ -157,13 +130,18 @@ const server = createServer(async (req, res) => {
       })) {
         return json(res, 401, { error: 'bad-signature' });
       }
-      const db = loadAll();
-      const checkout = Object.values(db.checkouts).find(c => String(c.mpId) === String(paymentId));
-      if (!checkout) return json(res, 200, { ok: true, unknown: true }); // ack p/ não reter fila
-      checkout.lastMpCheck = Date.now();
-      await settleCheckout(db, checkout);
-      saveAll(db);
-      return json(res, 200, { ok: true, status: checkout.status });
+      // Lock: settle faz rede antes de salvar; sem ele, dois webhooks
+      // concorrentes e um saveAll apaga o outro.
+      const out = await withStoreLock(async () => {
+        const db = loadAll();
+        const checkout = Object.values(db.checkouts).find(c => String(c.mpId) === String(paymentId));
+        if (!checkout) return { ok: true, unknown: true }; // ack p/ não reter fila
+        checkout.lastMpCheck = Date.now();
+        await settleCheckout(db, checkout);
+        saveAll(db);
+        return { ok: true, status: checkout.status };
+      });
+      return json(res, 200, out);
     }
 
     return json(res, 404, { error: 'not-found' });

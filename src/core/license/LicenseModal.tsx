@@ -89,12 +89,25 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
   };
 
   // Poll da chave: pago → verifica assinatura → salva → fecha sozinho.
+  // Para em estados terminais (pago, rejeitado, cancelado, divergente,
+  // expirado): sem isso pesquisava a cada 5s para sempre, mesmo após os
+  // 35min do Pix, e falhas ficavam no "Aguardando…" mudo.
   useEffect(() => {
     if (view !== 'auto' || !autoCheckout) return;
+    const terminalMsg: Record<string, string> = {
+      rejected: isEn ? 'Payment rejected. Cancel and generate another Pix.' : 'Pagamento rejeitado. Cancele e gere outro Pix.',
+      cancelled: isEn ? 'Payment cancelled. Cancel and generate another Pix.' : 'Pagamento cancelado. Cancele e gere outro Pix.',
+      amount_mismatch: isEn ? 'Amount mismatch — contact support.' : 'Valor divergente — fale com o suporte.',
+    };
     let alive = true;
     const email = autoEmail.trim().toLowerCase();
     const t = setInterval(async () => {
       try {
+        if (Date.now() > autoCheckout.expiresAt) {
+          clearInterval(t);
+          if (alive) setAutoError(isEn ? 'Pix expired. Cancel and generate another.' : 'Pix expirado. Cancele e gere outro.');
+          return;
+        }
         const r = await fetchAutoKey(autoCheckout.checkoutId, email);
         if (!alive) return;
         if (r.status === 'paid' && r.key) {
@@ -110,6 +123,12 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
           } else {
             setAutoError(isEn ? 'Invalid key from server.' : 'Chave inválida do servidor.');
           }
+          return;
+        }
+        const msg = terminalMsg[r.status];
+        if (msg) {
+          clearInterval(t);
+          if (alive) setAutoError(msg);
         }
       } catch { /* próximo tick tenta */ }
     }, 5000);
