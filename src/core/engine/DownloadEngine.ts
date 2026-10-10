@@ -76,6 +76,84 @@ class DownloadEngineClass {
 
   constructor() {
     this.loadState();
+    this.reconcileUnfinished().catch(() => {});
+  }
+
+  // Cura pós-kill: pausado/fila com arquivo final em disco vira concluído
+  // sem baixar de novo. Fora: pós-processamento ffmpeg (corte, extração,
+  // merge, embed, SponsorBlock, filtros) — ali um parcial existiria como
+  // "completo", então esses retomam o download normal.
+  private hasPostProcessing(item: DownloadItem): boolean {
+    if (item.audioOnly || item.mergeOutputFormat) return true;
+    if (item.embedThumbnail || item.embedSubs || item.embedMetadata) return true;
+    if (item.downloadSections) return true;
+    if (item.sponsorblockRemove) return true;
+    if (item.normalizeAudio) return true;
+    if (item.videoSharpen && item.videoSharpen !== 'none') return true;
+    return false;
+  }
+
+  private markHealed(id: string, path: string, size: number): boolean {
+    const live = this.items.find(i => i.id === id);
+    if (!live || !['paused', 'queued', 'downloading'].includes(live.status)) return false;
+    live.status = 'completed';
+    live.progress = 100;
+    live.processing = false;
+    live.speed = 0;
+    live.eta = 0;
+    live.activity = undefined;
+    // Fallback pode eleger o final renomeado (merge trocou o container):
+    // persiste o eleito p/ abrir pasta/stats usarem o caminho real.
+    live.filePath = path;
+    live.sizeDownloaded = size;
+    live.sizeTotal = Math.max(live.sizeTotal || 0, size);
+    live.finishedAt = new Date().toISOString();
+    this.touch(live.id);
+    this.notify(true);
+    return true;
+  }
+
+  private async completeFromDiskIfPresent(item: DownloadItem): Promise<boolean> {
+    if (!item.filePath) return false;
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const st = await invoke<{ exists: boolean; size: number }>('fs_file_stat', { path: item.filePath });
+      if (st?.exists && st.size > 0) {
+        // Caminho exato: só cura sem pós-processamento — ali um parcial
+        // (merge/recode interrompido) existiria como "completo".
+        if (this.hasPostProcessing(item)) return false;
+        return this.markHealed(item.id, item.filePath, st.size);
+      }
+      // Fallback: `destination` obsoleto (merge trocou o container, retry
+      // renomeou). Elege o final pelo mesmo radical no diretório.
+      const el = await invoke<{ path: string; size: number; hasPart: boolean } | null>(
+        'fs_elect_finished', { hintPath: item.filePath });
+      if (!el?.path || !(el.size > 0) || el.hasPart) return false;
+      if (this.hasPostProcessing(item)) {
+        // Pós-processado: só com prova positiva (tamanho >= total conhecido)
+        // e sem parcial em voo. Recorte entrega arquivo MENOR que o total —
+        // nunca cura aqui, retoma o download normal.
+        const live = this.items.find(i => i.id === item.id);
+        if (!live || !(live.sizeTotal > 0) || el.size < live.sizeTotal) return false;
+      }
+      return this.markHealed(item.id, el.path, el.size);
+    } catch {
+      return false;
+    }
+  }
+
+  // Boot: itens que o kill interrompeu com arquivo pronto já abrem verdes.
+  // Serial e best-effort; quem falhar aqui cura no resume (startDownload).
+  // Pública p/ o botão de verificação da lista (retorna quantos curou).
+  async reconcileUnfinished(): Promise<number> {
+    const cands = this.items.filter(i =>
+      (i.status === 'paused' || i.status === 'queued') && !!i.filePath);
+    let healed = 0;
+    for (const c of cands) {
+      if (await this.completeFromDiskIfPresent(c)) healed++;
+    }
+    this.processQueue();
+    return healed;
   }
 
   setSettings(newSettings: AppSettings) {
@@ -167,6 +245,7 @@ class DownloadEngineClass {
     const newBase = familyBaseOf(formatOptions?.customFilename);
     const sameCount = this.items.filter(item =>
       item.url === media.originalUrl
+      && (item.playlistName || '') === (formatOptions?.playlistName || '')
       && outContainerOf(item.audioOnly, item.audioFormat, item.mergeOutputFormat, item.format.ext) === newContainer
       && familyBaseOf(item.customFilename) === newBase
     ).length;
@@ -216,6 +295,7 @@ class DownloadEngineClass {
       bandLimit: formatOptions?.bandLimit,
       videoCodec: formatOptions?.videoCodec,
       customFilename,
+      playlistName: formatOptions?.playlistName,
       normalizeAudio: formatOptions?.normalizeAudio,
       videoSharpen: formatOptions?.videoSharpen,
       imageSource: (format.type === 'image' && /\.(jpe?g|png|gif|webp|bmp|tiff?|svg|heic|avif)(\?|$)/i.test(media.originalUrl))
@@ -478,12 +558,16 @@ class DownloadEngineClass {
 
     // Desktop Tauri é o único transporte (web/mobile removidos).
     const isTauri = typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window);
-    if (!isTauri) {
-      const live = this.items.find(i => i.id === item.id) ?? item;
+    if (!isTauri) {      const live = this.items.find(i => i.id === item.id) ?? item;
       live.status = 'failed';
       live.error = 'Download disponível apenas no app desktop';
       this.touch(live.id);
       this.notify();
+      return;
+    }
+    // Arquivo final já em disco (kill após renomear): conclui sem spawn.
+    if (await this.completeFromDiskIfPresent(item)) {
+      this.processQueue();
       return;
     }
     await this.startTauriDownload(item);
@@ -570,6 +654,14 @@ class DownloadEngineClass {
             live.activity = formatActivityMessage(data, this.settings.language);
             this.touch(live.id);
             this.notify(false);
+          }
+        } else if (data.type === 'destination' && typeof data.path === 'string' && data.path) {
+          // Caminho final conhecido cedo: persiste p/ reconciliar após kill.
+          const live = this.items.find(i => i.id === item.id);
+          if (live && ['downloading', 'queued', 'paused'].includes(live.status)) {
+            live.filePath = data.path;
+            this.touch(live.id);
+            this.notify(true);
           }
         } else if (data.type === 'complete' || data.type === 'error') {
           finish();

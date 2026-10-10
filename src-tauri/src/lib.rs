@@ -1,6 +1,12 @@
 // No Android o backend desktop é desligado por cfg; o allow cobre dead_code só nesse target.
 #![cfg_attr(target_os = "android", allow(dead_code))]
 
+// Allocator global só no desktop: mesma ABI, nenhum comportamento muda.
+// No Android mantém o allocator padrão (evita risco no mobile).
+#[cfg(not(target_os = "android"))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 mod ytdlp;
 mod fs;
 #[cfg(target_os = "android")]
@@ -50,10 +56,12 @@ pub fn run() {
       fs::ytdlp_job_state,
       fs::ytdlp_job_progress,
       fs::fs_get_downloads_path,
+      fs::fs_file_stat,
       fs::fs_open_path,
       fs::fs_select_folder,
       fs::fs_save_description,
       fs::fs_fetch_cover,
+      fs::fs_elect_finished,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

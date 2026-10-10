@@ -66,6 +66,17 @@ fn forget_download_paths(id: &str) -> Option<Vec<String>> {
     LAST_PATHS.lock().unwrap().remove(id)
 }
 
+/// Stat best-effort p/ reconciliação (arquivo final em disco após kill).
+/// Só leitura; nunca falha (ausente = exists:false).
+#[tauri::command]
+pub fn fs_file_stat(path: String) -> Result<serde_json::Value, String> {
+    let p = path.trim().trim_matches(|c| c == '\'' || c == '"');
+    match std::fs::metadata(p) {
+        Ok(m) => Ok(serde_json::json!({ "exists": m.is_file(), "size": m.len() })),
+        Err(_) => Ok(serde_json::json!({ "exists": false, "size": 0 })),
+    }
+}
+
 /// Diretório de downloads do SO.
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
@@ -824,11 +835,20 @@ pub async fn ytdlp_download(
         } else if let Some(dest) = parse_destination(trimmed) {
             eprintln!("[ytdlp_download] captured destination: {}", dest);
             remember_download_path(&download_id, &dest);
-            captured_filepath = Some(dest);
+            captured_filepath = Some(dest.clone());
+            // Frontend persiste na hora: kill depois daqui ainda reconcilia.
+            let _ = app.emit(
+                "yt-dlp-progress",
+                &serde_json::json!({ "id": download_id, "type": "destination", "path": dest }),
+            );
         } else if let Some(merged) = parse_merge(trimmed) {
             eprintln!("[ytdlp_download] captured merged file: {}", merged);
             remember_download_path(&download_id, &merged);
-            captured_filepath = Some(merged);
+            captured_filepath = Some(merged.clone());
+            let _ = app.emit(
+                "yt-dlp-progress",
+                &serde_json::json!({ "id": download_id, "type": "destination", "path": merged }),
+            );
             // Merge: sinaliza `processing` (fase silenciosa).
             let _ = app.emit(
                 "yt-dlp-progress",
@@ -1595,6 +1615,76 @@ pub fn latest_downloaded_file(output_dir: &Path) -> Option<String> {
     }
     latest.map(|(_,p)| p.to_string_lossy().into_owned())
 }
+
+/// Eleição do arquivo final p/ reconciliação (botão Verificar Lista + boot).
+/// O `destination` guardado no frontend pode estar obsoleto: merge trocou o
+/// container, retry renomeou com sufixo. Elege pelo mesmo radical no
+/// diretório do hint, ignorando temporários (.part, -Frag, .cuttmp…).
+/// Prefere mesmo radical (container trocado) a prefixo (sufixo de retry).
+/// `hasPart` acusa parcial em voo com o mesmo radical: com ele, nunca curar.
+/// Retorna null quando nada é elegível. Só leitura.
+#[tauri::command]
+pub fn fs_elect_finished(hint_path: String) -> Result<serde_json::Value, String> {
+    let hint = PathBuf::from(&hint_path);
+    let parent = match hint.parent() {
+        Some(p) => p.to_path_buf(),
+        None => return Ok(serde_json::Value::Null),
+    };
+    let stem = match hint.file_stem().and_then(|s| s.to_str()) {
+        Some(s) if !s.is_empty() => s.to_owned(),
+        _ => return Ok(serde_json::Value::Null),
+    };
+    let entries: Vec<PathBuf> = match std::fs::read_dir(&parent) {
+        Ok(r) => r.flatten().map(|e| e.path()).collect(),
+        Err(_) => return Ok(serde_json::Value::Null),
+    };
+    let mut best_same: Option<(SystemTime, PathBuf, u64)> = None;
+    let mut best_prefix: Option<(SystemTime, PathBuf, u64)> = None;
+    let mut has_part = false;
+    for e in &entries {
+        let name = match e.file_name().and_then(|s| s.to_str()) {
+            Some(n) => n.to_owned(),
+            None => continue,
+        };
+        let same_stem = e.file_stem().and_then(|s| s.to_str()) == Some(stem.as_str());
+        let prefix = name.starts_with(stem.as_str()) && name.len() > stem.len();
+        if is_temp_artifact_name(&name) {
+            if same_stem || prefix {
+                has_part = true;
+            }
+            continue;
+        }
+        let m = match e.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        if !m.is_file() || m.len() == 0 {
+            continue;
+        }
+        let t = match m.modified() {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        let slot = if same_stem {
+            &mut best_same
+        } else if prefix {
+            &mut best_prefix
+        } else {
+            continue;
+        };
+        if slot.as_ref().is_none_or(|(lt, _, _)| t > *lt) {
+            *slot = Some((t, e.clone(), m.len()));
+        }
+    }
+    match best_same.or(best_prefix) {
+        Some((_, p, size)) => Ok(serde_json::json!({
+            "path": p.to_string_lossy(),
+            "size": size,
+            "hasPart": has_part,
+        })),
+        None => Ok(serde_json::Value::Null),
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1794,6 +1884,46 @@ mod tests {
         std::fs::write(dir.join("other.mp4.part"), b"p").unwrap();
         let got = latest_downloaded_file(&dir).unwrap();
         assert!(got.ends_with("show.mp4"), "{got}");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn elect_finished_prefers_same_stem_over_prefix() {
+        let dir = unique_tmp_dir("elect");
+        // Mesmo radical, container trocado pelo merge (.mp4 → .mkv).
+        std::fs::write(dir.join("show.mkv"), b"merged").unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        // Retry com sufixo: mais novo, mas só vale se não houver mesmo radical.
+        std::fs::write(dir.join("show (1).mp4"), b"retry").unwrap();
+        let got = fs_elect_finished(dir.join("show.mp4").to_string_lossy().into_owned()).unwrap();
+        assert_eq!(got["path"].as_str().unwrap(), dir.join("show.mkv").to_string_lossy().as_ref());
+        assert_eq!(got["size"].as_u64().unwrap(), 6);
+        assert_eq!(got["hasPart"].as_bool().unwrap(), false);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn elect_finished_reports_part_and_ignores_temps() {
+        let dir = unique_tmp_dir("electpart");
+        std::fs::write(dir.join("show.mp4"), b"v").unwrap();
+        // .part mais novo com o mesmo radical: acusa parcial em voo.
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        std::fs::write(dir.join("show.mp4.part"), b"p").unwrap();
+        std::fs::write(dir.join("show.mp4-Frag3.part"), b"f").unwrap();
+        let got = fs_elect_finished(dir.join("show.webm").to_string_lossy().into_owned()).unwrap();
+        assert_eq!(got["path"].as_str().unwrap(), dir.join("show.mp4").to_string_lossy().as_ref());
+        assert_eq!(got["hasPart"].as_bool().unwrap(), true);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn elect_finished_returns_null_without_match() {
+        let dir = unique_tmp_dir("electnull");
+        std::fs::write(dir.join("other.mp4"), b"v").unwrap();
+        let got = fs_elect_finished(dir.join("show.mp4").to_string_lossy().into_owned()).unwrap();
+        assert!(got.is_null());
+        let got_empty = fs_elect_finished(String::new()).unwrap();
+        assert!(got_empty.is_null());
         std::fs::remove_dir_all(&dir).ok();
     }
 

@@ -47,7 +47,11 @@ export default defineConfig(() => {
       port: 1420,
       strictPort: true,
       hmr: process.env.DISABLE_HMR !== 'true',
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      watch: process.env.DISABLE_HMR === 'true' ? null : {
+        // gen/ (Android, 2,5 GB de intermediários) e target/ (build Rust)
+        // estouravam o limite de inotify (ENOSPC) no `tauri dev`.
+        ignored: ['**/src-tauri/gen/**', '**/src-tauri/target/**'],
+      },
     },
   };
 });

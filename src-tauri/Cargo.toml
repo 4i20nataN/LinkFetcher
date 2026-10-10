@@ -10,7 +10,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2.11", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "process", "signal", "fs", "io-util", "io-std", "sync", "time"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-webpki-roots", "stream"] }
 zip = "2"
 tar = "0.4"
@@ -21,6 +21,9 @@ sha2 = "0.10"
 # base64: transporte de bytes da capa via IPC (JSON não tem binário).
 base64 = "0.22"
 hex = "0.4"
+# mimalloc: allocator com menor fragmentação que o malloc padrão — reduz o
+# RSS/PSS residente sem tocar em nenhuma API ou comportamento.
+mimalloc = "0.1"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-process = "2"
