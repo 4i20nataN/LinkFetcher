@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { useTranslation } from '../../core/i18n';
 import { Shield, Database, Lock, Clock, ArrowLeft } from 'lucide-react';
 
-export function PrivacyPolicy() {
+export function PrivacyPolicy({ onBack }: { onBack?: () => void }) {
   const { setActiveTab, settings } = useApp();
   const { t } = useTranslation(settings);
   const version = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.2.1';
@@ -42,7 +42,7 @@ export function PrivacyPolicy() {
     <div className="min-h-screen flex flex-col items-center py-10 px-4 md:px-8 relative">
       <div className="w-full max-w-[1000px] mb-6">
         <button
-          onClick={() => setActiveTab('settings')}
+          onClick={() => (onBack ? onBack() : setActiveTab('settings'))}
           className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200
             ${isLight
               ? 'lf-text-secondary lf-border bg-white/40 hover:bg-white/70 hover:border-blue-300 hover:text-blue-600'

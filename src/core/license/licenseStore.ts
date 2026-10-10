@@ -9,6 +9,8 @@ export interface LicenseRecord {
   /** unix seconds; 0 = vitalícia */
   expiresAt: number;
   activatedAt: string;
+  /** contato informado na compra (e-mail ou WhatsApp); '' = não informado */
+  contact: string;
 }
 
 const LS_KEY = 'linkfetcher_license';

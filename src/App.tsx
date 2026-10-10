@@ -19,6 +19,7 @@ const FavoritesView = React.lazy(() => import('./features/favorites/FavoritesVie
 const DownloadLaterView = React.lazy(() => import('./features/later/DownloadLaterView').then(m => ({ default: m.DownloadLaterView })));
 const SettingsView = React.lazy(() => import('./features/settings/SettingsView').then(m => ({ default: m.SettingsView })));
 const PrivacyPolicy = React.lazy(() => import('./features/privacy/PrivacyPolicy').then(m => ({ default: m.PrivacyPolicy })));
+const AboutView = React.lazy(() => import('./features/about/AboutView').then(m => ({ default: m.AboutView })));
 const UpdateBanner = React.lazy(() => import('./features/update/UpdateBanner').then(m => ({ default: m.default })));
 const BinarySetupOverlay = React.lazy(() => import('./features/setup/BinarySetupOverlay').then(m => ({ default: m.BinarySetupOverlay })));
 
@@ -98,6 +99,7 @@ function DashboardContent() {
     later: DownloadLaterView,
     settings: SettingsView,
     privacy: PrivacyPolicy,
+    about: AboutView,
   } as const), []);
 
   const renderActiveView = useCallback(() => {

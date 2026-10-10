@@ -115,6 +115,7 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
             saveLicense({
               key: r.key, name: chk.name ?? '', plan: chk.plan ?? 'PRO',
               expiresAt: chk.expiresAt ?? 0, activatedAt: new Date().toISOString(),
+              contact: email,
             });
             onClose();
           } else {
@@ -148,6 +149,11 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
         plan: chk.plan ?? 'PRO',
         expiresAt: chk.expiresAt ?? 0,
         activatedAt: new Date().toISOString(),
+        // Vista compra manual: contato digitado; colagem avulsa: preserva o
+        // existente (renovação na mesma máquina).
+        contact: view === 'buy'
+          ? (ctype === 'wa' ? maskPhoneBR(contact) : contact.trim())
+          : (getLicense()?.contact ?? ''),
       });
       onClose();
     } finally {

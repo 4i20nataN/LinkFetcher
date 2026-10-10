@@ -22,7 +22,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
     { id: 'favorites', label: t('favorites'), icon: '⭐', desc: t('favoritesDesc') },
     { id: 'later', label: t('downloadLater'), icon: '⏰', desc: t('laterDesc') },
     { id: 'settings', label: t('settings'), icon: '⚙️', desc: t('settingsDesc') },
-    { id: 'privacy', label: t('privacy'), icon: '🛡️', desc: t('privacyDesc') }
+    { id: 'about', label: t('about'), icon: 'ℹ️', desc: t('aboutTabDesc') }
   ];
 
   return (
