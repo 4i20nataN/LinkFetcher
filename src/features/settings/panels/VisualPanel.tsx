@@ -1,11 +1,10 @@
 // Painel "Personalização Visual": tema, accent, ícones e idioma.
-import { Settings, Globe, Smile, Palette } from 'lucide-react';
+import { Settings, Globe, Palette } from 'lucide-react';
 import type { AppSettings } from '../../../types';
 import { useTranslation } from '../../../core/i18n';
 import {
   getAccentTextClass, getAccentBorderClass
 } from '../../../components/ThemeWrapper';
-import { Toggle } from '../../../components/Toggle';
 
 const accentColorsList = [
   { id: 'indigo', name: 'indigo', color: 'bg-indigo-500' },
@@ -105,19 +104,6 @@ export function VisualPanel({ settings, updateSettings, t }: VisualPanelProps) {
             ? 'Choose how icons appear on download option blocks and format selector cards.'
             : 'Escolha como os icones aparecem nos blocos de opcoes de download e cards do seletor de formato.'}
         </p>
-      </div>
-
-      <div className="flex items-center justify-between p-3 rounded-xl lf-surface-40 lf-border">
-        <div className="space-y-1">
-          <span className="text-xs text-white font-medium flex items-center gap-1.5">
-            <Smile size={14} className="lf-text-secondary" />
-            {settings.language === 'en' ? 'Colorful Sidebar Emojis' : 'Emojis Coloridos na Lateral'}
-          </span>
-          <p className="text-[10px] lf-text-muted">
-            {settings.language === 'en' ? 'Keep sidebar emojis colored at all times instead of grayscale' : 'Manter emojis da barra lateral sempre coloridos em vez de preto e branco'}
-          </p>
-        </div>
-        <Toggle value={settings.colorfulIcons} onChange={() => updateSettings({ colorfulIcons: !settings.colorfulIcons })} settings={settings} />
       </div>
 
       <div className="space-y-2">

@@ -100,10 +100,7 @@ export class StorageService {
       autoDownload: true,
       notifications: true,
       updates: true,
-      colorfulIcons: false,
       clipboardEnabled: true,
-      clipboardMonitoringEnabled: false,
-      clipboardFirstRunDone: false,
     };
   }
 

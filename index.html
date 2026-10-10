@@ -18,8 +18,13 @@
         width:100%;
         background:#030406;
         user-select:none;
+        transition:opacity .45s ease;
         padding:2rem;
         box-sizing:border-box;
+      }
+      .lf-startup-splash.lf-splash-hide {
+        opacity:0;
+        pointer-events:none;
       }
       .lf-startup-logo-wrapper {
         position:relative;
@@ -104,13 +109,23 @@
       <div class="lf-startup-splash">
         <div class="lf-startup-logo-wrapper">
           <div class="lf-startup-logo-glow"></div>
-          <img src="/app-logo.webp" alt="LinkFetcher" class="lf-startup-logo" />
+          <img src="/logo-dark.webp" alt="LinkFetcher" class="lf-startup-logo" />
         </div>
         <div class="lf-startup-title">LinkFetcher</div>
         <div class="lf-startup-sub">Media Downloader</div>
         <div class="lf-startup-loader"></div>
       </div>
     </div>
+    <script>
+      // Splash na cor do tema salvo: evita o flash preto antes do React.
+      try {
+        var s = JSON.parse(localStorage.getItem('universal_downloader_settings') || '{}');
+        var bg = { light: '#f4f0e6', dark: '#0A0C12', gray: '#15161c', white: '#f7f9fc' }[s.themeMode] || '#0A0C12';
+        document.documentElement.style.background = bg;
+        var sp = document.querySelector('.lf-startup-splash');
+        if (sp) sp.style.background = bg;
+      } catch (e) {}
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

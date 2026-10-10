@@ -16,6 +16,7 @@ import {
 } from '../../components/ThemeWrapper';
 import { getMediaType, formatSpeed } from './manager/downloadFormat';
 import { DownloadList } from './manager/DownloadList';
+import { PlaylistAlbumCard, groupPlaylistItems } from './manager/PlaylistAlbumCard';
 import { CommandPreview } from './manager/CommandPreview';
 import { DeleteConfirm } from './manager/DeleteConfirm';
 
@@ -163,6 +164,20 @@ export const DownloadManager: React.FC = () => {
 
   // Ordem real da fila (só-queued): base p/ habilitar as setas de reordenar.
   const queuedIds = useMemo(() => downloads.filter(d => d.status === 'queued').map(d => d.id), [downloads]);
+
+  // Aba Playlists: faixas da mesma origem viram um álbum expansível.
+  const playlistGroups = useMemo(() => (
+    mediaFilter === 'playlist' ? groupPlaylistItems(filteredDownloads) : null
+  ), [mediaFilter, filteredDownloads]);
+  const [expandedAlbums, setExpandedAlbums] = useState<Set<string>>(new Set());
+  const toggleAlbum = useCallback((key: string) => {
+    setExpandedAlbums(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
 
   return (
     <LayoutGroup>
@@ -344,6 +359,58 @@ export const DownloadManager: React.FC = () => {
           )}
         </div>
       </div>
+      {playlistGroups ? (
+        <div className="space-y-3.5 pb-[max(5rem,env(safe-area-inset-bottom))]">
+          {playlistGroups.length === 0 ? (
+            <DownloadList
+              items={[]}
+              visibleCount={visibleCount}
+              onShowMore={() => setVisibleCount(c => c + LIST_PAGE)}
+              settings={settings}
+              t={t}
+              queuedIds={queuedIds}
+              onMoveUp={handleMoveUp}
+              onMoveDown={handleMoveDown}
+              onOpenFolder={handleOpenFolder}
+              onShare={handleShare}
+              onPreview={setCommandPreview}
+              onRequestDelete={setPendingAction}
+            />
+          ) : (
+            <>
+              <AnimatedList initial={false}>
+                {playlistGroups.slice(0, visibleCount).map((group) => (
+                  <PlaylistAlbumCard
+                    key={group.key}
+                    group={group}
+                    expanded={expandedAlbums.has(group.key)}
+                    onToggle={toggleAlbum}
+                    settings={settings}
+                    t={t}
+                    queuedIds={queuedIds}
+                    onMoveUp={handleMoveUp}
+                    onMoveDown={handleMoveDown}
+                    onOpenFolder={handleOpenFolder}
+                    onShare={handleShare}
+                    onPreview={setCommandPreview}
+                    onRequestDelete={setPendingAction}
+                  />
+                ))}
+              </AnimatedList>
+              {playlistGroups.length > visibleCount && (
+                <button
+                  onClick={() => setVisibleCount(c => c + LIST_PAGE)}
+                  className="w-full py-2.5 rounded-xl lf-surface-40 border lf-border lf-text-secondary hover:text-white text-xs font-semibold transition-colors"
+                >
+                  {settings.language === 'en'
+                    ? `Show more (${playlistGroups.length - visibleCount} remaining)`
+                    : `Mostrar mais (${playlistGroups.length - visibleCount} restantes)`}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      ) : (
       <DownloadList
         items={filteredDownloads}
         visibleCount={visibleCount}
@@ -358,6 +425,7 @@ export const DownloadManager: React.FC = () => {
         onPreview={setCommandPreview}
         onRequestDelete={setPendingAction}
       />
+      )}
 
       <AnimatedList>
         {commandPreview && (

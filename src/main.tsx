@@ -3,11 +3,15 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { setupElectronShim } from './native/electronShim';
+import { relocateSplash, dismissSplash } from './bootSplash';
 
 setupElectronShim();
+relocateSplash();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
   </StrictMode>,
 );
+
+dismissSplash();

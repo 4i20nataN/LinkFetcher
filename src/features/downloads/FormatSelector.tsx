@@ -82,7 +82,6 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
   const [showSubs, setShowSubs] = useState(!!(formatOptions?.writeSubs || formatOptions?.writeAutoSubs));
   const [showSubsPicker, setShowSubsPicker] = useState(false);
   const [useUnderscore, setUseUnderscore] = useState(true);
-  const [uiScale, setUiScale] = useState(50);
   const [descExpanded, setDescExpanded] = useState(false);
   const [showLicense, setShowLicense] = useState(false);
   const license = useLicense();
@@ -368,23 +367,23 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
   };
 
   return (
-    <div className="space-y-3" style={{ '--ui-scale': uiScale } as React.CSSProperties}>
+    <div className="space-y-3">
       {!bulk && (
       <>
       <p className="font-bold text-white text-center text-base pt-4 mb-5">
         {settings.language === 'en' ? '📥 Free Download' : '📥 Download Gratuito'}
       </p>
-      <div className="grid grid-cols-2 gap-2 pb-3">
+      <div className="grid grid-cols-2 gap-5 pb-3">
         <button
           onClick={() => onQuickDownload?.('video')}
-          className="flex items-center justify-center gap-2 py-2.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold fs-sm whitespace-nowrap transition-all shadow-lg hover:scale-[1.01] active:scale-[0.99]"
+          className="flex items-center justify-center gap-2 py-2.5 px-2 rounded-xl bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:brightness-110 text-white font-bold fs-sm whitespace-nowrap transition-all shadow-lg shadow-blue-500/25 hover:scale-[1.01] active:scale-[0.99]"
         >
           <Clapperboard size={15} className="text-white shrink-0" />
           {settings.language === 'en' ? 'Default Video' : 'Vídeo Padrão'}
         </button>
         <button
           onClick={() => onQuickDownload?.('audio')}
-          className="flex items-center justify-center gap-2 py-2.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold fs-sm whitespace-nowrap transition-all shadow-lg hover:scale-[1.01] active:scale-[0.99]"
+          className="flex items-center justify-center gap-2 py-2.5 px-2 rounded-xl bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:brightness-110 text-white font-bold fs-sm whitespace-nowrap transition-all shadow-lg shadow-blue-500/25 hover:scale-[1.01] active:scale-[0.99]"
         >
           <Music size={15} className="text-white shrink-0" />
           {settings.language === 'en' ? 'MP3 Audio' : 'Áudio MP3'}
@@ -465,14 +464,6 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
         )
       )}
       <div className={proActive ? '' : 'pro-locked opacity-60 pointer-events-none select-none [&_.acc-head]:pointer-events-auto'} aria-disabled={!proActive}>
-      <div className="flex justify-end -mt-2 mb-1">
-        <div className="flex items-center gap-0.5">
-          <span className="fs-sm lf-text-faint mr-0.5">🔍</span>
-          <button onClick={() => setUiScale(s => Math.max(0, s - 5))} className="w-5 h-5 rounded flex items-center justify-center fs-sm lf-text-faint hover:text-zinc-300 hover:bg-zinc-800 transition-colors">A-</button>
-          <span className="fs-xs lf-text-muted w-7 text-center font-mono">{uiScale}%</span>
-          <button onClick={() => setUiScale(s => Math.min(100, s + 5))} className="w-5 h-5 rounded flex items-center justify-center fs-sm lf-text-faint hover:text-zinc-300 hover:bg-zinc-800 transition-colors">A+</button>
-        </div>
-      </div>
 
       <AnimatedList mode="wait">
         {activeTab === 'media' && (

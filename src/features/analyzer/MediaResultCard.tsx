@@ -14,7 +14,7 @@ import { slideUpStrong } from '../../animation/variants';
 import { PlatformBadge } from '../../components/PlatformBadge';
 import {
   Play, FileVideo, Music, Image as ImageIcon, Eye, Calendar, FolderOpen,
-  Clock, Star, ExternalLink, Download, RefreshCw, AlertCircle, Lock,
+  Clock, Star, Download, RefreshCw, AlertCircle, Lock,
 } from 'lucide-react';
 import { formatUploadDate } from './analyzerUtils';
 import { SummaryPanel } from './SummaryPanel';
@@ -191,15 +191,6 @@ export function MediaResultCard({
                 </div>
               )}
 
-              <a
-                href={mediaInfo.originalUrl}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="px-3.5 py-2 rounded-xl border lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850 text-sm font-semibold flex items-center gap-2 transition-all"
-              >
-                {settings.iconStyle === 'emoji' ? <span>🔗</span> : <ExternalLink size={14} className={getAccentTextClass(settings)} />}
-                {t('btnOriginal')}
-              </a>
             </div>
           </div>
         </div>

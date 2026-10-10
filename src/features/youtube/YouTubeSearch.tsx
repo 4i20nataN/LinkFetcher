@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { SearchResult } from '../../types';
 import { Search, Globe, Play, ArrowRight, Eye, AlertCircle } from 'lucide-react';
@@ -45,7 +45,7 @@ const SearchResultCard = React.memo<{
     animateKey={video.url}
     variant={scaleIn}
     onClick={() => onSelect(video.url)}
-    className="group rounded-2xl glass-card p-3 transition-all duration-300 cursor-pointer flex flex-col justify-between hover:bg-white/10"
+    className="group rounded-2xl glass-card p-3 transition-all duration-300 cursor-pointer flex flex-col justify-between hover:bg-white/10 [content-visibility:auto] [contain-intrinsic-size:auto_280px]"
   >
     <div>
       <div className="relative aspect-video rounded-xl overflow-hidden border lf-border lf-surface shrink-0">
@@ -96,6 +96,23 @@ export const YouTubeSearch: React.FC = () => {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const searchSeq = useRef(0);
+  const lastSearchId = useRef<string | null>(null);
+
+  // Mata o yt-dlp da busca anterior (best-effort): sem isso, pesquisar
+  // em sequência empilha processos e tudo fica lento.
+  const killPreviousSearch = useCallback((id: string | null) => {
+    if (!id) return;
+    import('@tauri-apps/api/core')
+      .then(({ invoke }) => invoke('ytdlp_cancel', { id }).catch(() => {}))
+      .catch(() => {});
+  }, []);
+
+  // Desmontou com busca em voo: não deixa órfão (lê o ref no cleanup).
+  useEffect(() => {
+    return () => killPreviousSearch(lastSearchId.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSelectVideo = useCallback((videoUrl: string) => {
     setSelectedUrl(videoUrl);
@@ -110,8 +127,12 @@ export const YouTubeSearch: React.FC = () => {
     if (!query.trim()) return;
 
     abortRef.current?.abort();
+    killPreviousSearch(lastSearchId.current);
     const controller = new AbortController();
     abortRef.current = controller;
+    searchSeq.current += 1;
+    const searchId = `search-${Date.now().toString(36)}-${searchSeq.current}`;
+    lastSearchId.current = searchId;
 
     const cacheKey = query.trim().toLowerCase();
     const cached = cacheGet(cacheKey);
@@ -127,7 +148,8 @@ export const YouTubeSearch: React.FC = () => {
       const data: SearchResult[] = await searchVideosWithAdapter({
         query: query.trim(),
         platform: 'youtube',
-        maxResults: 10
+        maxResults: 10,
+        searchId,
       });
       if (!controller.signal.aborted) {
         setResults(data);

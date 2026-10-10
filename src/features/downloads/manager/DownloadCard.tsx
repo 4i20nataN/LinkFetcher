@@ -32,11 +32,14 @@ export interface DownloadCardProps {
   onShare: (item: DownloadItem) => void;
   onPreview: (item: DownloadItem) => void;
   onRequestDelete: (item: DownloadItem) => void;
+  /** No álbum a faixa já herda o contexto: esconde a listra de status. */
+  hideAccent?: boolean;
 }
 
 export const DownloadCard = React.memo(function DownloadCard({
   item, settings, t, queuePos, queuedTotal,
   onMoveUp, onMoveDown, onOpenFolder, onShare, onPreview, onRequestDelete,
+  hideAccent,
 }: DownloadCardProps) {
               const platform = ProviderRegistry.getPlatformConfig(item.platform);
               const isDownloading = item.status === 'downloading';
@@ -50,9 +53,11 @@ export const DownloadCard = React.memo(function DownloadCard({
                   variant={slideExitLeft}
                   className="p-4 rounded-xl glass-card flex flex-col md:flex-row gap-4 items-start md:items-center relative overflow-hidden group hover:bg-white/10 transition-colors"
                 >
+                  {!hideAccent && (
                   <div className={`absolute left-0 top-0 bottom-0 w-1 ${
                     isCompleted ? 'bg-emerald-500' : isFailed ? 'bg-rose-500' : isPaused ? 'bg-amber-500' : 'bg-indigo-500'
                   }`} />
+                  )}
 
                   <div className="relative w-full md:w-28 aspect-video rounded-lg overflow-hidden border lf-border lf-surface shrink-0">
                     <img
@@ -88,14 +93,13 @@ export const DownloadCard = React.memo(function DownloadCard({
                         </span>
                       )}
                       {/* Concluído: extensão do arquivo real; pendente: container prometido. */}
+                      {/* Áudio tem selo próprio (verde, com qualidade): não duplica. */}
                       {(() => {
+                        if (item.audioOnly) return null;
                         const doneExt = item.status === 'completed' && item.filePath
                           ? (item.filePath.split('.').pop() || '')
                           : '';
-                        const outExt = doneExt
-                          || (item.audioOnly
-                            ? item.audioFormat
-                            : (item.mergeOutputFormat || item.format.ext));
+                        const outExt = doneExt || (item.mergeOutputFormat || item.format.ext);
                         return outExt ? (
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-white/10 lf-text-secondary border border-white/10">
                             {outExt.toUpperCase()}

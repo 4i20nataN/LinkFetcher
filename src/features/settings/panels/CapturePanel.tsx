@@ -1,5 +1,5 @@
 // Painel "Captura de Links": comportamento da área de transferência.
-import { Clipboard, Eye } from 'lucide-react';
+import { Clipboard } from 'lucide-react';
 import type { AppSettings } from '../../../types';
 import { useTranslation } from '../../../core/i18n';
 import { getAccentTextClass } from '../../../components/ThemeWrapper';
@@ -29,27 +29,6 @@ export function CapturePanel({ settings, updateSettings, t }: CapturePanelProps)
           </p>
         </div>
         <Toggle value={settings.clipboardEnabled} onChange={() => updateSettings({ clipboardEnabled: !settings.clipboardEnabled })} settings={settings} />
-      </div>
-
-      <div className="flex items-center justify-between p-3 rounded-xl lf-surface-40 lf-border">
-        <div className="space-y-1">
-          <span className="text-xs text-white font-medium flex items-center gap-1.5">
-            <Eye size={14} className="lf-text-secondary" />
-            {settings.language === 'en' ? 'Clipboard Link Detection' : 'Detecção de Links na Área de Transferência'}
-          </span>
-          <p className="text-[10px] lf-text-muted">
-            {settings.language === 'en'
-              ? 'Show download popup when a link is copied to clipboard'
-              : 'Mostrar popup de download quando um link for copiado para a área de transferência'}
-          </p>
-        </div>
-        <Toggle value={settings.clipboardMonitoringEnabled} onChange={() => {
-          const newVal = !settings.clipboardMonitoringEnabled;
-          updateSettings({
-            clipboardMonitoringEnabled: newVal,
-            clipboardFirstRunDone: true,
-          });
-        }} settings={settings} />
       </div>
     </div>
   );

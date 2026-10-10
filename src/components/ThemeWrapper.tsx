@@ -46,6 +46,10 @@ export function getThemeLogo(settings: { themeMode: string }): string {
   return THEME_LOGOS[settings.themeMode] ?? THEME_LOGOS.dark;
 }
 
+export function getThemeBackground(themeMode: string): string {
+  return THEME_BACKGROUNDS[themeMode] ?? THEME_BACKGROUNDS.dark;
+}
+
 // Perfil efficient: cor sólida + glow estático (bitmap trava o raster).
 const EFFICIENT_FLAT_BG: Record<string, string> = {
   light: '#f4f0e6',
@@ -72,7 +76,7 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <div
-      className={`h-screen transition-colors duration-300 select-none ${themeClass} ${RENDER_PROFILE === 'efficient' ? 'efficient' : ''} relative overflow-hidden`}
+      className={`h-screen transition-colors duration-300 select-none ${themeClass} ${RENDER_PROFILE === 'efficient' ? 'efficient' : 'full-noblur'} relative overflow-hidden`}
       style={style}
     >
       {RENDER_PROFILE === 'efficient' ? (
@@ -90,7 +94,8 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
         />
       )}
 
-      {/* Glow estático no efficient (blur animado trava o raster). */}
+      {/* Glow estático: blur animado trava o raster no WebKitGTK;
+          o wallpaper dá o movimento visual. */}
       {(settings.themeMode !== 'light' && settings.themeMode !== 'white') && (
         <div className="absolute inset-0 z-[1] pointer-events-none overflow-hidden">
           <div
@@ -102,12 +107,6 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
                 radial-gradient(circle at 85% 25%, rgba(48, 209, 88, 0.06) 0%, transparent 50%),
                 radial-gradient(circle at 50% 85%, rgba(148, 163, 184, 0.08) 0%, transparent 60%)
               `,
-              ...(RENDER_PROFILE === 'efficient'
-                ? {}
-                : {
-                    filter: 'blur(120px)',
-                    animation: 'bgmove 35s ease-in-out infinite alternate',
-                  }),
             }}
           />
         </div>

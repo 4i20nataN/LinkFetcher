@@ -68,10 +68,7 @@ class DownloadEngineClass {
     autoDownload: true,
     notifications: true,
     updates: true,
-    colorfulIcons: false,
     clipboardEnabled: true,
-    clipboardMonitoringEnabled: false,
-    clipboardFirstRunDone: false,
   };
 
   constructor() {
@@ -197,9 +194,20 @@ class DownloadEngineClass {
     try {
       const active = this.items.filter(i => ['queued', 'downloading', 'paused'].includes(i.status));
       const finished = this.items.filter(i => !['queued', 'downloading', 'paused'].includes(i.status));
-      const trimmedFinished = finished.slice(0, DownloadEngineClass.MAX_PERSISTED_FINISHED);
-      const toPersist = [...active, ...trimmedFinished].map(({ activity: _a, ...rest }) => rest);
-      localStorage.setItem('universal_downloader_items', JSON.stringify(toPersist));
+      const slim = (list: DownloadItem[]) => list.map(({ activity: _a, ...rest }) => rest);
+      // Quota do WebView (~5MB, dividida com o resto do app): após uso forte
+      // (playlist de 1300+ faixas) o payload pode estourar. Degrada o
+      // histórico de concluídos em vez de perder tudo — ativos nunca cortam.
+      const caps = [DownloadEngineClass.MAX_PERSISTED_FINISHED, 100, 30, 0];
+      for (let k = 0; k < caps.length; k++) {
+        try {
+          const toPersist = [...active, ...finished.slice(0, caps[k])];
+          localStorage.setItem('universal_downloader_items', JSON.stringify(slim(toPersist)));
+          return;
+        } catch (e) {
+          if (k === caps.length - 1) throw e;
+        }
+      }
     } catch (e) {
       console.error('Error saving engine state', e);
     }

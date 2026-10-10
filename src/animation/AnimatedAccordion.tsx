@@ -30,7 +30,7 @@ export function AnimatedAccordion({ isOpen, children, className }: AnimatedAccor
                   opacity: transitions.accordionOpacity,
                 }
           }
-          className={className}
+          className={className ? `overflow-hidden ${className}` : 'overflow-hidden'}
         >
           {children}
         </m.div>

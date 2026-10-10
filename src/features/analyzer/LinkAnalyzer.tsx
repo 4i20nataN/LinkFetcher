@@ -93,22 +93,6 @@ export const LinkAnalyzer: React.FC = () => {
   }, [selectedUrl]);
 
   useEffect(() => {
-    const handler = (e: Event) => {
-      const url = (e as CustomEvent).detail?.url;
-      if (url) {
-        setUrl(url);
-        const trimmed = url.trim();
-        if (trimmed && /^https?:\/\/.+/i.test(trimmed)) {
-          const clean = sanitizeUrl(trimmed);
-          handleAnalyzeRef.current(clean);
-        }
-      }
-    };
-    window.addEventListener('clipboard:analyze', handler);
-    return () => window.removeEventListener('clipboard:analyze', handler);
-  }, []);
-
-  useEffect(() => {
     const saved = localStorage.getItem('universal_downloader_analyzer_state');
     if (saved) {
       try {

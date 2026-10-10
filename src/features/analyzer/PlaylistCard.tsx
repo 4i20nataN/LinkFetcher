@@ -1,7 +1,7 @@
 // Card de playlist: preview + config única p/ todos os vídeos.
 // Personalizado atrás do PRO (mesma regra do download unitário);
 // o painel usa 1 vídeo de referência (sem probe por item).
-import React, { Suspense, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useTranslation } from '../../core/i18n';
 import {
@@ -12,7 +12,7 @@ import { AnimatedList } from '../../animation/AnimatedList';
 import { slideUpStrong } from '../../animation/variants';
 import { PlatformBadge } from '../../components/PlatformBadge';
 import { ProviderRegistry } from '../../core/plugins/Providers';
-import { ListMusic, ChevronUp, ChevronDown, Download, Lock, Clapperboard, Music, Settings2, Star, Clock, Image as ImageIcon, ExternalLink, FolderOpen, Play, X } from 'lucide-react';
+import { ListMusic, ChevronUp, ChevronDown, Download, Lock, Clapperboard, Music, Settings2, Star, Clock, Image as ImageIcon, FolderOpen, Play, X } from 'lucide-react';
 import type { MediaFormat, MediaInfo, PlaylistInfo } from '../../types';
 import type { FormatOptions } from '../downloads/FormatOptions';
 import { formatCompactViews } from '../../core/ytdlp/playlistUtils';
@@ -58,6 +58,13 @@ export function PlaylistCard({
   const { t } = useTranslation(settings);
   const isEn = settings.language === 'en';
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  // Expansão paginada: "Ver todos" em playlist de 1300+ itens montava 1300
+  // cards com thumb de uma vez (travada + pico de RAM). Mesmo padrão da
+  // fila de downloads: lote inicial + "mostrar mais".
+  const EXPANDED_PAGE = 100;
+  const [visibleItems, setVisibleItems] = useState(EXPANDED_PAGE);
+  const playlistId = playlistInfo?.id;
+  useEffect(() => { setVisibleItems(EXPANDED_PAGE); }, [playlistId]);
   const platformConfig = playlistInfo ? ProviderRegistry.getPlatformConfig(playlistInfo.platform) : null;
   const customLocked = !proActive;
   // 0 itens nunca renderiza ações (o handler já barra).
@@ -207,24 +214,20 @@ export function PlaylistCard({
                     )}
                   </div>
 
-                  <a
-                    href={playlistInfo.url}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="px-3.5 py-2 rounded-xl border lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850 text-sm font-semibold flex items-center gap-2 transition-all"
-                  >
-                    {settings.iconStyle === 'emoji' ? <span>🔗</span> : <ExternalLink size={14} className={getAccentTextClass(settings)} />}
-                    {t('btnOriginal')}
-                  </a>
                 </div>
               </div>
             </div>
 
             <div className="space-y-1.5">
-              {playlistInfo.items.slice(0, playlistExpanded ? playlistInfo.items.length : 5).map((item) => {
+              {playlistInfo.items.slice(0, playlistExpanded ? visibleItems : 5).map((item) => {
                 const pending = pendingUrl === item.url;
                 return (
-                <div key={item.id}>
+                <div
+                  key={item.id}
+                  // Fora da viewport o navegador pula layout/paint da linha
+                  // (scroll em lista de 1300 sem lag; ignorado se sem suporte).
+                  className="[content-visibility:auto] [contain-intrinsic-size:auto_64px]"
+                >
                   <div className={pending ? 'flex flex-col md:flex-row gap-2' : ''}>
                     <div className={`flex items-center gap-1 px-1 py-0.5 rounded-lg transition-colors ${pending ? 'bg-white/10 flex-1 min-w-0' : 'hover:bg-white/5'}`}>
                       <button
@@ -290,7 +293,10 @@ export function PlaylistCard({
 
             {playlistInfo.items.length > 5 && (
               <button
-                onClick={() => setPlaylistExpanded(!playlistExpanded)}
+                onClick={() => {
+                  if (playlistExpanded) setVisibleItems(EXPANDED_PAGE);
+                  setPlaylistExpanded(!playlistExpanded);
+                }}
                 className="w-full flex items-center justify-center gap-1 py-1.5 text-xs lf-text-secondary hover:text-zinc-300 transition-colors"
               >
                 {playlistExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
@@ -299,23 +305,33 @@ export function PlaylistCard({
                   : isEn ? `Show all ${playlistInfo.items.length}` : `Ver todos (${playlistInfo.items.length})`}
               </button>
             )}
+            {playlistExpanded && playlistInfo.items.length > visibleItems && (
+              <button
+                onClick={() => setVisibleItems((v) => v + EXPANDED_PAGE)}
+                className="w-full py-2 rounded-xl lf-surface-40 border lf-border lf-text-secondary hover:text-white text-xs font-semibold transition-colors"
+              >
+                {isEn
+                  ? `Show more (${playlistInfo.items.length - visibleItems} remaining)`
+                  : `Mostrar mais (${playlistInfo.items.length - visibleItems} restantes)`}
+              </button>
+            )}
 
             {/* Gratuito primeiro (mesma ordem do vídeo unitário). */}
             <div className="border-t lf-border pt-4 space-y-2">
               <p className="font-bold text-white text-center text-base">
                 {isEn ? '📥 Free Download' : '📥 Download Gratuito'}
               </p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-5">
                 <button
                   onClick={() => onDownloadAll('video')}
-                  className="flex items-center justify-center gap-2 py-2.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold fs-sm whitespace-nowrap transition-all shadow-lg hover:scale-[1.01] active:scale-[0.99]"
+                  className="flex items-center justify-center gap-2 py-2.5 px-2 rounded-xl bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:brightness-110 text-white font-bold fs-sm whitespace-nowrap transition-all shadow-lg shadow-blue-500/25 hover:scale-[1.01] active:scale-[0.99]"
                 >
                   <Clapperboard size={15} className="text-white shrink-0" />
                   {isEn ? 'Default Video' : 'Vídeo Padrão'}
                 </button>
                 <button
                   onClick={() => onDownloadAll('audio')}
-                  className="flex items-center justify-center gap-2 py-2.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold fs-sm whitespace-nowrap transition-all shadow-lg hover:scale-[1.01] active:scale-[0.99]"
+                  className="flex items-center justify-center gap-2 py-2.5 px-2 rounded-xl bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:brightness-110 text-white font-bold fs-sm whitespace-nowrap transition-all shadow-lg shadow-blue-500/25 hover:scale-[1.01] active:scale-[0.99]"
                 >
                   <Music size={15} className="text-white shrink-0" />
                   {isEn ? 'MP3 Audio' : 'Áudio MP3'}

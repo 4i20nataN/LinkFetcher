@@ -23,7 +23,9 @@ function maskKey(key: string): string {
 export function AboutView() {
   const { settings } = useApp();
   const isEn = settings.language === 'en';
-  const isLight = settings.themeMode === 'light';
+  // 'white' cai no ramo claro: classes dark + remap CSS geravam hover
+  // exagerado (sombra preta 0.3 sobre fundo branco).
+  const isLight = settings.themeMode === 'light' || settings.themeMode === 'white';
   const lic = useLicense() ?? getLicense();
   const active = isLicenseActive(lic);
   const [showPrivacy, setShowPrivacy] = useState(false);
@@ -49,8 +51,8 @@ export function AboutView() {
 
   const card = `rounded-2xl p-6 transition-all duration-300 cv-auto
     ${isLight
-      ? 'bg-white/50 border border-zinc-200/40 hover:border-blue-300/40 hover:shadow-lg'
-      : 'bg-white/[0.02] border border-white/[0.04] hover:border-blue-500/20 hover:shadow-[0_8px_25px_rgba(0,0,0,0.3)]'
+      ? 'bg-white/50 border border-zinc-200/40 hover:border-zinc-300 hover:shadow-sm'
+      : 'bg-white/[0.02] border border-white/[0.04] hover:border-white/10 hover:shadow-lg'
     }`;
   const cardTitle = `text-base font-semibold mb-3 flex items-center gap-2.5 ${isLight ? 'text-zinc-800' : 'text-white'}`;
   const body = `text-[13px] leading-relaxed ${isLight ? 'text-zinc-600' : 'lf-text-secondary'}`;

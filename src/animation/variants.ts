@@ -102,8 +102,8 @@ export const transitions = {
   tab: tween(0.2),
   /** Tween p/ opacidade do accordion */
   accordionOpacity: tween(0.2),
-  /** Spring p/ altura do accordion */
-  accordionHeight: spring(400, 30),
+  /** Tween ease-out p/ altura do accordion (spring assentava no fim do close) */
+  accordionHeight: tween(0.22, 'easeOut'),
   /** Tween p/ shimmer */
   shimmer: { duration: 1.5, repeat: Infinity, ease: 'linear' as const },
   /** Spring p/ toggle */

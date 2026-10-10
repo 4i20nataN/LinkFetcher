@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FavoriteItem } from '../../types';
-import { Star, ExternalLink, ArrowRight, Trash2, Edit2, Check, FileText, Download, ListMusic } from 'lucide-react';
+import { Star, ArrowRight, Trash2, Edit2, Check, FileText, Download, ListMusic } from 'lucide-react';
 import { AnimatedCard } from '../../animation/AnimatedCard';
 import { AnimatedList } from '../../animation/AnimatedList';
 import { scaleIn } from '../../animation/variants';
@@ -18,6 +18,9 @@ export const FavoritesView: React.FC = () => {
   const { t } = useTranslation(settings);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editNotes, setEditNotes] = useState('');
+  // Cap de render: mesmo padrão da fila de downloads.
+  const LIST_PAGE = 60;
+  const [visibleCount, setVisibleCount] = useState(LIST_PAGE);
 
   const handleStartEditing = (fav: FavoriteItem) => {
     setEditingId(fav.id);
@@ -92,7 +95,7 @@ export const FavoritesView: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <AnimatedList initial={false}>
-            {favorites.map((fav) => {
+            {favorites.slice(0, visibleCount).map((fav) => {
               const platform = ProviderRegistry.getPlatformConfig(fav.platform);
               const isEditing = editingId === fav.id;
               const isPlaylist = isPlaylistUrl(fav.url);
@@ -101,7 +104,7 @@ export const FavoritesView: React.FC = () => {
                 <AnimatedCard
                   animateKey={fav.id}
                   variant={scaleIn}
-                  className="rounded-2xl glass-card flex flex-col group hover:bg-white/10 transition-colors overflow-hidden"
+                  className="rounded-2xl glass-card flex flex-col group hover:bg-white/10 transition-colors overflow-hidden [content-visibility:auto] [contain-intrinsic-size:auto_320px]"
                 >
                   <div className="relative w-full h-36 overflow-hidden border-b lf-border lf-surface shrink-0">
                     {fav.thumbnailUrl ? (
@@ -196,16 +199,6 @@ export const FavoritesView: React.FC = () => {
                     </button>
 
                     <div className="flex items-center gap-2">
-                      <a
-                        href={fav.url}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="p-1.5 rounded-lg border border-zinc-800 hover:border-zinc-700 lf-surface-raised lf-text-secondary hover:text-white transition-colors"
-                        title={settings.language === 'en' ? 'View original' : 'Ver original'}
-                      >
-                        {settings.iconStyle === 'emoji' ? <span>🔗</span> : <ExternalLink size={13} className={getAccentTextClass(settings)} />}
-                      </a>
-                      
                       <button
                         onClick={() => handleAnalyze(fav.url)}
                         className={`
@@ -222,6 +215,16 @@ export const FavoritesView: React.FC = () => {
               );
             })}
           </AnimatedList>
+          {favorites.length > visibleCount && (
+            <button
+              onClick={() => setVisibleCount(c => c + LIST_PAGE)}
+              className="w-full py-2.5 rounded-xl lf-surface-40 border lf-border lf-text-secondary hover:text-white text-xs font-semibold transition-colors"
+            >
+              {settings.language === 'en'
+                ? `Show more (${favorites.length - visibleCount} remaining)`
+                : `Mostrar mais (${favorites.length - visibleCount} restantes)`}
+            </button>
+          )}
         </div>
       )}
     </div>

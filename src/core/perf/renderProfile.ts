@@ -10,4 +10,18 @@ const isChromium =
 const isAndroid =
   typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
 
-export const RENDER_PROFILE: 'full' | 'efficient' = (isTauri && !isChromium) || isAndroid ? 'efficient' : 'full';
+// Perfil de render: desktop mostra o wallpaper (bitmap estático + glow
+// estático, sem blur animado); Android força 'efficient' (GPU móvel + bateria).
+// Override manual p/ teste A/B (devtools): localStorage 'lf-render-profile'.
+export const RENDER_PROFILE: 'full' | 'efficient' = forcedProfile() ?? (isAndroid ? 'efficient' : 'full');
+
+// Override manual p/ teste A/B (devtools): 'full' mostra o wallpaper,
+// 'efficient' força o modo leve. Ausente = automático.
+function forcedProfile(): 'full' | 'efficient' | null {
+  try {
+    const v = typeof localStorage !== 'undefined' ? localStorage.getItem('lf-render-profile') : null;
+    return v === 'full' || v === 'efficient' ? v : null;
+  } catch {
+    return null;
+  }
+}

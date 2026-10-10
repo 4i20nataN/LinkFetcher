@@ -34,7 +34,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
             alt="LinkFetcher"
             width={48}
             height={48}
-            className="w-12 h-12 rounded-2xl object-cover shrink-0 shadow-md"
+            className="w-12 h-12 rounded-2xl object-cover shrink-0"
             decoding="async"
           />
           <div className="flex flex-col">
@@ -74,7 +74,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
             alt="LinkFetcher"
             width={48}
             height={48}
-            className="w-12 h-12 rounded-2xl object-cover shrink-0 shadow-md"
+            className="w-12 h-12 rounded-2xl object-cover shrink-0"
             decoding="async"
           />
           <div>
@@ -129,7 +129,6 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
                     className={`
                       text-xl transition-transform duration-300 group-hover:scale-110 
                       ${!isActive ? 'opacity-50 group-hover:opacity-100' : ''}
-                      ${!isActive && !settings.colorfulIcons ? 'grayscale group-hover:grayscale-0' : ''}
                     `}
                   >
                     {item.icon}

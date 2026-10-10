@@ -253,9 +253,9 @@ body {
 
 /* ── Theme Variables ────────────────────────────────────────────────────────── */
 .dark {
-  --lf-surface: rgba(10, 14, 23, 0.35);
+  --lf-surface: rgba(10, 14, 23, 0.68);
   --lf-surface-rgb: 10, 14, 23;
-  --lf-surface-raised: rgba(10, 14, 23, 0.50);
+  --lf-surface-raised: rgba(10, 14, 23, 0.78);
   --lf-surface-sunken: rgba(0, 0, 0, 0.25);
   --lf-border: rgba(255, 255, 255, 0.06);
   --lf-border-strong: rgba(255, 255, 255, 0.08);
@@ -374,19 +374,19 @@ body {
 
 /* Opacity variants — backdrop blur matches header bar aesthetic */
 .lf-surface-50 {
-  background-color: rgba(var(--lf-surface-rgb, 10, 14, 23) / 0.75);
+  background-color: rgba(var(--lf-surface-rgb, 10, 14, 23) / 0.88);
   backdrop-filter: blur(15px) saturate(150%);
   -webkit-backdrop-filter: blur(15px) saturate(150%);
 }
 
 .lf-surface-40 {
-  background-color: rgba(var(--lf-surface-rgb, 10, 14, 23) / 0.40);
+  background-color: rgba(var(--lf-surface-rgb, 10, 14, 23) / 0.62);
   backdrop-filter: blur(8px) saturate(150%);
   -webkit-backdrop-filter: blur(8px) saturate(150%);
 }
 
 .lf-surface-30 {
-  background-color: rgba(var(--lf-surface-rgb, 10, 14, 23) / 0.30);
+  background-color: rgba(var(--lf-surface-rgb, 10, 14, 23) / 0.52);
   backdrop-filter: blur(8px) saturate(150%);
   -webkit-backdrop-filter: blur(8px) saturate(150%);
 }
@@ -402,7 +402,7 @@ body {
 
 /* Frosted Glass Utilities — Obsidian Glass Design System (reference-exact values) */
 @utility glass-card {
-  background: rgba(12, 16, 26, 0.65);
+  background: rgba(12, 16, 26, 0.82);
   border: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(8px) saturate(150%);
   -webkit-backdrop-filter: blur(8px) saturate(150%);
@@ -412,7 +412,7 @@ body {
 }
 
 @utility glass-card-hover {
-  background: rgba(12, 16, 26, 0.72);
+  background: rgba(12, 16, 26, 0.86);
   border: 1px solid rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(10px) saturate(160%);
   -webkit-backdrop-filter: blur(10px) saturate(160%);
@@ -421,7 +421,7 @@ body {
 }
 
 @utility glass-sidebar {
-  background: rgba(12, 16, 26, 0.65);
+  background: rgba(12, 16, 26, 0.84);
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(12px) saturate(150%);
   -webkit-backdrop-filter: blur(12px) saturate(150%);
@@ -430,7 +430,7 @@ body {
 }
 
 @utility glass-input {
-  background: rgba(2, 3, 5, 0.55);
+  background: rgba(2, 3, 5, 0.78);
   border: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(6px) saturate(140%);
   -webkit-backdrop-filter: blur(6px) saturate(140%);
@@ -438,29 +438,11 @@ body {
 }
 
 @utility glass-pill {
-  background: rgba(10, 14, 23, 0.40);
+  background: rgba(10, 14, 23, 0.62);
   border: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(6px) saturate(140%);
   -webkit-backdrop-filter: blur(6px) saturate(140%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-/* bgmove keyframe — reference: bg-glow-container animation (used by glow layer + neural bg) */
-@keyframes bgmove {
-  0% {
-    scale: 1;
-    translate: 0 0;
-  }
-
-  50% {
-    scale: 1.1;
-    translate: 30px -40px;
-  }
-
-  100% {
-    scale: 0.95;
-    translate: -20px 20px;
-  }
 }
 
 /* ═══════════════════════════════════════════════════════════════ */
@@ -767,6 +749,19 @@ input[type="checkbox"] {
   color: #6B5E4A;
 }
 
+/* ── Botões coloridos mantêm texto branco (o remap acima escureceria) ── */
+.light [class*="bg-emerald-"].text-white,
+.light [class*="bg-indigo-"].text-white,
+.light [class*="bg-blue-"].text-white,
+.light [class*="bg-red-"].text-white,
+.light [class*="from-blue-"].text-white {
+  color: #FFFFFF;
+}
+
+/* ── Verdes de status (emerald claro some no creme): tinta escura ── */
+.light .text-emerald-300 { color: #046C4E; }
+.light .text-emerald-400 { color: #057A55; }
+
 /* ── Tags (format selector pills) ─────────────────────────────── */
 .light .tag {
   background: rgba(235, 228, 212, 0.45);
@@ -806,6 +801,13 @@ input[type="checkbox"] {
 .light .glass-sidebar button:hover {
   background-color: rgba(0, 0, 0, 0.05);
 }
+
+/* ── Hover dark-mode (branco translúcido) invisível sobre bege: overlay
+   escuro + tinta escura. Centralizado aqui em vez de 60 pontos no JSX. ── */
+.light .hover\:bg-white\/5:hover { background-color: rgba(15, 23, 42, 0.05); }
+.light .hover\:bg-white\/10:hover { background-color: rgba(15, 23, 42, 0.08); }
+.light .hover\:bg-white\/15:hover { background-color: rgba(15, 23, 42, 0.12); }
+.light .hover\:text-white:hover { color: #0F172A; }
 
 /* ── Scrollbar ────────────────────────────────────────────────── */
 .light ::-webkit-scrollbar-thumb {
@@ -1033,6 +1035,13 @@ input[type="checkbox"] {
 .efficient .lf-surface-40,
 .efficient .lf-surface-30,
 .efficient .lf-surface-50 {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Sem backdrop-blur no full: no WebKitGTK por software cada scroll repinta
+   tudo atrás do vidro. Painéis usam opacidade alta em vez de desfoque. */
+.full-noblur [class*="backdrop-blur"] {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
@@ -1438,6 +1447,13 @@ input[type="checkbox"] {
   background-color: #FFFFFF;
 }
 
+/* ── Hover dark-mode (branco translúcido) invisível sobre branco: overlay
+   escuro + tinta escura. Centralizado aqui em vez de 60 pontos no JSX. ── */
+.white .hover\:bg-white\/5:hover { background-color: rgba(15, 23, 42, 0.05); }
+.white .hover\:bg-white\/10:hover { background-color: rgba(15, 23, 42, 0.08); }
+.white .hover\:bg-white\/15:hover { background-color: rgba(15, 23, 42, 0.12); }
+.white .hover\:text-white:hover { color: #0F172A; }
+
 /* ── Zinc variants ────────────────────────────────────────────────────────── */
 .white .bg-zinc-900\/10 {
   background-color: rgba(255, 255, 255, 0.16);
@@ -1552,10 +1568,18 @@ input[type="checkbox"] {
 .white p, .white span, .white label {
   color: #2a3040;
 }
-.white .text-zinc-300 { color: #1e2535; }
-.white .text-zinc-400 { color: #454d60; }
-.white .text-zinc-500 { color: #6b7280; }
 .white .text-zinc-600 { color: #3a4050; }
+/* ── Botões coloridos mantêm texto branco (o remap acima escureceria) ── */
+.white [class*="bg-emerald-"].text-white,
+.white [class*="bg-indigo-"].text-white,
+.white [class*="bg-blue-"].text-white,
+.white [class*="bg-red-"].text-white,
+.white [class*="from-blue-"].text-white {
+  color: #FFFFFF;
+}
+/* ── Verdes de status (emerald claro some no branco): tinta escura ── */
+.white .text-emerald-300 { color: #047857; }
+.white .text-emerald-400 { color: #059669; }
 
 /* ── Tags ─────────────────────────────────────────────────────────────────── */
 .white .tag {

@@ -10,8 +10,6 @@ import { LazyMotionProvider } from './animation/LazyMotionProvider';
 import { CSSPageTransition } from './animation/CSSPageTransition';
 import { isAndroid } from './core/ytdlp/YtDlpAdapter';
 const Sidebar = React.lazy(() => import('./components/Sidebar').then(m => ({ default: m.Sidebar })));
-const ClipboardPopup = React.lazy(() => import('./components/ClipboardPopup').then(m => ({ default: m.ClipboardPopup })));
-const FirstRunClipboardPrompt = React.lazy(() => import('./components/FirstRunClipboardPrompt').then(m => ({ default: m.FirstRunClipboardPrompt })));
 const LinkAnalyzer = React.lazy(() => import('./features/analyzer/LinkAnalyzer').then(m => ({ default: m.LinkAnalyzer })));
 const YouTubeSearch = React.lazy(() => import('./features/youtube/YouTubeSearch').then(m => ({ default: m.YouTubeSearch })));
 const DownloadManager = React.lazy(() => import('./features/downloads/DownloadManager').then(m => ({ default: m.DownloadManager })));
@@ -26,12 +24,8 @@ const BinarySetupOverlay = React.lazy(() => import('./features/setup/BinarySetup
 function DashboardContent() {
   const { activeTab, setActiveTab, settings } = useApp();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [clipboardPopupUrl, setClipboardPopupUrl] = useState('');
-  const [showClipboardPopup, setShowClipboardPopup] = useState(false);
-  const [showFirstRunPrompt, setShowFirstRunPrompt] = useState(!settings.clipboardFirstRunDone);
-  // Callbacks estáveis: evitam re-render de Sidebar/popups memoizados a cada tick.
+  // Callbacks estáveis: evitam re-render de Sidebar memoizada a cada tick.
   const toggleSidebar = useCallback(() => setSidebarOpen(v => !v), []);
-  const dismissClipboardPopup = useCallback(() => setShowClipboardPopup(false), []);
 
   const isTauri = typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window);
   // No Android o yt-dlp é embarcado (ytdlp_status sempre ready): sem overlay
@@ -49,47 +43,6 @@ function DashboardContent() {
       } catch { /* plugin indisponível: padrão ligado no nativo */ }
     })();
   }, [settings.updates]);
-
-  // Clipboard: polling nativo (2s) mostra popup ao copiar link.
-  useEffect(() => {
-    if (!settings.clipboardMonitoringEnabled) return;
-
-    let stopped = false;
-    let lastSeen = '';
-    let timer: ReturnType<typeof setInterval> | undefined;
-
-    (async () => {
-      const { readClipboardText, looksLikeUrl } = await import('./native/clipboard');
-      if (stopped) return;
-      const poll = async () => {
-        try {
-          const text = (await readClipboardText()).trim();
-          if (text && text !== lastSeen && looksLikeUrl(text)) {
-            lastSeen = text;
-            setClipboardPopupUrl(text);
-            setShowClipboardPopup(true);
-          } else if (text) {
-            lastSeen = text;
-          }
-        } catch {
-          // clipboard indisponível — tenta de novo no próximo ciclo
-        }
-      };
-      await poll();
-      if (!stopped) timer = setInterval(poll, 2000);
-    })();
-
-    return () => {
-      stopped = true;
-      if (timer) clearInterval(timer);
-    };
-  }, [settings.clipboardMonitoringEnabled]);
-
-  const handleAnalyzeClipboardUrl = useCallback((url: string) => {
-    setActiveTab('analyze');
-    // Avisa o LinkAnalyzer via evento.
-    window.dispatchEvent(new CustomEvent('clipboard:analyze', { detail: { url } }));
-  }, [setActiveTab]);
 
   const views = useMemo(() => ({
     analyze: LinkAnalyzer,
@@ -177,22 +130,6 @@ function DashboardContent() {
           )}
         </div>
       </main>
-
-      {/* Popup de link do clipboard */}
-      <Suspense fallback={null}>
-        <ClipboardPopup
-          url={showClipboardPopup ? clipboardPopupUrl : ''}
-          onDismiss={dismissClipboardPopup}
-          onAnalyze={handleAnalyzeClipboardUrl}
-        />
-      </Suspense>
-
-      {/* Prompt inicial do clipboard */}
-      {showFirstRunPrompt && (
-        <Suspense fallback={null}>
-          <FirstRunClipboardPrompt onDismiss={() => setShowFirstRunPrompt(false)} />
-        </Suspense>
-      )}
     </div>
   );
 }

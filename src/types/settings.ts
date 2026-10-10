@@ -12,8 +12,5 @@ export interface AppSettings {
   autoDownload: boolean;
   notifications: boolean;
   updates: boolean;
-  colorfulIcons: boolean;
   clipboardEnabled: boolean;
-  clipboardMonitoringEnabled: boolean;
-  clipboardFirstRunDone: boolean;
 }

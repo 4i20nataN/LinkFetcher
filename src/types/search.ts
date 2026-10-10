@@ -3,6 +3,8 @@ export interface SearchOptions {
   platform: 'youtube' | 'vimeo' | 'dailymotion' | 'bilibili' | 'soundcloud';
   maxResults?: number;
   proxy?: string;
+  /** Id p/ cancelamento: pesquisa nova mata o yt-dlp da anterior. */
+  searchId?: string;
 }
 
 export interface SearchResult {
