@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ProviderRegistry, probePlaylistFull } from '../../core/plugins/Providers';
-import { MediaInfo, MediaFormat, PlaylistInfo } from '../../types';
+import { MediaInfo, MediaFormat, PlaylistInfo, PlatformId } from '../../types';
 import {
   RefreshCw, ShieldCheck, HelpCircle, AlertCircle,
 } from 'lucide-react';
@@ -12,12 +12,13 @@ import {
   getAccentTextClass
 } from '../../components/ThemeWrapper';
 import { DownloadEngine } from '../../core/engine/DownloadEngine';
-import { getLicense } from '../../core/license/licenseStore';
+import { getLicense, useLicense } from '../../core/license/licenseStore';
 import { isLicenseActive } from '../../core/license/license';
 import type { FormatOptions } from '../downloads/FormatOptions';
 import { isPlaylistUrl } from '../../core/ytdlp/playlistUtils';
 import { adapterErrorMessage } from '../../core/ytdlp/YtDlpAdapter';
-import { sanitizeUrl, formatUploadDate as fmtDate, pickQuickRefFormat, buildQuickOptions } from './analyzerUtils';
+import { sanitizeUrl, formatUploadDate as fmtDate, pickQuickRefFormat, buildQuickOptions, buildBulkOptions, playlistItemToMedia, removePlaylistItem } from './analyzerUtils';
+import { LicenseModal } from '../../core/license/LicenseModal';
 import { AnalyzeForm } from './AnalyzeForm';
 import { PlaylistCard } from './PlaylistCard';
 import { MediaResultCard } from './MediaResultCard';
@@ -54,9 +55,12 @@ export const LinkAnalyzer: React.FC = () => {
   const [playlistInfo, setPlaylistInfo] = useState<PlaylistInfo | null>(null);
   const [playlistLoading, setPlaylistLoading] = useState(false);
   const [playlistExpanded, setPlaylistExpanded] = useState(false);
-  // Enfileiramento da playlist (pool de probes): progresso + cancelamento.
-  const [enqueueProgress, setEnqueueProgress] = useState<{ done: number; total: number } | null>(null);
-  const enqueueCancelRef = useRef(false);
+  // Modal PRO (desbloqueio a partir do card de playlist).
+  const [showLicense, setShowLicense] = useState(false);
+  // Mídia de referência p/ o painel global (1 probe no 1º item).
+  const [refMedia, setRefMedia] = useState<MediaInfo | null>(null);
+  const [refLoading, setRefLoading] = useState(false);
+  const playlistRef = useRef('');
   const [formatOptions, setFormatOptions] = useState<FormatOptions>({
     format: 'bestvideo+bestaudio/best',
     audioOnly: false,
@@ -128,6 +132,29 @@ export const LinkAnalyzer: React.FC = () => {
     return () => clearTimeout(t);
   }, [url, mediaInfo, selectedFormat, formatOptions]);
 
+  // Painel global com dados reais do 1º vídeo (resoluções, codecs, fps).
+  // 1 probe basta — o formatString resolve por vídeo no download.
+  // Falha aqui não trava o lote (presets gratuitos continuam valendo).
+  const fireReferenceProbe = (playlist: PlaylistInfo) => {
+    const first = playlist.items[0];
+    if (!first?.url) return;
+    playlistRef.current = playlist.id;
+    setRefMedia(null);
+    setRefLoading(true);
+    (async () => {
+      try {
+        const provider = ProviderRegistry.getProviderForUrl(first.url);
+        const info = await provider.analyze(first.url);
+        if (playlistRef.current !== playlist.id) return;
+        setRefMedia(info.formats && info.formats.length > 0 ? info : null);
+      } catch {
+        if (playlistRef.current === playlist.id) setRefMedia(null);
+      } finally {
+        if (playlistRef.current === playlist.id) setRefLoading(false);
+      }
+    })();
+  };
+
   const handleAnalyze = async (urlToAnalyze: string) => {
     const targetUrl = urlToAnalyze.trim();
     if (!targetUrl) return;
@@ -136,6 +163,8 @@ export const LinkAnalyzer: React.FC = () => {
     setError(null);
     setMediaInfo(null);
     setSelectedFormat(null);
+    setRefMedia(null);
+    setRefLoading(false);
     setFormatOptions({
       format: 'bestvideo+bestaudio/best',
       audioOnly: false,
@@ -157,14 +186,25 @@ export const LinkAnalyzer: React.FC = () => {
     setSuccessMsg(null);
     setProbeError(null);
     setPlaylistInfo(null);
+    setShowCoverFormats(false);
 
     if (isPlaylistUrl(targetUrl)) {
       setPlaylistLoading(true);
       try {
         const playlist = await probePlaylistFull(targetUrl);
-        setPlaylistInfo(playlist);
         setPlaylistLoading(false);
+        if (playlist.items.length === 0) {
+          // Título sem itens (redirect morto, privada, bot-wall):
+          // erro claro em vez de card vazio com "Baixar Todos (0)".
+          setLoading(false);
+          setError(settings.language === 'en'
+            ? 'Playlist is empty or unavailable — check the link or try a single video.'
+            : 'Playlist vazia ou indisponível — confira o link ou tente um vídeo individual.');
+          return;
+        }
+        setPlaylistInfo(playlist);
         setLoading(false);
+        fireReferenceProbe(playlist);
         return;
       } catch (err: any) {
         setPlaylistLoading(false);
@@ -325,40 +365,28 @@ export const LinkAnalyzer: React.FC = () => {
     }, 1200);
   };
 
-  const handleDownloadAllPlaylist = async () => {
-    if (!playlistInfo || playlistInfo.items.length === 0 || enqueueProgress) return;
-
-    // Pool de 3 probes cancelável; `next` é seguro (síncrono entre awaits).
-    enqueueCancelRef.current = false;
-    const items = playlistInfo.items;
-    setEnqueueProgress({ done: 0, total: items.length });
-    let next = 0;
-    const worker = async () => {
-      for (;;) {
-        if (enqueueCancelRef.current) return;
-        const i = next++;
-        if (i >= items.length) return;
-        const item = items[i];
-        try {
-          const provider = ProviderRegistry.getProviderForUrl(item.url);
-          const info = await provider.analyze(item.url);
-          if (!enqueueCancelRef.current && info.formats && info.formats.length > 0) {
-            DownloadEngine.addDownload(info, info.formats[0], formatOptions);
-          }
-        } catch (err) {
-          console.warn(`Failed to probe playlist item: ${item.title}`, err);
-        }
-        setEnqueueProgress((p) => (p ? { done: p.done + 1, total: p.total } : p));
-      }
-    };
-    await Promise.all([worker(), worker(), worker()]);
-
-    const cancelled = enqueueCancelRef.current;
-    setEnqueueProgress(null);
-    if (cancelled) return;
+  // Lote com config única: sem probe por item (o MediaInfo vem da entry
+  // flat). custom = PRO, igual ao personalizado unitário.
+  const handleDownloadAllPlaylist = (kind: 'custom' | 'audio' | 'video') => {
+    if (!playlistInfo || playlistInfo.items.length === 0) return;
+    if (kind === 'custom' && !isLicenseActive(getLicense())) {
+      setError(settings.language === 'en' ? 'Bulk custom download is PRO — use a free preset or activate your key.' : 'Download em lote personalizado é PRO — use um preset gratuito ou ative sua chave.');
+      return;
+    }
+    const opts = buildBulkOptions(formatOptions, kind);
+    opts.playlistName = playlistInfo.title;
+    const container = opts.audioOnly ? (opts.audioFormat || 'mp3') : (opts.videoFormat || 'mp4');
+    let added = 0;
+    for (const item of playlistInfo.items) {
+      if (!item.url) continue;
+      const media = playlistItemToMedia(playlistInfo, item, { audioOnly: !!opts.audioOnly, container });
+      DownloadEngine.addDownload(media, media.formats[0], opts);
+      added++;
+    }
+    const total = playlistInfo.items.length;
     setSuccessMsg(settings.language === 'en'
-      ? `Added ${playlistInfo.items.length} items to queue`
-      : `${playlistInfo.items.length} itens adicionados a fila`);
+      ? (added === total ? `Added ${added} items to queue` : `Added ${added} of ${total} items to queue`)
+      : (added === total ? `${added} itens adicionados a fila` : `${added} de ${total} itens adicionados a fila`));
     setTimeout(() => setActiveTab('manager'), 1200);
   };
 
@@ -389,10 +417,61 @@ export const LinkAnalyzer: React.FC = () => {
     }
   };
 
+  // Playlist salva como um item só (chave = URL): o clique em Favoritos /
+  // Baixar Depois re-analisa e volta ao fluxo de playlist.
+  const handleTogglePlaylistFav = () => {
+    if (!playlistInfo) return;
+    toggleFavorite({
+      id: playlistInfo.id,
+      title: playlistInfo.title,
+      url: playlistInfo.url,
+      platform: playlistInfo.platform,
+      thumbnailUrl: playlistInfo.thumbnailUrl
+    });
+  };
+
+  const handleTogglePlaylistLater = () => {
+    if (!playlistInfo) return;
+    if (isDownloadLater(playlistInfo.url)) {
+      removeFromDownloadLater(playlistInfo.url);
+    } else {
+      addToDownloadLater({
+        id: playlistInfo.id,
+        title: playlistInfo.title,
+        url: playlistInfo.url,
+        platform: playlistInfo.platform,
+        thumbnailUrl: playlistInfo.thumbnailUrl
+      });
+    }
+  };
+
+  const handleDownloadPlaylistCover = (targetExt?: 'jpg' | 'png' | 'webp') => {
+    if (!playlistInfo) return;
+    handleDownloadThumbnail(targetExt, {
+      title: playlistInfo.title,
+      thumbnailUrl: playlistInfo.thumbnailUrl,
+      platform: playlistInfo.platform,
+    });
+  };
+
+  const handleAnalyzePlaylistItem = (itemUrl: string) => {
+    const clean = sanitizeUrl(itemUrl.trim());
+    if (!clean) return;
+    setUrl(clean);
+    handleAnalyze(clean);
+  };
+
+  // Tira o item só da lista em tela (lote baixa o que sobrar).
+  const handleRemovePlaylistItem = (id: string) => {
+    setPlaylistInfo(prev => removePlaylistItem(prev, id));
+  };
+
   const [showCoverFormats, setShowCoverFormats] = useState(false);
 
-  const handleDownloadThumbnail = async (targetExt?: 'jpg' | 'png' | 'webp') => {
-    if (!mediaInfo || !mediaInfo.thumbnailUrl) return;
+  const handleDownloadThumbnail = async (targetExt?: 'jpg' | 'png' | 'webp', cover?: { title: string; thumbnailUrl: string; platform: PlatformId }) => {
+    const srcTitle = cover?.title || mediaInfo?.title;
+    const srcThumb = cover?.thumbnailUrl || mediaInfo?.thumbnailUrl;
+    if (!srcTitle || !srcThumb) return;
     // Baixar capa exige licença ativa.
     if (!isLicenseActive(getLicense())) {
       setError(settings.language === 'en' ? 'Cover download is PRO — activate your key in the Custom Download panel.' : 'Baixar capa é PRO — ative sua chave no painel Download Personalizado.');
@@ -403,7 +482,7 @@ export const LinkAnalyzer: React.FC = () => {
       return;
     }
     setShowCoverFormats(false);
-    const titleBase = ((mediaInfo.title || 'video').replace(/[<>:"/\\|?*]/g, '_').substring(0, 80));
+    const titleBase = ((srcTitle || 'video').replace(/[<>:"/\\|?*]/g, '_').substring(0, 80));
     // blob: é same-origin: o canvas nunca contamina (sem CORS).
     const convertCoverBytes = (raw: Uint8Array, srcMime: string, target: 'jpg' | 'png' | 'webp'): Promise<Uint8Array> =>
       new Promise((resolve, reject) => {
@@ -446,7 +525,7 @@ export const LinkAnalyzer: React.FC = () => {
         // 1. Bytes via backend (sem CORS: <img> com crossOrigin falharia).
         const fetched = await invoke<{ success: boolean; data: string; ext: string; size: number }>(
           'fs_fetch_cover',
-          { url: mediaInfo.thumbnailUrl },
+          { url: srcThumb },
         );
         const raw = Uint8Array.from(atob(fetched.data), (c) => c.charCodeAt(0));
         const realExt = (fetched.ext || 'jpg').toLowerCase();
@@ -479,12 +558,12 @@ export const LinkAnalyzer: React.FC = () => {
           throw new Error('write');
         }
         DownloadEngine.registerCompletedFile({
-          title: mediaInfo.title || titleBase,
+          title: srcTitle || titleBase,
           filePath,
           size: outBytes.length,
-          platform: mediaInfo.platform,
-          url: mediaInfo.thumbnailUrl,
-          thumbnailUrl: mediaInfo.thumbnailUrl,
+          platform: cover?.platform ?? mediaInfo?.platform ?? 'generic',
+          url: srcThumb,
+          thumbnailUrl: srcThumb,
           ext: outExt,
         });
         const shown = outExt.toUpperCase();
@@ -500,7 +579,7 @@ export const LinkAnalyzer: React.FC = () => {
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve();
         img.onerror = () => reject(new Error('img'));
-        img.src = mediaInfo.thumbnailUrl;
+        img.src = srcThumb;
       });
       const canvas = document.createElement('canvas');
       canvas.width = img.naturalWidth;
@@ -529,6 +608,8 @@ export const LinkAnalyzer: React.FC = () => {
 
   const isFav = mediaInfo ? isFavorite(mediaInfo.originalUrl) : false;
   const isLater = mediaInfo ? isDownloadLater(mediaInfo.originalUrl) : false;
+  const isPlFav = playlistInfo ? isFavorite(playlistInfo.url) : false;
+  const isPlLater = playlistInfo ? isDownloadLater(playlistInfo.url) : false;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 py-2 md:py-6 px-4">
@@ -603,10 +684,25 @@ export const LinkAnalyzer: React.FC = () => {
         playlistInfo={playlistInfo}
         playlistExpanded={playlistExpanded}
         setPlaylistExpanded={setPlaylistExpanded}
-        enqueueProgress={enqueueProgress}
-        onCancelEnqueue={() => { enqueueCancelRef.current = true; }}
+        proActive={isLicenseActive(useLicense())}
         onDownloadAll={handleDownloadAllPlaylist}
+        onUnlockPro={() => setShowLicense(true)}
+        refMedia={refMedia}
+        refLoading={refLoading}
+        formatOptions={formatOptions}
+        onFormatSelect={setFormatOptions}
+        onFormatChange={setSelectedFormat}
+        isFav={isPlFav}
+        isLater={isPlLater}
+        onToggleFav={handleTogglePlaylistFav}
+        onToggleLater={handleTogglePlaylistLater}
+        showCoverFormats={showCoverFormats}
+        onDownloadCover={handleDownloadPlaylistCover}
+        onAnalyzeItem={handleAnalyzePlaylistItem}
+        onRemoveItem={handleRemovePlaylistItem}
       />
+
+      {showLicense && <LicenseModal onClose={() => setShowLicense(false)} />}
 
       {mediaInfo && !loading && (
         <MediaResultCard

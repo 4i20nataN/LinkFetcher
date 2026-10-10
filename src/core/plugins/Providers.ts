@@ -1,6 +1,7 @@
 import type { MediaInfo, PlatformId, MediaFormat, MediaType, PlaylistInfo, PlaylistItem } from '../../types';
 import type { MediaProvider } from './MediaProvider';
 import { probeUrlWithAdapter, probePlaylistWithAdapter } from '../ytdlp/YtDlpAdapter';
+import { pickEntryThumbnail } from '../ytdlp/playlistUtils';
 import { PLATFORM_REGISTRY, matchPlatformForUrl, type PlatformConfig } from './platformConfigs';
 import { YtDlpProvider } from './YtDlpProvider';
 
@@ -453,9 +454,11 @@ export async function probePlaylistFull(
     id: (entry.id as string) || `pl_${idx}`,
     title: (entry.title as string) || `Item ${idx + 1}`,
     url: (entry.url as string) || (entry.webpage_url as string) || url,
-    thumbnailUrl: (entry.thumbnail as string) || '',
+    thumbnailUrl: pickEntryThumbnail(entry),
     duration: (entry.duration as number) || undefined,
     index: (entry.playlist_index as number) || idx + 1,
+    uploader: ((entry.uploader as string) || (entry.channel as string)) || undefined,
+    views: (entry.view_count as number) ?? undefined,
   }));
 
   return {
@@ -468,5 +471,6 @@ export async function probePlaylistFull(
     platform,
     url,
     items,
+    channel: items[0]?.uploader,
   };
 }

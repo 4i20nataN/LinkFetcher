@@ -31,6 +31,8 @@ export interface DownloadItem {
   fpsMax?: number;
   bandLimit?: number;
   customFilename?: string;
+  /** Título da playlist de origem (lote). Também alimenta a subpasta. */
+  playlistName?: string;
   videoFormat?: string;
   videoCodec?: string;
   normalizeAudio?: boolean;

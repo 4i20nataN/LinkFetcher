@@ -23,6 +23,8 @@ interface FormatSelectorProps {
   onFormatChange?: (format: MediaFormat) => void;
   formatOptions?: FormatOptions;
   onQuickDownload?: (kind: 'audio' | 'video') => void;
+  // Lote: esconde o que não vale por item (presets unitários, corte, nome, desc).
+  bulk?: boolean;
 }
 
 import type { FormatOptions } from './FormatOptions';
@@ -70,7 +72,7 @@ import {
 
 type TabId = 'media' | 'advanced';
 
-export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, formatOptions, onQuickDownload }: FormatSelectorProps) {
+export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, onFormatSelect, onFormatChange, formatOptions, onQuickDownload, bulk }: FormatSelectorProps) {
   const { settings, updateSettings } = useApp();
   const { t } = useTranslation(settings);
   const [activeTab, setActiveTab] = useState<TabId>('media');
@@ -367,6 +369,8 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
 
   return (
     <div className="space-y-3" style={{ '--ui-scale': uiScale } as React.CSSProperties}>
+      {!bulk && (
+      <>
       <p className="font-bold text-white text-center text-base pt-4 mb-5">
         {settings.language === 'en' ? '📥 Free Download' : '📥 Download Gratuito'}
       </p>
@@ -386,6 +390,8 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
           {settings.language === 'en' ? 'MP3 Audio' : 'Áudio MP3'}
         </button>
       </div>
+      </>
+      )}
       <div className="border-t lf-border pt-4 mt-5">
       <div className="text-center mb-3">
         <p className="font-bold text-white text-base">
@@ -395,8 +401,8 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
         </p>
         <p className="fs-sm lf-text-muted mt-1">
           {settings.language === 'en'
-            ? 'Resolution, codec, trims and subtitles — full control of the final file'
-            : 'Resolução, codec, cortes e legendas — controle total do arquivo final'}
+            ? (bulk ? 'Resolution, codec, fps and subtitles — one setup for every video' : 'Resolution, codec, trims and subtitles — full control of the final file')
+            : (bulk ? 'Resolução, codec, fps e legendas — um ajuste para todos os vídeos' : 'Resolução, codec, cortes e legendas — controle total do arquivo final')}
         </p>
         {proActive && license?.name && (
           <p className="fs-sm text-emerald-400 mt-1">
@@ -474,15 +480,15 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
             <ResolutionSection ctx={ctx} />
             <VideoFormatSection ctx={ctx} />
             <AudioSection ctx={ctx} />
-            {mediaInfo.description && <DescriptionSection ctx={ctx} />}
+            {!bulk && mediaInfo.description && <DescriptionSection ctx={ctx} />}
             <SubtitlesSection ctx={ctx} />
-            <FilenameSection ctx={ctx} />
+            {!bulk && <FilenameSection ctx={ctx} />}
           </AnimatedCard>
         )}
 
         {activeTab === 'advanced' && (
           <AnimatedCard animateKey="advanced" variant={slideUp} className="space-y-3">
-            <TrimSection ctx={ctx} />
+            {!bulk && <TrimSection ctx={ctx} />}
             <OutputSection ctx={ctx} />
             <SponsorBlockSection ctx={ctx} />
             <MetadataSection ctx={ctx} />

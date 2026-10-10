@@ -988,7 +988,7 @@ input[type="checkbox"] {
   display: flex;
   gap: 10px;
   width: max-content;
-  animation: scrollLeft 95s linear infinite;
+  animation: scrollLeft 300s linear infinite;
 
   /* Respiro interno para o hover não ser cortado pelo overflow:hidden */
   padding-top: 12px;
@@ -1018,7 +1018,7 @@ input[type="checkbox"] {
    efficient). É uma faixa pequena com translateX — custo de repaint baixo,
    diferente dos blurs full-screen que o perfil efficient mantém estáticos. */
 .efficient .scroll-row {
-  animation: scrollLeft 95s linear infinite;
+  animation: scrollLeft 300s linear infinite;
 }
 
 /* No Linux WebKitGTK software rasterizer, backdrop-filter forces full-surface

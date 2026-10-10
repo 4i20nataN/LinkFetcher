@@ -1,8 +1,7 @@
 /** Config do formato de download (tipo compartilhado, sem import circular). */
 
 export interface FormatOptions {
-  format?: string;
-  audioOnly: boolean;
+  format?: string;  audioOnly: boolean;
   audioFormat: string;
   audioQuality: string;
   writeSubs: boolean;
@@ -26,6 +25,8 @@ export interface FormatOptions {
   videoCodec?: string; // '', 'h264', 'h265', 'vp9', 'av01'
   videoFormat?: string; // 'mp4', 'mkv', 'webm', 'flv' (ts/avi/mov removidos: falham no merge com codecs padrão av1/opus)
   customFilename?: string;
+  /** Origem em lote: título da playlist (filtro + futura subpasta). */
+  playlistName?: string;
   descFormat?: 'txt' | 'md' | 'none';
   normalizeAudio?: boolean;
   videoSharpen?: 'none' | 'light' | 'normal' | 'strong';

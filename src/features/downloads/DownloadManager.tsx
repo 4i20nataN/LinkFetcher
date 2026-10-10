@@ -4,7 +4,7 @@ import { DownloadItem } from '../../types';
 import { DownloadEngine } from '../../core/engine/DownloadEngine';
 import {
   Pause, X, CheckCircle2, AlertTriangle,
-  Clock, TrendingUp, ShieldCheck,
+  Clock, TrendingUp, ShieldCheck, RefreshCw,
 } from 'lucide-react';
 import { AnimatedCard } from '../../animation/AnimatedCard';
 import { AnimatedList } from '../../animation/AnimatedList';
@@ -64,6 +64,24 @@ export const DownloadManager: React.FC = () => {
       }
     });
     showToast(settings.language === 'en' ? 'Download queue cancelled' : 'Fila de downloads cancelada');
+  };
+
+  // Verificação sob demanda: pausados/fila com arquivo pronto em disco
+  // viram concluídos (mesma cura do boot). Toast diz quantos curou.
+  const [reconciling, setReconciling] = useState(false);
+  const handleReconcile = async () => {
+    if (reconciling) return;
+    setReconciling(true);
+    try {
+      const healed = await DownloadEngine.reconcileUnfinished();
+      showToast(healed > 0
+        ? (settings.language === 'en'
+          ? `${healed} download(s) recognized as completed`
+          : `${healed} download(s) reconhecido(s) como concluído(s)`)
+        : (settings.language === 'en' ? 'List verified — nothing to fix' : 'Lista verificada — nada a corrigir'));
+    } finally {
+      setReconciling(false);
+    }
   };
 
   const handleClearStatusFilters = () => {
@@ -231,6 +249,15 @@ export const DownloadManager: React.FC = () => {
             >
               {settings.language === 'en' ? 'Cancel All' : 'Cancelar Todos'}
             </button>
+            <button 
+              onClick={handleReconcile}
+              disabled={reconciling}
+              title={settings.language === 'en' ? 'Verify files on disk and fix statuses' : 'Confere os arquivos em disco e corrige os status'}
+              className="px-3 py-1.5 rounded-lg lf-surface-raised hover:bg-zinc-700 border border-zinc-700/40 text-[10px] font-bold lf-text-secondary hover:text-white transition-colors flex items-center gap-1.5 disabled:opacity-60"
+            >
+              <RefreshCw size={11} className={reconciling ? 'animate-spin' : ''} />
+              {settings.language === 'en' ? 'Verify List' : 'Verificar Lista'}
+            </button>
           </div>
           </AnimatedCard>
       )}
@@ -317,7 +344,6 @@ export const DownloadManager: React.FC = () => {
           )}
         </div>
       </div>
-      // Lista memoizada por assinatura: ticks não reconciliam.
       <DownloadList
         items={filteredDownloads}
         visibleCount={visibleCount}

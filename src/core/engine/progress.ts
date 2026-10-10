@@ -13,6 +13,7 @@ export const PROGRESS_EVENT_SIGNATURE_FIELDS = [
   'speed',
   'eta',
   'filePath',
+  'path',
   'message',
   'kind',
   'current',

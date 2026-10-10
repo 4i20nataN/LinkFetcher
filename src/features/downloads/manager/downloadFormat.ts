@@ -33,7 +33,9 @@ export const formatEta = (seconds: number) => {  if (!Number.isFinite(seconds) |
 };
 
 // Playlist via parse real de parâmetro, não substring.
+// Origem em lote vence: item de playlist aparece na aba Playlists.
 export const getMediaType = (item: DownloadItem): string => {
+  if (item.playlistName) return 'playlist';
   if (item.audioOnly) return 'audio';
   if (item.format.type === 'audio') return 'audio';
   if (item.format.type === 'image') return 'image';

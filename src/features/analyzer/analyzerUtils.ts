@@ -1,6 +1,6 @@
 // Utilidades puras do analisador (formato de referência + opções neutras
 // do download gratuito, datas, URLs).
-import type { MediaFormat, MediaInfo } from '../../types';
+import type { MediaFormat, MediaInfo, PlaylistInfo, PlaylistItem } from '../../types';
 import type { FormatOptions } from '../downloads/FormatOptions';
 
 export function formatUploadDate(d: string): string {
@@ -64,4 +64,87 @@ export function buildQuickOptions(base: FormatOptions, kind: 'audio' | 'video'):
       videoSharpen: 'none' as const,
     } : {}),
   };
+}
+
+/** Tira um item da lista em tela (lote baixa o que sobrar).
+ *  Vazia → null (o card fecha). Pura p/ teste. */
+export function removePlaylistItem(info: PlaylistInfo | null, id: string): PlaylistInfo | null {
+  if (!info) return info;
+  const items = info.items.filter(i => i.id !== id);
+  if (items.length === 0) return null;
+  return {
+    ...info,
+    items,
+    itemCount: items.length,
+    totalDuration: items.reduce((s, i) => s + (i.duration || 0), 0) || undefined,
+    thumbnailUrl: items[0]?.thumbnailUrl || info.thumbnailUrl,
+    channel: items[0]?.uploader ?? info.channel,
+  };
+}
+
+/** Segundos → "MM:SS" ou "H:MM:SS". */
+export function fmtDuration(sec?: number): { text: string; seconds: number } {
+  if (!sec || sec <= 0 || !Number.isFinite(sec)) return { text: '', seconds: 0 };
+  const s = Math.round(sec);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  return {
+    text: h > 0
+      ? `${h}:${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`
+      : `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`,
+    seconds: s,
+  };
+}
+
+// MediaInfo a partir da entry flat: o lote é regido pelo FormatOptions
+// global, então probe por item é redundância (N probes = espera + 429).
+// O formato aqui é só referência p/ exibição.
+export function playlistItemToMedia(
+  playlist: PlaylistInfo,
+  item: PlaylistItem,
+  opts: { audioOnly: boolean; container: string },
+): MediaInfo {
+  const dur = fmtDuration(item.duration);
+  const type = opts.audioOnly ? 'audio' as const : 'video' as const;
+  return {
+    id: `pl_${item.id}`,
+    title: item.title,
+    author: '',
+    channel: playlist.title,
+    duration: dur.text,
+    durationSeconds: dur.seconds,
+    sizeEst: '',
+    formats: [{
+      id: 'bulk',
+      ext: opts.container,
+      quality: opts.container.toUpperCase(),
+      sizeEst: '',
+      sizeBytes: 0,
+      codec: '',
+      type,
+    }],
+    codec: '',
+    type,
+    platform: playlist.platform,
+    originalUrl: item.url,
+    thumbnailUrl: item.thumbnailUrl,
+    status: 'success' as const,
+  };
+}
+
+// Opções do lote: config única p/ todos os vídeos.
+// custom (PRO): como está no painel, sem nome fixo/corte/descrição.
+// audio/video: preset gratuito igual ao download rápido unitário.
+export function buildBulkOptions(base: FormatOptions, kind: 'custom' | 'audio' | 'video'): FormatOptions {
+  if (kind === 'custom') {
+    const opts: FormatOptions = {
+      ...base,
+      downloadSections: '',
+      descFormat: 'none',
+    };
+    delete opts.customFilename;
+    return opts;
+  }
+  return buildQuickOptions(base, kind);
 }

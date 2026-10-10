@@ -18,7 +18,7 @@ describe('contrato de progresso (regressão v1.4.0)', () => {
     expect([...PROGRESS_EVENT_SIGNATURE_FIELDS].sort()).toEqual(
       [
         'type', 'percent', 'downloaded', 'total', 'speed', 'eta',
-        'filePath', 'message', 'kind', 'current', 'text',
+        'filePath', 'path', 'message', 'kind', 'current', 'text',
       ].sort(),
     );
   });
@@ -34,6 +34,12 @@ describe('contrato de progresso (regressão v1.4.0)', () => {
     const a = { type: 'progress', percent: 42 };
     const b = { type: 'progress', percent: 43 };
     expect(progressEventSignature(a)).not.toBe(progressEventSignature(b));
+  });
+
+  it('destination e merged têm assinatura distinta (não engolido)', () => {
+    const d = { type: 'destination', path: '/dl/a.mp4' };
+    const m = { type: 'destination', path: '/dl/a-final.mp3' };
+    expect(progressEventSignature(d)).not.toBe(progressEventSignature(m));
   });
 
   it('complete tem assinatura distinta de progress (nunca engolido)', () => {

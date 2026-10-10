@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FavoriteItem } from '../../types';
-import { Star, Link2, ExternalLink, ArrowRight, Trash2, Edit2, Check, FileText, Download } from 'lucide-react';
+import { Star, ExternalLink, ArrowRight, Trash2, Edit2, Check, FileText, Download, ListMusic } from 'lucide-react';
 import { AnimatedCard } from '../../animation/AnimatedCard';
 import { AnimatedList } from '../../animation/AnimatedList';
 import { scaleIn } from '../../animation/variants';
@@ -11,6 +11,7 @@ import {
 } from '../../components/ThemeWrapper';
 import { ProviderRegistry } from '../../core/plugins/Providers';
 import { PlatformBadge } from '../../components/PlatformBadge';
+import { isPlaylistUrl } from '../../core/ytdlp/playlistUtils';
 
 export const FavoritesView: React.FC = () => {
   const { settings, favorites, toggleFavorite, updateFavoriteNotes, setSelectedUrl, setActiveTab } = useApp();
@@ -94,15 +95,16 @@ export const FavoritesView: React.FC = () => {
             {favorites.map((fav) => {
               const platform = ProviderRegistry.getPlatformConfig(fav.platform);
               const isEditing = editingId === fav.id;
+              const isPlaylist = isPlaylistUrl(fav.url);
 
               return (
                 <AnimatedCard
                   animateKey={fav.id}
                   variant={scaleIn}
-                  className="p-4 rounded-2xl glass-card flex flex-col justify-between space-y-4 group hover:bg-white/10 transition-colors"
+                  className="rounded-2xl glass-card flex flex-col group hover:bg-white/10 transition-colors overflow-hidden"
                 >
-                  <div className="flex gap-4">
-                    <div className="relative w-24 h-24 rounded-lg overflow-hidden border lf-border lf-surface shrink-0">
+                  <div className="relative w-full h-36 overflow-hidden border-b lf-border lf-surface shrink-0">
+                    {fav.thumbnailUrl ? (
                       <img
                         src={fav.thumbnailUrl}
                         alt={fav.title}
@@ -111,23 +113,34 @@ export const FavoritesView: React.FC = () => {
                         loading="lazy"
                         decoding="async"
                       />
-                      {platform && (
-                        <PlatformBadge platformId={fav.platform} name={platform.name} color={platform.color} variant="overlay" />
-                      )}
-                    </div>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-white/[0.03]">
+                        {settings.iconStyle === 'emoji' ? <span className="text-3xl">⭐</span> : <Star size={28} className="lf-text-muted" />}
+                      </div>
+                    )}
+                    {platform && (
+                      <PlatformBadge platformId={fav.platform} name={platform.name} color={platform.color} variant="overlay" />
+                    )}
+                  </div>
 
-                    <div className="min-w-0 flex-1 space-y-1">
+                  <div className="p-4 flex flex-col justify-between space-y-4 flex-1">
+                    <div className="min-w-0 space-y-1">
                       <span className="text-[9px] font-semibold lf-text-muted block font-mono uppercase tracking-wider">
                         {t('dateAdded')} {new Date(fav.dateAdded).toLocaleDateString()}
                       </span>
-                      <h4 className="font-semibold text-xs text-white leading-snug line-clamp-2">
+                      <h4 className="font-semibold text-sm text-white leading-snug line-clamp-2">
                         {fav.title}
                       </h4>
                       <p className="text-[10px] lf-text-secondary block truncate font-mono">
                         {fav.url}
                       </p>
+                      {isPlaylist && (
+                        <span className="inline-flex px-2 py-0.5 rounded-md bg-white/5 border lf-border text-[10px] uppercase font-mono tracking-wider items-center gap-1.5 lf-text-secondary">
+                          {settings.iconStyle === 'emoji' ? <span>📋</span> : <ListMusic size={12} className="text-indigo-400" />}
+                          Playlist
+                        </span>
+                      )}
                     </div>
-                  </div>
 
                   <div className="p-3 rounded-lg bg-white/5 border lf-border">
                     <div className="flex justify-between items-center mb-1">
@@ -203,6 +216,7 @@ export const FavoritesView: React.FC = () => {
                         {settings.language === 'en' ? 'Analyze' : 'Analisar'} <ArrowRight size={12} />
                       </button>
                     </div>
+                  </div>
                   </div>
                 </AnimatedCard>
               );

@@ -239,9 +239,17 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                 response.out.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.forEach { line ->
                     try {
                         val obj = JSONObject(line)
-                        val isPlaylist = obj.optString("_type") == "playlist" || obj.has("playlist_count")
+                        val type = obj.optString("_type")
+                        // `_type: url` (redirect de watch?v+list) é um vídeo:
+                        // item, nunca cabeçalho — mesmo com playlist_count null.
+                        if (type == "url") {
+                            entries.put(obj)
+                            return@forEach
+                        }
+                        val countVal = if (obj.has("playlist_count") && !obj.isNull("playlist_count")) obj.optLong("playlist_count") else null
+                        val isPlaylist = type == "playlist" || countVal != null
                         if (isPlaylist) {
-                            if (count == null && obj.has("playlist_count")) count = obj.optLong("playlist_count")
+                            if (count == null && countVal != null) count = countVal
                             if (title == null) {
                                 obj.optString("title").takeIf { it.isNotEmpty() }?.let { title = it }
                             }

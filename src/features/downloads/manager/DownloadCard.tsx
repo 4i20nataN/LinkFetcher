@@ -79,6 +79,14 @@ export const DownloadCard = React.memo(function DownloadCard({
                       {platform && (
                         <PlatformBadge platformId={item.platform} name={platform.name} color={platform.color} variant="inline" />
                       )}
+                      {item.playlistName && (
+                        <span
+                          title={item.playlistName}
+                          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-semibold bg-indigo-900/60 text-indigo-300 border border-indigo-800/40 max-w-32"
+                        >
+                          <span className="truncate">📋 {item.playlistName}</span>
+                        </span>
+                      )}
                       {/* Concluído: extensão do arquivo real; pendente: container prometido. */}
                       {(() => {
                         const doneExt = item.status === 'completed' && item.filePath
