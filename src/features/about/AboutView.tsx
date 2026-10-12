@@ -6,7 +6,6 @@ import { useApp } from '../../context/AppContext';
 import { useLicense, getLicense, clearLicense } from '../../core/license/licenseStore';
 import { isLicenseActive } from '../../core/license/license';
 import { LicenseModal } from '../../core/license/LicenseModal';
-import { WHATS_NUMBER } from '../../core/license/purchase';
 import { PrivacyPolicy } from '../privacy/PrivacyPolicy';
 import {
   Info, KeyRound, ShieldCheck, Copy, Check, Eye, EyeOff,
@@ -45,9 +44,9 @@ export function AboutView() {
     } catch { /* clipboard indisponível: seleção manual */ }
   };
 
-  const supportLink = `https://wa.me/${WHATS_NUMBER}?text=${encodeURIComponent(
-    isEn ? 'Hello! I need help with LinkFetcher.' : 'Olá! Preciso de ajuda com o LinkFetcher.',
-  )}`;
+  const supportHint = isEn
+    ? 'Lost your key or having trouble? Use "Lost my key" in the PRO panel or reply to the email where you received your key.'
+    : 'Perdeu a chave ou com problema? Use "Perdi minha chave" no painel PRO ou responda ao e-mail onde recebeu sua chave.';
 
   const card = `rounded-2xl p-6 transition-all duration-300 cv-auto
     ${isLight
@@ -228,19 +227,8 @@ export function AboutView() {
                 {isEn ? 'Support' : 'Suporte'}
               </h3>
               <p className={`${body} mb-3`}>
-                {isEn
-                  ? 'Lost your key or having trouble? Call us with your purchase contact at hand.'
-                  : 'Perdeu a chave ou com problema? Chame com o contato da compra em mãos.'}
+                {supportHint}
               </p>
-              <a
-                href={supportLink}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all"
-              >
-                <MessageCircle size={14} />
-                WhatsApp
-              </a>
             </div>
           </div>
 

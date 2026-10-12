@@ -9,7 +9,7 @@ export interface LicenseRecord {
   /** unix seconds; 0 = vitalícia */
   expiresAt: number;
   activatedAt: string;
-  /** contato informado na compra (e-mail ou WhatsApp); '' = não informado */
+  /** contato da compra (e-mail); '' = não informado */
   contact: string;
 }
 
