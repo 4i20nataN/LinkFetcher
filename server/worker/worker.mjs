@@ -186,7 +186,17 @@ export async function mintKeyFor(env, name, days) {
 }
 
 // --- e-mail genérico via Brevo (chave usa este; broadcast também) ---
-async function sendEmail(env, { to, subject, text, html }) {
+function b64encodeUtf8(s) {
+  const bytes = new TextEncoder().encode(s);
+  let bin = '';
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
+}
+
+async function sendEmail(env, { to, subject, text, html, attachments }) {
   if (!env.BREVO_API_KEY || !env.SMTP_FROM) {
     console.error('email NOT configured (BREVO_API_KEY/SMTP_FROM ausentes)');
     return { sent: false, reason: 'email-not-configured' };
@@ -199,6 +209,12 @@ async function sendEmail(env, { to, subject, text, html }) {
       textContent: text,
     };
     if (html) payload.htmlContent = html;
+    if (attachments && attachments.length > 0) {
+      payload.attachment = attachments.map((a) => ({
+        content: a.base64,
+        name: a.name,
+      }));
+    }
     const res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: { 'api-key': env.BREVO_API_KEY, 'content-type': 'application/json' },
@@ -280,6 +296,15 @@ async function sendKeyEmail(env, { to, key, days }) {
     '2. Já tenho uma chave (cole a chave acima)',
     '',
     'Guarde este e-mail. Qualquer dúvida, responda por aqui.',
+    'Anexo: sua chave também vai em .txt para baixar e guardar.',
+  ].join('\n');
+  const keyFile = [
+    'LinkFetcher PRO — sua chave',
+    '',
+    key,
+    '',
+    'Ative em: Download Personalizado → Ativar PRO → Já tenho uma chave.',
+    `Validade: ${days} dias.`,
   ].join('\n');
   const html = keyEmailHtml({
     preheader: 'Obrigado por assinar o PRO — sua chave chegou.',
@@ -291,13 +316,14 @@ async function sendKeyEmail(env, { to, key, days }) {
       'Abra o LinkFetcher → <b>Download Personalizado</b> → <b>Ativar PRO</b>',
       'Toque em <b>Já tenho uma chave</b> e cole a chave acima',
     ],
-    foot: 'Guarde este e-mail com carinho — é com ele que você recupera sua chave. Perdeu? No app: Download Personalizado → Ativar PRO → <b>Perdi minha chave</b>.',
+    foot: 'Anexamos sua chave em <b>.txt</b> — baixe e guarde. Perdeu tudo? No app: Download Personalizado → Ativar PRO → <b>Perdi minha chave</b>.',
   });
   return sendEmail(env, {
     to,
     subject: 'Sua chave LinkFetcher PRO',
     text,
     html,
+    attachments: [{ name: 'linkfetcher-chave-pro.txt', base64: b64encodeUtf8(keyFile) }],
   });
 }
 
