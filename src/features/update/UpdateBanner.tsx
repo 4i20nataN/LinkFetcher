@@ -10,7 +10,7 @@ import { useTranslation } from '../../core/i18n';
 import { appVersion } from '../../core/version';
 import { formatBytes } from '../downloads/manager/downloadFormat';
 import { isAndroid } from '../../core/ytdlp/YtDlpAdapter';
-import { checkAndroidUpdate, type AndroidUpdateAvailable } from './AndroidUpdater';
+import { checkAndroidUpdate, invokeUpdateDownload, waitUpdateComplete, type AndroidUpdateAvailable } from './AndroidUpdater';
 
 type UpdateStage = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error' | 'dismissed';
 
@@ -104,8 +104,9 @@ export default function UpdateBanner() {
   }, [stage]);
 
   const handleUpdateAndRestart = useCallback(async () => {
-    // Android: sideload via DownloadManager (sem relaunch); a notificação
-    // do sistema assume e abre o instalador. Fecha o popup sozinho.
+    // Android: sideload via DownloadManager (sem relaunch). Usa a rota Rust
+    // (transporte provado) e aguarda o desfecho; a notificação do sistema
+    // assume e o instalador abre sozinho. Fecha o popup em seguida.
     if (isAndroid()) {
       const info = androidUpdateRef.current;
       if (!info) {
@@ -117,9 +118,14 @@ export default function UpdateBanner() {
       setProgress(0);
       setErrorMsg('');
       try {
-        const { invoke } = await import('@tauri-apps/api/core');
-        await invoke('plugin:ytdlp|updateDownload', { url: info.apkUrl, fileName: info.apkName });
-        setTimeout(() => setStage('dismissed'), 4000);
+        await invokeUpdateDownload(info.apkUrl, info.apkName);
+        const done = await waitUpdateComplete(info.apkName);
+        if (done.status === 'failed') {
+          setErrorMsg(done.error || t('updFailGeneric'));
+          setStage('error');
+          return;
+        }
+        setTimeout(() => setStage('dismissed'), done.status === 'ok' ? 2500 : 4000);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         setErrorMsg(typeof msg === 'string' && msg ? msg : t('updFailGeneric'));

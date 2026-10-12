@@ -1307,6 +1307,52 @@ pub async fn ytdlp_cancel(
     Ok(())
 }
 
+/// Disparo de update (APK) no Android via Kotlin; fora dele, erro.
+/// Rota via Rust (não invoke direto do JS): usa o transporte provado
+/// (o mesmo de probe/execute), imune a falha de dispatch no WebView.
+#[cfg(target_os = "android")]
+#[tauri::command]
+pub async fn ytdlp_update_download(
+    app: AppHandle,
+    options: Option<serde_json::Value>,
+    params: Option<serde_json::Value>,
+    payload: Option<serde_json::Value>,
+) -> Result<String, String> {
+    let opts = options
+        .as_ref()
+        .or(params.as_ref())
+        .or(payload.as_ref());
+    let url = opts
+        .and_then(|v| v.get("url").and_then(|u| u.as_str()))
+        .unwrap_or("");
+    let file = opts
+        .and_then(|v| v.get("fileName").and_then(|f| f.as_str()))
+        .unwrap_or("");
+    if url.is_empty() || file.is_empty() {
+        return Err("URL ou nome de APK ausentes".into());
+    }
+    let res: serde_json::Value = crate::mobile_ytdlp::call_mobile(
+        &app,
+        "updateDownload",
+        &serde_json::json!({ "url": url, "fileName": file }),
+    )
+    .await?;
+    let id = res
+        .get("downloadId")
+        .and_then(|v| v.as_i64())
+        .map(|n| n.to_string())
+        .unwrap_or_default();
+    eprintln!("[ytdlp_update_download] enfileirado id={id}");
+    Ok(id)
+}
+
+/// Fora do Android: sem DownloadManager (erro explícito).
+#[cfg(not(target_os = "android"))]
+#[tauri::command]
+pub async fn ytdlp_update_download() -> Result<String, String> {
+    Err("update_download suportado só no Android".into())
+}
+
 /// Reconciliação pós-background no Android; retorna o JSON cru do Kotlin.
 /// `unknown` = sem registro (engine não age).
 #[cfg(target_os = "android")]

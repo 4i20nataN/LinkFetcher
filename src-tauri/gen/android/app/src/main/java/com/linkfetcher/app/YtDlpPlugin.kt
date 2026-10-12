@@ -664,6 +664,24 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
             invoke.reject("URL de atualização não confiável")
             return
         }
+        // Permissão de notificação: sem ela o DownloadManager com aviso
+        // visível estoura SecurityException no Android 13+.
+        ensureNotificationPermission()
+        // Sem "instalar apps desconhecidos" o instalador morre em silêncio
+        // depois do download: barra antes, guiando p/ a tela do sistema.
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 26 && !activity.packageManager.canRequestPackageInstalls()) {
+                try {
+                    val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                        data = android.net.Uri.parse("package:${activity.packageName}")
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    activity.startActivity(intent)
+                } catch (_: Exception) { /* segue sem atalho */ }
+                invoke.reject("Permita \"Instalar apps desconhecidos\" para o LinkFetcher e toque em Instalar de novo")
+                return
+            }
+        } catch (_: Exception) { /* segue sem a checagem */ }
         try {
             val dm = activity.getSystemService(android.app.DownloadManager::class.java)
                 ?: return invoke.reject("DownloadManager indisponível")
@@ -699,6 +717,11 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                 )
                 if (status != android.app.DownloadManager.STATUS_SUCCESSFUL) {
                     Log.w(TAG, "update download malsucedido: $fileName status=$status")
+                    emitOnUi("lf-update-complete") {
+                        put("fileName", fileName)
+                        put("ok", false)
+                        put("error", "download do APK falhou no sistema, status=$status")
+                    }
                     return
                 }
             }
@@ -720,8 +743,18 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
             }
             activity.startActivity(intent)
             Log.i(TAG, "instalador aberto: $fileName")
+            emitOnUi("lf-update-complete") {
+                put("fileName", fileName)
+                put("filePath", file.absolutePath)
+                put("ok", true)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "instalação do update falhou: $fileName", e)
+            emitOnUi("lf-update-complete") {
+                put("fileName", fileName)
+                put("ok", false)
+                put("error", (e.message ?: "falha ao abrir o instalador").take(200))
+            }
         }
     }
 

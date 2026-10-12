@@ -52,6 +52,7 @@ pub fn run() {
       ytdlp::binary::ytdlp_ensure_binaries,
       fs::ytdlp_download,
       fs::ytdlp_cancel,
+      fs::ytdlp_update_download,
       fs::ytdlp_cleanup,
       fs::ytdlp_job_state,
       fs::ytdlp_job_progress,

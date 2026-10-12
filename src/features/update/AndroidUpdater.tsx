@@ -24,7 +24,56 @@ function compareVer(a: string, b: string): number {
   return 0;
 }
 
-type Stage = 'idle' | 'checking' | 'available' | 'downloading' | 'error';
+type Stage = 'idle' | 'checking' | 'available' | 'downloading' | 'done' | 'error';
+
+export type UpdateComplete = { status: 'ok' | 'failed' | 'timeout'; error?: string };
+
+/** Dispara o update pela rota Rust (transporte provado do probe/execute),
+ *  em vez do invoke direto no plugin. */
+export async function invokeUpdateDownload(url: string, fileName: string): Promise<string> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<string>('ytdlp_update_download', { options: { url, fileName } });
+}
+
+/** Aguarda o desfecho do instalador (`lf-update-complete` do plugin):
+ *  ok = instalador abriu; failed = motivo em `error`; timeout = segue
+ *  baixando pela notificação (sem erro). Transporte duplo igual ao engine. */
+export function waitUpdateComplete(fileName: string, timeoutMs = 120_000): Promise<UpdateComplete> {
+  return new Promise((resolve) => {
+    let done = false;
+    let unlistenTauri: (() => void) | null = null;
+    let onCustom: ((e: Event) => void) | null = null;
+    const timer: ReturnType<typeof setTimeout> = setTimeout(() => finish({ status: 'timeout' }), timeoutMs);
+    const finish = (r: UpdateComplete) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try {
+        unlistenTauri?.();
+      } catch { /* idempotente */ }
+      try {
+        if (onCustom && typeof window !== 'undefined') window.removeEventListener('lf-update-complete', onCustom);
+      } catch { /* idempotente */ }
+      resolve(r);
+    };
+    const match = (d: any) => {
+      if (!d || (d.fileName && d.fileName !== fileName)) return;
+      finish(d.ok === false
+        ? { status: 'failed', error: typeof d.error === 'string' ? d.error : undefined }
+        : { status: 'ok' });
+    };
+    (async () => {
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+        unlistenTauri = await listen('lf-update-complete', (e: any) => match(e?.payload));
+      } catch { /* sem Tauri: só CustomEvent */ }
+      if (typeof window !== 'undefined') {
+        onCustom = (e: Event) => match((e as CustomEvent).detail);
+        window.addEventListener('lf-update-complete', onCustom);
+      }
+    })();
+  });
+}
 
 export interface AndroidUpdateAvailable {
   tag: string;
@@ -128,9 +177,15 @@ export function AndroidUpdater() {
     setStage('downloading');
     setError('');
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      const fileName = apkName;
-      await invoke('plugin:ytdlp|updateDownload', { url: apkUrl, fileName });
+      await invokeUpdateDownload(apkUrl, apkName);
+      const done = await waitUpdateComplete(apkName);
+      if (done.status === 'ok') {
+        setStage('done');
+      } else if (done.status === 'failed') {
+        setError(done.error || (en ? 'Download failed' : 'Falha no download'));
+        setStage('error');
+      }
+      // timeout = segue baixando pela notificação do sistema, sem erro.
     } catch (e: any) {
       const msg = typeof e === 'string' ? e : e?.message;
       setError(msg || (en ? 'Download failed' : 'Falha no download'));
@@ -143,11 +198,13 @@ export function AndroidUpdater() {
       ? (en ? 'Checking…' : 'Verificando…')
       : stage === 'downloading'
         ? (en ? 'Downloading via system notification…' : 'Baixando pela notificação do sistema…')
-        : stage === 'available'
-          ? (en ? `${remote} available` : `${remote} disponível`)
-          : remote
-            ? (en ? `Up to date (${remote})` : `Em dia (${remote})`)
-            : (en ? 'Check for app updates via GitHub releases' : 'Verifica atualizações nas releases do GitHub');
+        : stage === 'done'
+          ? (en ? 'Installer opened — finish on the system screen' : 'Instalador aberto — conclua na tela do sistema')
+          : stage === 'available'
+            ? (en ? `${remote} available` : `${remote} disponível`)
+            : remote
+              ? (en ? `Up to date (${remote})` : `Em dia (${remote})`)
+              : (en ? 'Check for app updates via GitHub releases' : 'Verifica atualizações nas releases do GitHub');
 
   return (
     <div className="flex items-center justify-between gap-2 p-3 rounded-xl lf-surface-40 lf-border">
@@ -157,7 +214,8 @@ export function AndroidUpdater() {
         </span>
         <p className="text-[10px] lf-text-muted flex items-center gap-1">
           {stage === 'error' ? <AlertCircle size={10} className="text-rose-400 shrink-0" /> : null}
-          <span className="truncate">{stage === 'error' ? error : statusText}</span>
+          {stage === 'done' ? <CheckCircle2 size={10} className="text-emerald-400 shrink-0" /> : null}
+          <span className="break-words line-clamp-3">{stage === 'error' ? error : statusText}</span>
         </p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
@@ -170,7 +228,7 @@ export function AndroidUpdater() {
             <Download size={12} />
             {en ? 'Install' : 'Instalar'}
           </button>
-        ) : stage === 'idle' || stage === 'error' ? (
+        ) : stage === 'idle' || stage === 'error' || stage === 'done' ? (
           <button
             onClick={check}
             className="px-3 py-2 rounded-xl lf-surface-raised hover:bg-zinc-800 lf-text hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-zinc-700/50 transition-all whitespace-nowrap"
