@@ -1,6 +1,5 @@
-// Compra automática PRO (Mercado Pago via license server).
-// DORMENTE até LICENSE_SERVER_URL ser preenchida (ver server/README.md).
-// Com vazio, o modal usa só o fluxo manual (QR próprio + chave digitada).
+// Compra automática PRO (Mercado Pago via license server em Cloudflare Workers).
+// Ativo: LICENSE_SERVER_URL aponta para o Worker de produção.
 
 /** HTTPS do license server. '' = recurso oculto. */
 export const LICENSE_SERVER_URL = 'https://linkfetcher-licenses.linkfetcher.workers.dev';

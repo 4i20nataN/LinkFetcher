@@ -45,7 +45,7 @@ describe('license PRO', () => {
 
   it('rejeita 1 caractere digitável trocado (teste do usuário)', async () => {
     const { pair, spki } = await freshPair();
-    const key = await mint(pair, 'natan.vanim@gmail.com', 0);
+    const key = await mint(pair, 'cliente.exemplo@teste.com', 0);
     const idx = key.indexOf('-') + 5;
     const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
     const tampered = key.slice(0, idx) + alphabet[(alphabet.indexOf(key[idx]) + 1) % alphabet.length] + key.slice(idx + 1);

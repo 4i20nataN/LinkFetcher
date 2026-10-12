@@ -32,6 +32,27 @@ function hex(bytes) {
   return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+// Trunca UTF-8 em N bytes sem partir caractere multibyte no meio.
+function utf8Truncate(s, max) {
+  const full = enc.encode(s);
+  if (full.length <= max) return full.slice(0, max);
+  let n = max;
+  while (n > 0) {
+    try {
+      new TextDecoder('utf-8', { fatal: true }).decode(full.slice(0, n));
+      break;
+    } catch {
+      n--;
+    }
+  }
+  return full.slice(0, n);
+}
+
+// Normaliza contato p/ comparação (case, espaços, unicode).
+function normContact(s) {
+  return String(s || '').trim().normalize('NFKC').toLowerCase();
+}
+
 const CORS = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, POST, OPTIONS',
@@ -84,6 +105,7 @@ export async function verifySignature({ secret, signatureHeader, requestId, data
   );
   const { ts, v1 } = parts;
   if (!ts || !v1) return false;
+  if (!/^\d+$/.test(ts)) return false;
   if (Math.abs(nowMs - Number(ts) * 1000) > 5 * 60_000) return false;
   const manifest = `id:${dataId};request-id:${requestId};ts:${ts};`;
   const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
@@ -146,7 +168,7 @@ async function privateKey(env) {
 
 export async function mintKeyFor(env, name, days) {
   const exp = Math.floor(Date.now() / 1000) + Math.floor(Number(days)) * 86400;
-  const nb = enc.encode(String(name || '').trim()).slice(0, 24);
+  const nb = utf8Truncate(String(name || '').trim(), 24);
   const payload = new Uint8Array(7 + nb.length);
   payload[0] = 0x01;
   payload[1] = 0x01;
@@ -193,7 +215,7 @@ async function sendKeyEmail(env, { to, key, days }) {
       }),
     });
     if (!res.ok) {
-      console.error('email brevo:', res.status, (await res.text()).slice(0, 200));
+      console.error('email brevo:', res.status);
       return { sent: false, reason: 'send-failed' };
     }
     return { sent: true };
@@ -218,9 +240,10 @@ async function saveCheckout(env, c) {
      (checkout_id, mp_id, email, contact, price, days, status, license_key, created_at, updated_at, last_check, paid_at, email_sent)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(checkout_id) DO UPDATE SET
-       status=excluded.status, license_key=excluded.license_key,
+       status=CASE WHEN checkouts.status = 'paid' THEN 'paid' ELSE excluded.status END,
+       license_key=COALESCE(checkouts.license_key, excluded.license_key),
        updated_at=excluded.updated_at, last_check=excluded.last_check,
-       paid_at=excluded.paid_at, email_sent=excluded.email_sent`,
+       paid_at=COALESCE(checkouts.paid_at, excluded.paid_at), email_sent=excluded.email_sent`,
   )
     .bind(
       c.checkout_id,
@@ -252,6 +275,12 @@ async function settleCheckout(env, c) {
   const price = priceOf(env, c);
   const amountOk = Math.abs(Number(pay.transaction_amount) - price) < 0.005 && pay.currency_id === 'BRL';
   if (!amountOk) {
+    c.status = 'amount_mismatch';
+    c.updated_at = new Date().toISOString();
+    return c;
+  }
+  // Amarração pagamento↔checkout: o pagamento tem que citar este checkout.
+  if (pay.external_reference && pay.external_reference !== `lf-${c.checkout_id}`) {
     c.status = 'amount_mismatch';
     c.updated_at = new Date().toISOString();
     return c;
@@ -347,16 +376,24 @@ export default {
       // Checkout: cria o Pix no MP.
       if (request.method === 'POST' && url.pathname === '/api/checkout') {
         if (!rateOk(ip)) return json({ error: 'rate-limited' }, 429);
+        if (Number(request.headers.get('content-length') || 0) > 64 * 1024) {
+          return json({ error: 'body-too-large' }, 413);
+        }
         let body;
         try {
           body = await request.json();
         } catch {
           return json({ error: 'bad-json' }, 400);
         }
-        const email = String(body.email || '').trim().toLowerCase();
-        const contact = String(body.contact || email).trim().slice(0, 60);
+        const email = String(body.email || '').trim().normalize('NFKC').toLowerCase();
+        const contact = String(body.contact || email).trim().normalize('NFKC').slice(0, 60);
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || !contact) {
           return json({ error: 'bad-contact' }, 400);
+        }
+        // A chave só carrega 24 bytes de nome: contato maior mintaria chave
+        // que nunca ativa manualmente. Recusa antes de gerar Pix.
+        if (enc.encode(contact).length > 24) {
+          return json({ error: 'contact-too-long' }, 400);
         }
         const price = Number(env.PRICE || '9.99');
         const days = Number(env.PLAN_DAYS || '30');
@@ -381,6 +418,15 @@ export default {
         }
         const checkoutId = crypto.randomUUID();
         const base = (env.BASE_URL || url.origin).replace(/\/$/, '');
+        // Teto anti-abuso/anti-duplo-clique: sem Pix novo com 3 pendentes frescos (<35min).
+        const fresh = await env.DB.prepare(
+          `SELECT COUNT(*) AS n FROM checkouts
+           WHERE lower(email) = ? AND status = 'pending'
+           AND created_at > datetime('now', '-35 minutes')`,
+        ).bind(email).first();
+        if (Number(fresh?.n || 0) >= 3) {
+          return json({ error: 'too-many-pending' }, 429);
+        }
         let mp;
         try {
           mp = await createPixPayment(env, {
@@ -425,10 +471,11 @@ export default {
       // Poll da chave (só entrega ao contato da compra).
       const keyMatch = url.pathname.match(/^\/api\/key\/([A-Za-z0-9-]+)$/);
       if (request.method === 'GET' && keyMatch) {
+        if (!rateOk(ip)) return json({ error: 'rate-limited' }, 429);
         const c = await getCheckout(env, keyMatch[1]);
         if (!c) return json({ error: 'not-found' }, 404);
-        const who = String(url.searchParams.get('contact') || '').trim().toLowerCase();
-        const same = who && (who === String(c.email).toLowerCase() || who === String(c.contact).toLowerCase());
+        const who = normContact(url.searchParams.get('contact'));
+        const same = who && (who === normContact(c.email) || who === normContact(c.contact));
         // Fallback anti-webhook-perdido: revalida no MP a cada 45s.
         if (c.status === 'pending' && Date.now() - Number(c.last_check || 0) > 45_000) {
           c.last_check = Date.now();
@@ -453,19 +500,20 @@ export default {
       const recMatch = url.pathname === '/api/recover';
       if (request.method === 'GET' && recMatch) {
         if (!rateOk(ip)) return json({ error: 'rate-limited' }, 429);
-        const who = String(url.searchParams.get('contact') || '').trim().toLowerCase();
+        const who = normContact(url.searchParams.get('contact'));
         if (!who) return json({ error: 'bad-contact' }, 400);
         const c = await env.DB.prepare(
           `SELECT * FROM checkouts
            WHERE (lower(email) = ? OR lower(contact) = ?) AND status = 'paid' AND license_key IS NOT NULL
            ORDER BY paid_at DESC LIMIT 1`,
         ).bind(who, who).first();
-        if (!c || !/@/.test(c.email || '')) return json({ status: 'not-found' });
+        // Resposta única (exista ou não): sem oráculo de quem pagou.
+        if (!c || !/@/.test(c.email || '')) return json({ status: 'sent' });
         const r = await sendKeyEmail(env, { to: c.email, key: c.license_key, days: daysOf(env, c) });
         c.email_sent = r.sent ? 1 : 0;
         c.updated_at = new Date().toISOString();
         await saveCheckout(env, c);
-        return json({ status: r.sent ? 'sent' : 'send-failed', days: daysOf(env, c) });
+        return json({ status: 'sent' });
       }
 
       // Painel de vendas (dono): HTML + JSON com senha (ADMIN_PASSWORD).
@@ -474,6 +522,7 @@ export default {
           headers: {
             'content-type': 'text/html; charset=utf-8',
             'cache-control': 'no-store',
+            'content-security-policy': "default-src 'self'",
             'x-content-type-options': 'nosniff',
             'x-frame-options': 'DENY',
             'referrer-policy': 'no-referrer',

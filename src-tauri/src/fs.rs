@@ -340,7 +340,19 @@ pub async fn fs_fetch_cover(url: String) -> Result<serde_json::Value, String> {
     }
     let client = reqwest::Client::builder()
         .user_agent("LinkFetcher")
-        .redirect(reqwest::redirect::Policy::limited(5))
+        // Revalida cada hop: só https:// com host público (anti-SSRF via redirect).
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() >= 5 {
+                attempt.stop()
+            } else {
+                let u = attempt.url().as_str();
+                if !u.starts_with("https://") || cover_host_blocked(u) {
+                    attempt.stop()
+                } else {
+                    attempt.follow()
+                }
+            }
+        }))
         .build()
         .map_err(|e| e.to_string())?;
     let resp = client

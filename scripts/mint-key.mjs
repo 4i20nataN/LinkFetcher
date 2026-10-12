@@ -20,7 +20,19 @@ function b32enc(bytes) {
 const b64e = (bytes) => Buffer.from(bytes).toString('base64');
 
 function buildPayload(name, expSec) {
-  const nb = Buffer.from(name.trim(), 'utf8').slice(0, 24);
+  const full = Buffer.from(name.trim(), 'utf8');
+  // Trunca em 24 bytes sem partir caractere multibyte (espelho de license.ts).
+  let n = Math.min(full.length, 24);
+  const fatal = new TextDecoder('utf-8', { fatal: true });
+  while (n > 0) {
+    try {
+      fatal.decode(full.subarray(0, n));
+      break;
+    } catch {
+      n--;
+    }
+  }
+  const nb = full.subarray(0, n);
   const buf = Buffer.alloc(7 + nb.length);
   buf[0] = 0x01; buf[1] = 0x01;
   buf.writeUInt32BE(Math.max(0, Math.floor(expSec)), 2);
@@ -51,6 +63,10 @@ async function init(force) {
 
 async function mint(name, days) {
   if (!name) { console.error('Uso: node scripts/mint-key.mjs "Nome do Cliente" [dias]'); process.exit(1); }
+  if (Buffer.from(name.trim(), 'utf8').length > 24) {
+    console.error('Contato com mais de 24 bytes: a chave truncada nunca ativaria manualmente. Use contato curto.');
+    process.exit(1);
+  }
   let file;
   try { file = JSON.parse(await fs.readFile(KEY_FILE, 'utf8')); }
   catch { console.error(`Sem ${KEY_FILE}. Rode --init primeiro.`); process.exit(1); }

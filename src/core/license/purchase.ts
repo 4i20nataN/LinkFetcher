@@ -1,6 +1,7 @@
-// Venda PRO via Pix (semi-automática, sem servidor): QR + copia-e-cola
-// (BR Code/EMV) e botão de WhatsApp. Conferido o pagamento, a chave sai com:
-// node scripts/mint-key.mjs "Nome do Cliente" 30  (sem nº = vitalícia).
+// Venda PRO via Pix automático (license server em Cloudflare Workers).
+// O fluxo manual legado (BR Code próprio) foi removido; a compra atual
+// gera o Pix no servidor (`POST /api/checkout`) e a chave sai com:
+// node scripts/mint-key.mjs "contato-curto" 30  (sem nº = vitalícia).
 
 export const PRO_PLAN = {
   label: 'PRO mensal',
@@ -8,14 +9,8 @@ export const PRO_PLAN = {
   days: 30,
 } as const;
 
-// Conta do vendedor (obrigatórios no BR Code, como está no banco).
-export const PIX_KEY = 'f84b864f-d051-4aed-a87b-db49a400fca7';
-export const PIX_RECEIVER_NAME = 'NATAN ANTUNES'; // max 25 letras (completo tem 27)
-export const PIX_CITY = 'SAO JOAO'; // max 15 letras
-export const WHATS_NUMBER = '5546999174002'; // DDI+DDD+número, só dígitos
-
-const field = (id: string, value: string): string =>
-  `${id}${String(value.length).padStart(2, '0')}${value}`;
+// Suporte via WhatsApp (DDI+DDD+número, só dígitos).
+export const WHATS_NUMBER = '5546999174002';
 
 /** Remove acentos, mantém A-Z 0-9 espaço, maiúsculas, trunca. */
 export function pixText(s: string, max: number): string {
@@ -39,24 +34,6 @@ export function crc16(str: string): string {
     }
   }
   return crc.toString(16).toUpperCase().padStart(4, '0');
-}
-
-/** Monta o Pix copia-e-cola (BR Code) a partir das constantes acima. */
-export function buildPixPayload(): string {
-  const gui = field('00', 'br.gov.bcb.pix') + field('01', PIX_KEY);
-  const amount = PRO_PLAN.price.toFixed(2);
-  const base =
-    field('00', '01') +
-    field('26', gui) +
-    field('52', '0000') +
-    field('53', '986') +
-    field('54', amount) +
-    field('58', 'BR') +
-    field('59', pixText(PIX_RECEIVER_NAME, 25)) +
-    field('60', pixText(PIX_CITY, 15)) +
-    field('62', field('05', '***')) +
-    '6304';
-  return base + crc16(base);
 }
 
 export function whatsappBuyLink(contact?: string): string {

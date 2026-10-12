@@ -108,6 +108,14 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
   async function startBuy(): Promise<void> {
     const buyer = email.trim().toLowerCase();
     if (!validEmail(buyer) || buying) return;
+    // A chave só carrega 24 bytes de nome: barra antes de gerar o Pix.
+    if (new TextEncoder().encode(buyer).length > 24) {
+      setPayError(t(
+        'Este e-mail é longo demais para a chave PRO (limite de 24 bytes). Use um e-mail mais curto.',
+        'This email is too long for the PRO key (24-byte limit). Use a shorter email.',
+      ));
+      return;
+    }
     setBuying(true);
     setPayError(null);
     setDoneKey(null);

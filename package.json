@@ -1,11 +1,10 @@
 {
   "name": "linkfetcher",
   "private": true,
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "LinkFetcher-Tauri - desktop yt-dlp frontend (Tauri v2)",
   "author": {
-    "name": "Natan Vanim",
-    "email": "natan.vanim@gmail.com"
+    "name": "LinkFetcher"
   },
   "type": "module",
   "scripts": {
@@ -16,7 +15,7 @@
     "test:server": "node --test server/server.test.mjs",
     "test:e2e": "playwright test",
     "bump": "node scripts/bump-version.mjs",
-    "android:dev": "NDK_HOME=/home/natan/Android/sdk/ndk/27.1.12297006 ANDROID_NDK_HOME=$NDK_HOME npx @tauri-apps/cli@2 android dev --host",
+    "android:dev": "NDK_HOME=$HOME/Android/sdk/ndk/27.1.12297006 ANDROID_NDK_HOME=$NDK_HOME npx @tauri-apps/cli@2 android dev --host",
     "android:sync": "node scripts/sync-android-plugin.mjs",
     "tauri": "tauri",
     "lint": "tsc --noEmit",

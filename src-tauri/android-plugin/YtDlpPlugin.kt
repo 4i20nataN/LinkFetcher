@@ -632,6 +632,15 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
             invoke.reject("URL ou nome de APK inválidos")
             return
         }
+        // Allowlist: update só via HTTPS do GitHub (pós-XSS não desvia p/ APK alheio).
+        val updateUri = android.net.Uri.parse(args.url)
+        val updateHost = (updateUri.host ?: "").lowercase()
+        val updateHostOk = updateHost == "github.com" || updateHost.endsWith(".github.com") ||
+            updateHost == "objects.githubusercontent.com" || updateHost == "release-assets.githubusercontent.com"
+        if (updateUri.scheme?.lowercase() != "https" || !updateHostOk) {
+            invoke.reject("URL de atualização não confiável")
+            return
+        }
         try {
             val dm = activity.getSystemService(android.app.DownloadManager::class.java)
                 ?: return invoke.reject("DownloadManager indisponível")

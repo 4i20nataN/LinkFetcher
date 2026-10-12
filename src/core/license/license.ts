@@ -71,7 +71,19 @@ export function base32Decode(s: string): Uint8Array | null {
 
 /** Monta o payload (sem assinatura). Expira em unix seconds; 0 = vitalícia. */
 export function buildLicensePayload(name: string, expiresAtSec: number): Uint8Array {
-  const nameBytes = new TextEncoder().encode(name.trim()).slice(0, MAX_NAME_BYTES);
+  const full = new TextEncoder().encode(name.trim());
+  // Trunca em 24 bytes sem partir caractere multibyte no meio.
+  let n = Math.min(full.length, MAX_NAME_BYTES);
+  const fatal = new TextDecoder('utf-8', { fatal: true });
+  while (n > 0) {
+    try {
+      fatal.decode(full.slice(0, n));
+      break;
+    } catch {
+      n--;
+    }
+  }
+  const nameBytes = full.slice(0, n);
   const buf = new Uint8Array(7 + nameBytes.length);
   const view = new DataView(buf.buffer);
   buf[0] = LICENSE_VERSION;
@@ -116,7 +128,7 @@ export async function verifyLicenseKey(
   try {
     const pubKey = await crypto.subtle.importKey(
       'spki',
-      b64ToBytes(spkiB64).buffer as ArrayBuffer,
+      b64ToBytes(spkiB64),
       { name: 'ECDSA', namedCurve: 'P-256' },
       false,
       ['verify'],
@@ -124,8 +136,8 @@ export async function verifyLicenseKey(
     ok = await crypto.subtle.verify(
       { name: 'ECDSA', hash: 'SHA-256' },
       pubKey,
-      sig.buffer as ArrayBuffer,
-      payload.buffer as ArrayBuffer,
+      sig,
+      payload,
     );
   } catch {
     return { valid: false, error: 'signature' };
@@ -143,8 +155,9 @@ export async function verifyLicenseKey(
 
 /** A chave pertence ao contato da compra? (reativação exige os dois). */
 export function keyBelongsToContact(chkName: string | undefined, contact: string): boolean {
-  return (chkName ?? '').trim().toLowerCase() === contact.trim().toLowerCase()
-    && contact.trim().length > 0;
+  const a = (chkName ?? '').trim().normalize('NFKC').toLowerCase();
+  const b = contact.trim().normalize('NFKC').toLowerCase();
+  return a === b && b.length > 0;
 }
 
 /** Registro ativo = existe e (vitalício ou não expirado). */
@@ -168,7 +181,6 @@ export async function isLicenseGenuine(): Promise<boolean> {
   const now = Date.now();
   if (genuineOk && now - genuineAt < 60_000) return true;
   const chk = await verifyLicenseKey(rec.key);
-  genuineAt = now;
   const same =
     chk.valid &&
     (chk.expiresAt ?? -1) === rec.expiresAt &&
@@ -179,5 +191,6 @@ export async function isLicenseGenuine(): Promise<boolean> {
     return false;
   }
   genuineOk = true;
+  genuineAt = now;
   return true;
 }

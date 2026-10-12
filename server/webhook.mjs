@@ -22,6 +22,7 @@ export function verifySignature({ secret, signatureHeader, requestId, dataId, no
   );
   const { ts, v1 } = parts;
   if (!ts || !v1) return false;
+  if (!/^\d+$/.test(ts)) return false;
   if (Math.abs(nowMs - Number(ts) * 1000) > 5 * 60_000) return false;
   const manifest = `id:${dataId};request-id:${requestId};ts:${ts};`;
   const expected = createHmac('sha256', secret).update(manifest).digest('hex');

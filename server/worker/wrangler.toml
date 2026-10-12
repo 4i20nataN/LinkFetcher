@@ -9,8 +9,9 @@ PLAN_DAYS = "30"
 # Vazio = usa o origin do Worker p/ notification_url. Preencha com o
 # workers.dev (ou domínio próprio) depois do 1º deploy.
 BASE_URL = "https://linkfetcher-licenses.linkfetcher.workers.dev"
-# Remetente do e-mail da chave (tem que ser o Gmail verificado no Brevo).
-SMTP_FROM = "natan.vanim@gmail.com"
+# Remetente do e-mail da chave (tem que ser o e-mail verificado no Brevo).
+# FORA DO REPO: configure como segredo — `wrangler secret put SMTP_FROM`.
+# (O Worker lê env.SMTP_FROM igual; [vars] aqui exporia o endereço no git.)
 
 # D1 — crie antes: wrangler d1 create linkfetcher-licenses
 # e cole o database_id abaixo. Aplique o schema 1x:
