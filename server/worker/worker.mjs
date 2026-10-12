@@ -73,11 +73,11 @@ const daysOf = (env, row) => Number(row?.days ?? env.PLAN_DAYS ?? '30');
 // Catálogo de planos (fonte da verdade no servidor; o app espelha p/ exibir).
 // `PLANS_JSON` (secret/var) sobrescreve sem redeploy: {"mensal":{"price":9.99,"days":30,"label":"Mensal"}}.
 const BUILTIN_PLANS = {
-  semanal: { price: 5, days: 7, label: 'Semanal' },
-  mensal: { price: 9.99, days: 30, label: 'Mensal' },
-  trimestral: { price: 24.99, days: 90, label: 'Trimestral' },
-  semestral: { price: 44.99, days: 180, label: 'Semestral' },
-  anual: { price: 79.99, days: 365, label: 'Anual' },
+  semanal: { price: 5, days: 7, label: '7 dias' },
+  mensal: { price: 9.99, days: 30, label: '1 mês' },
+  trimestral: { price: 24.99, days: 90, label: '3 meses' },
+  semestral: { price: 44.99, days: 180, label: '6 meses' },
+  anual: { price: 79.99, days: 365, label: '1 ano' },
 };
 
 function plansOf(env) {

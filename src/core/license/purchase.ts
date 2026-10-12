@@ -15,11 +15,11 @@ export interface ProPlan {
 
 /** Catálogo de planos (espelho do servidor — fonte da verdade é o Worker). */
 export const PLANS: ProPlan[] = [
-  { id: 'semanal', label: 'Semanal', labelEn: 'Weekly', days: 7, price: 5 },
-  { id: 'mensal', label: 'Mensal', labelEn: 'Monthly', days: 30, price: 9.99, tag: 'mais popular' },
-  { id: 'trimestral', label: 'Trimestral', labelEn: 'Quarterly', days: 90, price: 24.99, tag: '-17%' },
-  { id: 'semestral', label: 'Semestral', labelEn: 'Semiannual', days: 180, price: 44.99, tag: '-25%' },
-  { id: 'anual', label: 'Anual', labelEn: 'Annual', days: 365, price: 79.99, tag: '-33%' },
+  { id: 'semanal', label: '7 dias', labelEn: '7 days', days: 7, price: 5 },
+  { id: 'mensal', label: '1 mês', labelEn: '1 month', days: 30, price: 9.99, tag: 'mais popular' },
+  { id: 'trimestral', label: '3 meses', labelEn: '3 months', days: 90, price: 24.99, tag: '-17%' },
+  { id: 'semestral', label: '6 meses', labelEn: '6 months', days: 180, price: 44.99, tag: '-25%' },
+  { id: 'anual', label: '1 ano', labelEn: '1 year', days: 365, price: 79.99, tag: '-33%' },
 ];
 
 /** Plano padrão (Mensal). */
