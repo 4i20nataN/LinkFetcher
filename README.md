@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/logo-dark.webp" alt="LinkFetcher" width="160" />
+  <img src="public/linkfetcher-banner.png" alt="LinkFetcher" width="720" />
 </p>
 
 <h1 align="center">LinkFetcher</h1>
@@ -9,6 +9,30 @@
   Queue, 4K video, audio, thumbnails, cut sections, subtitles, SponsorBlock — for Windows & Linux.
   <br />Also on <strong>Android</strong> (same engine embedded, sideload via GitHub Releases).
 </p>
+
+## Screenshots
+
+| Analyzer | PRO checkout |
+|---|---|
+| ![Analyzer](screenshots/01-analisar.webp) | ![PRO plans](screenshots/03-pro.webp) |
+
+| Downloads | Settings |
+|---|---|
+| ![Downloads](screenshots/04-downloads.webp) | ![Settings](screenshots/05-ajustes.webp) |
+
+## PRO plans
+
+Unlock Custom Download (up to 4K, every codec, trims, subtitles, SponsorBlock):
+
+| Plan | Duration | Price (BRL) |
+|---|---|---|
+| 7 dias | 7 days | R$ 5,00 |
+| 1 mês | 30 days | R$ 9,99 |
+| 3 meses | 90 days | R$ 24,99 |
+| 6 meses | 180 days | R$ 44,99 |
+| 1 ano | 365 days | R$ 79,99 |
+
+Pay with Pix in the app — the key arrives on screen and by e-mail.
 
 ## Features
 
