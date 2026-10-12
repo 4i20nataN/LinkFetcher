@@ -6,11 +6,10 @@ import { useApp } from '../../context/AppContext';
 import { useLicense, getLicense, clearLicense } from '../../core/license/licenseStore';
 import { isLicenseActive } from '../../core/license/license';
 import { LicenseModal } from '../../core/license/LicenseModal';
-import { SUPPORT_EMAIL } from '../../core/license/purchase';
 import { PrivacyPolicy } from '../privacy/PrivacyPolicy';
 import {
   Info, KeyRound, ShieldCheck, Copy, Check, Eye, EyeOff,
-  Trash2, MessageCircle, ChevronRight, Cpu,
+  Trash2, ChevronRight, Cpu,
 } from 'lucide-react';
 
 /** Mostra prefixo + 1º grupo; o resto vira •••• (evita shoulder surfing). */
@@ -44,18 +43,6 @@ export function AboutView() {
       setTimeout(() => setCopied(false), 2000);
     } catch { /* clipboard indisponível: seleção manual */ }
   };
-
-  const supportHint = isEn
-    ? 'Lost your key or having trouble? Use "Lost my key" in the PRO panel or reply to the email where you received your key.'
-    : 'Perdeu a chave ou com problema? Use "Perdi minha chave" no painel PRO ou responda ao e-mail onde recebeu sua chave.';
-  const supportMailto = SUPPORT_EMAIL
-    ? `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
-      isEn ? 'LinkFetcher support' : 'Suporte LinkFetcher',
-    )}&body=${encodeURIComponent(
-      (isEn ? 'App version: ' : 'Versão do app: ') + version + '\n' +
-      (isEn ? 'Purchase contact (key email): ' : 'Contato da compra (e-mail da chave): ') + (lic?.contact || ''),
-    )}`
-    : null;
 
   const card = `rounded-2xl p-6 transition-all duration-300 cv-auto
     ${isLight
@@ -214,41 +201,19 @@ export function AboutView() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4.5">
-            {/* Privacidade */}
-            <button onClick={() => setShowPrivacy(true)} className={`${card} text-left group`}>
-              <h3 className={cardTitle}>
-                <ShieldCheck size={18} className="text-blue-500 shrink-0" />
-                {isEn ? 'Privacy Policy' : 'Política de Privacidade'}
-                <ChevronRight size={16} className="ml-auto lf-text-muted group-hover:translate-x-0.5 transition-transform" />
-              </h3>
-              <p className={body}>
-                {isEn
-                  ? 'See what stays on your machine and who the app talks to online.'
-                  : 'Veja o que fica na sua máquina e com quem o app fala na rede.'}
-              </p>
-            </button>
-
-            {/* Suporte */}
-            <div className={card}>
-              <h3 className={cardTitle}>
-                <MessageCircle size={18} className="text-blue-500 shrink-0" />
-                {isEn ? 'Support' : 'Suporte'}
-              </h3>
-              <p className={`${body} mb-3`}>
-                {supportHint}
-              </p>
-              {supportMailto && (
-                <a
-                  href={supportMailto}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all"
-                >
-                  <MessageCircle size={14} />
-                  {isEn ? 'Contact support' : 'Falar com suporte'}
-                </a>
-              )}
-            </div>
-          </div>
+          {/* Privacidade */}
+          <button onClick={() => setShowPrivacy(true)} className={`${card} text-left group`}>
+            <h3 className={cardTitle}>
+              <ShieldCheck size={18} className="text-blue-500 shrink-0" />
+              {isEn ? 'Privacy Policy' : 'Política de Privacidade'}
+              <ChevronRight size={16} className="ml-auto lf-text-muted group-hover:translate-x-0.5 transition-transform" />
+            </h3>
+            <p className={body}>
+              {isEn
+                ? 'See what stays on your machine and who the app talks to online.'
+                : 'Veja o que fica na sua máquina e com quem o app fala na rede.'}
+            </p>
+          </button>
 
           {/* App */}
           <div className={card}>

@@ -13,7 +13,3 @@ export const PRO_PLAN = {
 export function validEmail(s: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s.trim());
 }
-
-/** E-mail público de suporte (conta de papel, ex. a verificada no Brevo).
- * '' = ainda não configurado (o app mostra só a orientação por e-mail). */
-export const SUPPORT_EMAIL = '';
