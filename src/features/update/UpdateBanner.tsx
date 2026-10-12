@@ -7,10 +7,10 @@ import { Download, X, CheckCircle, AlertCircle, Loader2, ShieldCheck, Sparkles, 
 import type { Update } from '@tauri-apps/plugin-updater';
 import { useApp } from '../../context/AppContext';
 import { useTranslation } from '../../core/i18n';
+import { appVersion } from '../../core/version';
+import { formatBytes } from '../downloads/manager/downloadFormat';
 import { isAndroid } from '../../core/ytdlp/YtDlpAdapter';
 import { checkAndroidUpdate, type AndroidUpdateAvailable } from './AndroidUpdater';
-
-declare const __APP_VERSION__: string;
 
 type UpdateStage = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error' | 'dismissed';
 
@@ -19,13 +19,6 @@ interface UpdateInfo {
   currentVersion: string;
   body?: string;
   date?: string;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes <= 0) return '0 B';
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
 export default function UpdateBanner() {
@@ -68,15 +61,9 @@ export default function UpdateBanner() {
       const r = await checkAndroidUpdate();
       if (r.available && r.info) {
         androidUpdateRef.current = r.info;
-        let current = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.2.0';
-        try {
-          const { getVersion } = await import('@tauri-apps/api/app');
-          current = await getVersion();
-        } catch {
-        }
         setUpdateInfo({
           version: r.info.tag,
-          currentVersion: current,
+          currentVersion: appVersion(),
           body: r.info.body || undefined,
           date: undefined,
         });
@@ -102,7 +89,7 @@ export default function UpdateBanner() {
         tauriUpdateRef.current = update;
         setUpdateInfo({
           version: update.version,
-          currentVersion: update.currentVersion || (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.2.0'),
+          currentVersion: update.currentVersion || appVersion(),
           body: update.body || undefined,
           date: update.date || undefined,
         });

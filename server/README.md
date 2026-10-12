@@ -1,5 +1,11 @@
 # License Server — venda automática PRO via Mercado Pago Pix
 
+> **Deploy oficial: Cloudflare Workers (`server/worker/`).** Este servidor
+> Node é o legado de referência (VPS própria): funciona, mas NÃO tem planos
+> múltiplos, anti-cobrança-dupla, recover, painel admin, broadcast nem
+> `external_reference` — tudo isso só existe no Worker. Não suba os dois
+> em produção sem alinhar.
+
 ## 1. Mercado Pago (dashboard do vendedor)
 1. Crie a aplicação e pegue o **Access Token de produção** → `MP_ACCESS_TOKEN`
 2. Cadastre o webhook `https://SEU-SERVIDOR/api/webhook/mercadopago` p/ eventos

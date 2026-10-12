@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useLicense, getLicense, clearLicense } from '../../core/license/licenseStore';
+import { appVersion } from '../../core/version';
 import { isLicenseActive } from '../../core/license/license';
 import { LicenseModal } from '../../core/license/LicenseModal';
 import { PrivacyPolicy } from '../privacy/PrivacyPolicy';
@@ -31,7 +32,7 @@ export function AboutView() {
   const [showLicense, setShowLicense] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
-  const version = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.2.1';
+  const version = appVersion();
 
   if (showPrivacy) return <PrivacyPolicy onBack={() => setShowPrivacy(false)} />;
 

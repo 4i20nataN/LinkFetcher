@@ -14,7 +14,7 @@ import { KeyRound, X, Lock, Trash2, Copy, Check } from 'lucide-react';
 const ERR_PT: Record<string, string> = {
   format: 'Formato inválido. Confira a chave recebida (começa com LF1-).',
   signature: 'Assinatura inválida. Chave recusada.',
-  version: 'Chave de outra versão. Fale com o suporte.',
+  version: 'Chave de outra versão. Use "Perdi minha chave" para receber a atual.',
   plan: 'Plano desconhecido nesta chave.',
   expired: 'Chave expirada. Renove para continuar no PRO.',
   unconfigured: 'Licenciamento ainda não configurado neste build.',
@@ -22,7 +22,7 @@ const ERR_PT: Record<string, string> = {
 const ERR_EN: Record<string, string> = {
   format: 'Invalid format. Check the key you received (starts with LF1-).',
   signature: 'Invalid signature. Key rejected.',
-  version: 'Key from another version. Contact support.',
+  version: 'Key from another version. Use "Lost my key" to get the current one.',
   plan: 'Unknown plan in this key.',
   expired: 'Key expired. Renew to stay PRO.',
   unconfigured: 'Licensing not configured in this build yet.',
@@ -159,7 +159,7 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
     const terminalMsg: Record<string, string> = {
       rejected: t('Pagamento rejeitado. Cancele e gere outro Pix.', 'Payment rejected. Cancel and generate another Pix.'),
       cancelled: t('Pagamento cancelado. Cancele e gere outro Pix.', 'Payment cancelled. Cancel and generate another Pix.'),
-      amount_mismatch: t('Valor divergente — fale com o suporte.', 'Amount mismatch — contact support.'),
+      amount_mismatch: t('Valor divergente — cancele e gere outro Pix.', 'Amount mismatch — cancel and generate another Pix.'),
     };
     let alive = true;
     const buyer = email.trim().toLowerCase();
@@ -302,7 +302,7 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
       if (r.status === 'sent') {
         setRecoverMsg(t('Chave enviada pro seu e-mail.', 'Key sent to your email.'));
       } else if (r.status === 'send-failed') {
-        setRecoverMsg(t('Compra encontrada, mas o e-mail falhou — fale com o suporte.', 'Purchase found, but email failed — contact support.'));
+        setRecoverMsg(t('Compra encontrada, mas o e-mail falhou — use "Perdi minha chave" para tentar de novo.', 'Purchase found, but email failed — use "Lost my key" to retry.'));
       } else {
         setRecoverMsg(t('Nenhuma compra paga para este e-mail.', 'No paid purchase for this email.'));
       }

@@ -1,12 +1,13 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { useTranslation } from '../../core/i18n';
+import { appVersion } from '../../core/version';
 import { Shield, Database, Lock, Clock, ArrowLeft } from 'lucide-react';
 
 export function PrivacyPolicy({ onBack }: { onBack?: () => void }) {
   const { setActiveTab, settings } = useApp();
   const { t } = useTranslation(settings);
-  const version = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.2.1';
+  const version = appVersion();
   const isLight = settings.themeMode === 'light';
 
   const POLICY_CARDS = [

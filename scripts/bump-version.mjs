@@ -14,6 +14,7 @@ function patch(path, pattern, replacement) {
   console.log(`ok  ${path}`);
 }
 
+patch('src/core/version.ts', /APP_VERSION_FALLBACK = '\d+\.\d+\.\d+'/, `APP_VERSION_FALLBACK = '${next}'`);
 patch('package.json', /"version": "\d+\.\d+\.\d+"/, `"version": "${next}"`);
 patch('src-tauri/tauri.conf.json', /"version": "\d+\.\d+\.\d+"/, `"version": "${next}"`);
 patch('src-tauri/Cargo.toml', /^version = "\d+\.\d+\.\d+"$/m, `version = "${next}"`);
