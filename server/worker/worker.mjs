@@ -185,10 +185,8 @@ export async function mintKeyFor(env, name, days) {
   return `LF1-${g.join('-')}`;
 }
 
-// --- e-mail OBRIGATÓRIO via Brevo (HTTP; grátis 300/dia, sem domínio).
-// Poll do app + retentativa cobrem falha transitória; sem BREVO_API_KEY/
-// SMTP_FROM nada é enviado (erro fica no log — configure antes de vender). ---
-async function sendKeyEmail(env, { to, key, days }) {
+// --- e-mail genérico via Brevo (chave usa este; broadcast também) ---
+async function sendEmail(env, { to, subject, text }) {
   if (!env.BREVO_API_KEY || !env.SMTP_FROM) {
     console.error('email NOT configured (BREVO_API_KEY/SMTP_FROM ausentes)');
     return { sent: false, reason: 'email-not-configured' };
@@ -200,18 +198,8 @@ async function sendKeyEmail(env, { to, key, days }) {
       body: JSON.stringify({
         sender: { email: env.SMTP_FROM, name: 'LinkFetcher' },
         to: [{ email: to }],
-        subject: 'Sua chave LinkFetcher PRO',
-        textContent: [
-          'Pagamento confirmado. Sua chave PRO:',
-          '',
-          key,
-          '',
-          `Validade: ${days} dias. Como ativar:`,
-          '1. Abra o LinkFetcher → Download Personalizado → Ativar PRO',
-          '2. Já tenho uma chave (cole a chave acima)',
-          '',
-          'Guarde este e-mail.',
-        ].join('\n'),
+        subject,
+        textContent: text,
       }),
     });
     if (!res.ok) {
@@ -223,6 +211,24 @@ async function sendKeyEmail(env, { to, key, days }) {
     console.error('email error:', err?.message || err);
     return { sent: false, reason: 'send-failed' };
   }
+}
+
+async function sendKeyEmail(env, { to, key, days }) {
+  return sendEmail(env, {
+    to,
+    subject: 'Sua chave LinkFetcher PRO',
+    text: [
+      'Pagamento confirmado. Sua chave PRO:',
+      '',
+      key,
+      '',
+      `Validade: ${days} dias. Como ativar:`,
+      '1. Abra o LinkFetcher → Download Personalizado → Ativar PRO',
+      '2. Já tenho uma chave (cole a chave acima)',
+      '',
+      'Guarde este e-mail.',
+    ].join('\n'),
+  });
 }
 
 // --- D1 ---
@@ -560,6 +566,61 @@ export default {
             status: r.status, emailSent: !!r.email_sent,
           })),
         });
+      }
+
+      // Broadcast do dono: novidade de update p/ todos os compradores.
+      // POST {"tag":"v1.5.0","subject":"...","message":"..."} + x-admin-key.
+      // Tag idempotente: repetir só envia a quem faltou (anti-duplo-CI).
+      // Teto 300/call = cota diária do Brevo grátis.
+      if (request.method === 'POST' && url.pathname === '/api/admin/broadcast') {
+        if (!env.ADMIN_PASSWORD) {
+          console.error('ADMIN_PASSWORD ausente');
+          return json({ error: 'not-configured' }, 500);
+        }
+        if (!adminOk(request, env)) return json({ error: 'unauthorized' }, 401);
+        if (!rateOk(ip)) return json({ error: 'rate-limited' }, 429);
+        if (Number(request.headers.get('content-length') || 0) > 64 * 1024) {
+          return json({ error: 'body-too-large' }, 413);
+        }
+        let body;
+        try {
+          body = await request.json();
+        } catch {
+          return json({ error: 'bad-json' }, 400);
+        }
+        const tag = String(body.tag || '').trim().slice(0, 40);
+        const subject = String(body.subject || '').trim().slice(0, 120);
+        const message = String(body.message || '').trim().slice(0, 2000);
+        if (!/^[A-Za-z0-9._-]{1,40}$/.test(tag) || !subject || !message) {
+          return json({ error: 'bad-broadcast' }, 400);
+        }
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          'INSERT OR IGNORE INTO broadcasts (tag, subject, created_at) VALUES (?, ?, ?)',
+        ).bind(tag, subject, now).run();
+        const buyers = await env.DB.prepare(
+          `SELECT DISTINCT lower(email) AS email FROM checkouts
+           WHERE status = 'paid' AND email LIKE '%@%' LIMIT 300`,
+        ).all();
+        let sent = 0, failed = 0;
+        for (const row of buyers.results || []) {
+          const to = String(row.email || '').trim().toLowerCase();
+          if (!to) continue;
+          const already = await env.DB.prepare(
+            'SELECT 1 AS x FROM broadcast_sends WHERE tag = ? AND email = ?',
+          ).bind(tag, to).first();
+          if (already) continue;
+          const r = await sendEmail(env, { to, subject, text: message });
+          if (r.sent) {
+            sent++;
+            await env.DB.prepare(
+              'INSERT OR IGNORE INTO broadcast_sends (tag, email, sent_at) VALUES (?, ?, ?)',
+            ).bind(tag, to, new Date().toISOString()).run();
+          } else {
+            failed++;
+          }
+        }
+        return json({ status: 'done', tag, sent, failed, total: (buyers.results || []).length });
       }
 
       // Webhook do Mercado Pago.

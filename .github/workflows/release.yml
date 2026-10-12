@@ -162,3 +162,37 @@ jobs:
             "$APK_DIR/LinkFetcher.apk" \
             "$APK_DIR/LinkFetcher.aab" \
             --clobber
+
+      - name: Avisar compradores por e-mail (update novo)
+        # Requer o secret ADMIN_PASSWORD (mesmo valor do Worker). Sem ele,
+        # o passo é pulado e o aviso sai manual via /api/admin/broadcast.
+        if: ${{ secrets.ADMIN_PASSWORD != '' }}
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          python3 - <<'EOF'
+          import json, os, urllib.request
+          tag = os.environ["GITHUB_REF_NAME"]
+          repo = os.environ["GITHUB_REPOSITORY"]
+          server = os.environ.get("LICENSE_SERVER_URL", "https://linkfetcher-licenses.linkfetcher.workers.dev")
+          url = f"{server}/api/admin/broadcast"
+          msg = (
+            f"LinkFetcher {tag} disponível!\n"
+            f"\n"
+            f"Baixe a nova versão (Windows, Linux e Android):\n"
+            f"https://github.com/{repo}/releases/tag/{tag}\n"
+            f"\n"
+            f"Sua chave PRO continua válida — nada muda na ativação.\n"
+            f"Perdeu a chave? No app: Download Personalizado → Ativar PRO → Perdi minha chave."
+          )
+          body = json.dumps({
+            "tag": tag,
+            "subject": f"LinkFetcher {tag} disponível",
+            "message": msg,
+          }).encode()
+          req = urllib.request.Request(url, data=body, method="POST", headers={
+            "content-type": "application/json",
+            "x-admin-key": os.environ["ADMIN_PASSWORD"],
+          })
+          print(urllib.request.urlopen(req, timeout=120).read().decode()[:300])
+          EOF

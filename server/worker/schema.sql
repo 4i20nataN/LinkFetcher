@@ -18,3 +18,17 @@ CREATE TABLE IF NOT EXISTS checkouts (
 );
 CREATE INDEX IF NOT EXISTS idx_checkouts_mp_id ON checkouts (mp_id);
 CREATE INDEX IF NOT EXISTS idx_checkouts_status ON checkouts (status);
+
+-- Broadcasts do dono (ex.: aviso de update). Tag idempotente: repetir a
+-- mesma tag só envia a quem faltou. Aplicar com o mesmo comando do schema.
+CREATE TABLE IF NOT EXISTS broadcasts (
+  tag TEXT PRIMARY KEY,
+  subject TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS broadcast_sends (
+  tag TEXT NOT NULL,
+  email TEXT NOT NULL,
+  sent_at TEXT NOT NULL,
+  PRIMARY KEY (tag, email)
+);
