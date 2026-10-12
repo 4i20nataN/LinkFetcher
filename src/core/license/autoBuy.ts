@@ -6,6 +6,9 @@ export const LICENSE_SERVER_URL = 'https://linkfetcher-licenses.linkfetcher.work
 
 export interface AutoCheckout {
   checkoutId: string;
+  plan?: string;
+  price?: number;
+  days?: number;
   qrText: string;
   qrImage: string | null;
   expiresAt: number;
@@ -30,8 +33,8 @@ async function api(path: string, init?: RequestInit) {
   return res.json();
 }
 
-export function createAutoCheckout(email: string, contact: string): Promise<AutoCheckout> {
-  return api('/api/checkout', { method: 'POST', body: JSON.stringify({ email, contact }) });
+export function createAutoCheckout(email: string, contact: string, plan = 'mensal'): Promise<AutoCheckout> {
+  return api('/api/checkout', { method: 'POST', body: JSON.stringify({ email, contact, plan }) });
 }
 
 export function fetchAutoKey(checkoutId: string, contact: string): Promise<{ status: string; key?: string; emailSent?: boolean }> {

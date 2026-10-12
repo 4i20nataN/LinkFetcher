@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS checkouts (
   mp_id TEXT NOT NULL,
   email TEXT NOT NULL,
   contact TEXT NOT NULL,
+  plan TEXT NOT NULL DEFAULT 'mensal',
   price REAL NOT NULL,
   days INTEGER NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',

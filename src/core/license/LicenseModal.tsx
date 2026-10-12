@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext';
 import { verifyLicenseKey, isLicenseActive, keyBelongsToContact } from './license';
 import { getLicense, saveLicense, clearLicense, useLicense } from './licenseStore';
-import { PRO_PLAN, validEmail } from './purchase';
+import { PLANS, planById, formatBRL, validEmail } from './purchase';
 import { createAutoCheckout, fetchAutoKey, recoverKey, saveLastCheckout, loadLastCheckout, clearLastCheckout, type AutoCheckout } from './autoBuy';
 import QRCode from 'qrcode';
 import { KeyRound, X, Lock, Trash2, Copy, Check } from 'lucide-react';
@@ -87,7 +87,9 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
   const [recoverMsg, setRecoverMsg] = useState<string | null>(null);
 
   const emailOk = validEmail(email);
-  const price = `R$ ${PRO_PLAN.price.toFixed(2).replace('.', ',')}`;
+  const [planId, setPlanId] = useState('mensal');
+  const plan = planById(planId);
+  const price = formatBRL(plan.price);
   const t = (pt: string, en: string) => (isEn ? en : pt);
 
   function flash(setter: (v: boolean) => void): void {
@@ -121,7 +123,7 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
     setDoneKey(null);
     setDoneExp(null);
     try {
-      const co = await createAutoCheckout(buyer, buyer);
+      const co = await createAutoCheckout(buyer, buyer, plan.id);
       setCheckout(co);
       saveLastCheckout(buyer, co);
       setResumed(null);
@@ -144,6 +146,7 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
   async function resumeLast(): Promise<void> {
     if (!resumed) return;
     setEmail(resumed.email);
+    if (resumed.co.plan) setPlanId(resumed.co.plan);
     setCheckout(resumed.co);
     setResumed(null);
     setQr(await qrFromCheckout(resumed.co));
@@ -358,12 +361,35 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
               <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 tracking-widest">PRO</span>
               <p className="mt-1 text-2xl font-bold text-white">
                 {price}
-                <span className="text-sm font-normal lf-text-muted">/mês</span>
               </p>
               <p className="fs-sm lf-text-muted">
-                {t(`${PRO_PLAN.days} dias de versão PRO`, `${PRO_PLAN.days} days of PRO version`)}
+                {isEn ? `${plan.labelEn} • ${plan.days} days of PRO` : `${plan.label} • ${plan.days} dias de PRO`}
               </p>
             </div>
+            {!checkout && !doneKey && (
+              <div className="grid grid-cols-5 gap-1.5">
+                {PLANS.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => setPlanId(p.id)}
+                    className={`relative px-1 py-2 rounded-xl border text-center transition-all ${
+                      p.id === plan.id
+                        ? 'border-emerald-500 bg-emerald-500/10 text-white'
+                        : 'lf-border lf-surface-40 lf-text-secondary hover:text-white'
+                    }`}
+                  >
+                    {p.tag && (
+                      <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-1 rounded text-[8px] font-bold bg-amber-500 text-black whitespace-nowrap">
+                        {p.tag}
+                      </span>
+                    )}
+                    <span className="block text-[10px] font-semibold">{isEn ? p.labelEn : p.label}</span>
+                    <span className="block text-xs font-bold mt-0.5">{formatBRL(p.price)}</span>
+                    <span className="block text-[9px] lf-text-muted">{p.days}d</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-1.5">
               {(isEn
                 ? ['Up to 4K', 'Every codec', 'Trims and subtitles', 'SponsorBlock']
@@ -390,7 +416,7 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
             {doneKey ? (
               <>
                 <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center font-bold text-emerald-300 fs-sm">
-                  {t('Pagamento confirmado — 30 dias de PRO ativos!', 'Payment confirmed — 30 days of PRO active!')}
+                  {t(`Pagamento confirmado — ${plan.days} dias de PRO ativos!`, `Payment confirmed — ${plan.days} days of PRO active!`)}
                   {doneExp !== null && doneExp !== 0 && (
                     <span className="block lf-text-muted font-normal">
                       {t('Válida até ', 'Valid until ')}

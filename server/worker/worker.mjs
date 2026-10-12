@@ -70,6 +70,39 @@ function json(data, status = 200) {
 const priceOf = (env, row) => Number(row?.price ?? env.PRICE ?? '9.99');
 const daysOf = (env, row) => Number(row?.days ?? env.PLAN_DAYS ?? '30');
 
+// Catálogo de planos (fonte da verdade no servidor; o app espelha p/ exibir).
+// `PLANS_JSON` (secret/var) sobrescreve sem redeploy: {"mensal":{"price":9.99,"days":30,"label":"Mensal"}}.
+const BUILTIN_PLANS = {
+  semanal: { price: 5, days: 7, label: 'Semanal' },
+  mensal: { price: 9.99, days: 30, label: 'Mensal' },
+  trimestral: { price: 24.99, days: 90, label: 'Trimestral' },
+  semestral: { price: 44.99, days: 180, label: 'Semestral' },
+  anual: { price: 79.99, days: 365, label: 'Anual' },
+};
+
+function plansOf(env) {
+  try {
+    const raw = env.PLANS_JSON ? JSON.parse(env.PLANS_JSON) : null;
+    if (raw && typeof raw === 'object') {
+      const out = {};
+      for (const [id, p] of Object.entries(raw)) {
+        const price = Number(p?.price);
+        const days = Math.floor(Number(p?.days));
+        const label = String(p?.label || id).slice(0, 20);
+        if (Number.isFinite(price) && price > 0 && Number.isFinite(days) && days > 0) {
+          out[id] = { price, days, label };
+        }
+      }
+      if (out.mensal) return out;
+    }
+  } catch { /* override inválido: catálogo embutido */ }
+  return BUILTIN_PLANS;
+}
+
+function planLabelOf(env, row) {
+  return String(row?.plan && plansOf(env)[row.plan]?.label || '') || 'PRO';
+}
+
 // --- rate limit em memória (best-effort por isolate): 20 checkouts/min por IP ---
 const hits = new Map();
 function rateOk(ip) {
@@ -283,7 +316,8 @@ E-mail automático da sua compra — responda se precisar de ajuda.
 </body></html>`;
 }
 
-async function sendKeyEmail(env, { to, key, days }) {
+async function sendKeyEmail(env, { to, key, days, plan }) {
+  const label = plan || 'PRO';
   const text = [
     'Bem-vindo ao PRO! Obrigado por apoiar o LinkFetcher.',
     '',
@@ -291,7 +325,7 @@ async function sendKeyEmail(env, { to, key, days }) {
     '',
     key,
     '',
-    `Validade: ${days} dias. Como ativar:`,
+    `Plano ${label} — validade: ${days} dias. Como ativar:`,
     '1. Abra o LinkFetcher → Download Personalizado → Ativar PRO',
     '2. Já tenho uma chave (cole a chave acima)',
     '',
@@ -311,7 +345,7 @@ async function sendKeyEmail(env, { to, key, days }) {
     title: 'Bem-vindo ao PRO! 🎉',
     lead: 'Obrigado por apoiar o LinkFetcher! Sua assinatura já está ativa — copie a chave abaixo e ative no app em menos de 1 minuto. Qualquer dúvida, é só responder este e-mail.',
     key: escHtml(key),
-    validity: `Sua chave vale por ${days} dias. Bom proveito!`,
+    validity: `Plano ${label} — válido por ${days} dias. Bom proveito!`,
     steps: [
       'Abra o LinkFetcher → <b>Download Personalizado</b> → <b>Ativar PRO</b>',
       'Toque em <b>Já tenho uma chave</b> e cole a chave acima',
@@ -339,8 +373,8 @@ async function findByMpId(env, mpId) {
 async function saveCheckout(env, c) {
   await env.DB.prepare(
     `INSERT INTO checkouts
-     (checkout_id, mp_id, email, contact, price, days, status, license_key, created_at, updated_at, last_check, paid_at, email_sent)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     (checkout_id, mp_id, email, contact, plan, price, days, status, license_key, created_at, updated_at, last_check, paid_at, email_sent)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(checkout_id) DO UPDATE SET
        status=CASE WHEN checkouts.status = 'paid' THEN 'paid' ELSE excluded.status END,
        license_key=COALESCE(checkouts.license_key, excluded.license_key),
@@ -352,6 +386,7 @@ async function saveCheckout(env, c) {
       String(c.mp_id),
       c.email,
       c.contact,
+      String(c.plan || 'mensal').slice(0, 20),
       Number(c.price),
       Number(c.days),
       c.status,
@@ -393,7 +428,7 @@ async function settleCheckout(env, c) {
   c.paid_at = new Date().toISOString();
   c.updated_at = c.paid_at;
   if (/@/.test(c.email || '')) {
-    const r = await sendKeyEmail(env, { to: c.email, key: c.license_key, days });
+    const r = await sendKeyEmail(env, { to: c.email, key: c.license_key, days, plan: planLabelOf(env, c) });
     c.email_sent = r.sent ? 1 : 0;
   }
   return c;
@@ -434,7 +469,7 @@ button{background:#059669;color:#fff;border:none;font-weight:bold;cursor:pointer
 </div>
 <div id="panel" style="display:none">
 <div class="cards" id="cards"></div>
-<table><thead><tr><th>Data</th><th>E-mail</th><th>Valor</th><th>Status</th><th>E-mail chave</th></tr></thead>
+<table><thead><tr><th>Data</th><th>E-mail</th><th>Plano</th><th>Valor</th><th>Status</th><th>E-mail chave</th></tr></thead>
 <tbody id="rows"></tbody></table>
 <p class="muted">Sem chaves aqui — só totais e status. Comprovante oficial: extrato do Mercado Pago.</p>
 </div>
@@ -455,7 +490,7 @@ async function load(k){
     '<div class="card">Receita<b>' + esc(d.paid.revenue) + '</b></div>' +
     '<div class="card">Pendentes<b>' + d.pending + '</b></div>';
   document.getElementById('rows').innerHTML = d.rows.map(x =>
-    '<tr><td>' + esc(x.when) + '</td><td>' + esc(x.email) + '</td><td>' + esc(x.price) + '</td><td>' + esc(x.status) + '</td><td>' + (x.emailSent ? 'sim' : 'não') + '</td></tr>'
+    '<tr><td>' + esc(x.when) + '</td><td>' + esc(x.email) + '</td><td>' + esc(x.plan) + '</td><td>' + esc(x.price) + '</td><td>' + esc(x.status) + '</td><td>' + (x.emailSent ? 'sim' : 'não') + '</td></tr>'
   ).join('');
 }
 </script></body></html>`;
@@ -497,8 +532,16 @@ export default {
         if (enc.encode(contact).length > 24) {
           return json({ error: 'contact-too-long' }, 400);
         }
-        const price = Number(env.PRICE || '9.99');
-        const days = Number(env.PLAN_DAYS || '30');
+        // Plano escolhido (default = mensal, p/ app antigo). Validado aqui,
+        // antes de qualquer chamada ao MP — plano inválido nunca gera Pix.
+        const plans = plansOf(env);
+        const planId = String(body.plan || 'mensal').trim().toLowerCase().slice(0, 20);
+        const plan = plans[planId];
+        if (!plan) {
+          return json({ error: 'bad-plan', plans: Object.keys(plans) }, 400);
+        }
+        const price = plan.price;
+        const days = plan.days;
         // Anti-cobrança-dupla: e-mail com PRO ainda válido não gera Pix novo —
         // reenvia a chave e avisa (409). Expirado segue como renovação.
         const prev = await env.DB.prepare(
@@ -510,7 +553,7 @@ export default {
           const validUntil = Date.parse(prev.paid_at || prev.created_at) + Number(prev.days || 30) * 86400_000;
           if (validUntil > Date.now()) {
             if (/@/.test(prev.email || '')) {
-              const r = await sendKeyEmail(env, { to: prev.email, key: prev.license_key, days: daysOf(env, prev) });
+              const r = await sendKeyEmail(env, { to: prev.email, key: prev.license_key, days: daysOf(env, prev), plan: planLabelOf(env, prev) });
               prev.email_sent = r.sent ? 1 : 0;
               prev.updated_at = new Date().toISOString();
               await saveCheckout(env, prev);
@@ -548,6 +591,7 @@ export default {
           mp_id: String(mp.id),
           email,
           contact,
+          plan: planId,
           price,
           days,
           status: 'pending',
@@ -562,6 +606,9 @@ export default {
         return json(
           {
             checkoutId,
+            plan: planId,
+            price,
+            days,
             qrText: tx.qr_code || null,
             qrImage: tx.qr_code_base64 ? `data:image/png;base64,${tx.qr_code_base64}` : null,
             expiresAt: Date.now() + 35 * 60_000,
@@ -586,7 +633,7 @@ export default {
         }
         // Retentativa de e-mail: pago mas ainda não entregue → tenta a cada poll.
         if (c.status === 'paid' && c.license_key && !c.email_sent && /@/.test(c.email || '')) {
-          const r = await sendKeyEmail(env, { to: c.email, key: c.license_key, days: daysOf(env, c) });
+          const r = await sendKeyEmail(env, { to: c.email, key: c.license_key, days: daysOf(env, c), plan: planLabelOf(env, c) });
           c.email_sent = r.sent ? 1 : 0;
           c.updated_at = new Date().toISOString();
           await saveCheckout(env, c);
@@ -644,7 +691,7 @@ export default {
            FROM checkouts GROUP BY status`,
         ).all();
         const rows = await env.DB.prepare(
-          `SELECT email, price, status, paid_at, created_at, email_sent
+          `SELECT email, plan, price, status, paid_at, created_at, email_sent
            FROM checkouts ORDER BY created_at DESC LIMIT 100`,
         ).all();
         const brl = (v) => `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
@@ -658,7 +705,7 @@ export default {
           paid: { count: byStatus('paid')?.n ?? 0, revenue: brl(byStatus('paid')?.revenue) },
           pending: byStatus('pending')?.n ?? 0,
           rows: (rows.results || []).map((r) => ({
-            when: when(r), email: r.email, price: brl(r.price),
+            when: when(r), email: r.email, plan: r.plan || 'mensal', price: brl(r.price),
             status: r.status, emailSent: !!r.email_sent,
           })),
         });
