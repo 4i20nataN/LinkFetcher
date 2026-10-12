@@ -26,6 +26,67 @@ function compareVer(a: string, b: string): number {
 
 type Stage = 'idle' | 'checking' | 'available' | 'downloading' | 'error';
 
+export interface AndroidUpdateAvailable {
+  tag: string;
+  apkUrl: string;
+  apkName: string;
+  body: string;
+}
+
+export interface AndroidCheckResult {
+  available: boolean;
+  /** tag remota (mesmo quando já está em dia) */
+  tag: string;
+  info?: AndroidUpdateAvailable;
+}
+
+/** Checagem pura reusável (banner automático + linha manual): resolve com
+ *  o APK da ABI do aparelho quando há release maior que a instalada.
+ *  Erros: AbortError (timeout 15s), NO_APK (sem APK), ou HTTP do GitHub. */
+export async function checkAndroidUpdate(): Promise<AndroidCheckResult> {
+  // Timeout: fetch sem sinal pendura a UI em rede móvel ruim.
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 15000);
+  try {
+    const { getVersion } = await import('@tauri-apps/api/app');
+    const current = await getVersion();
+    const res = await fetch(LATEST_URL, {
+      headers: { Accept: 'application/vnd.github+json' },
+      signal: ctl.signal,
+    });
+    if (!res.ok) throw new Error(`GitHub HTTP ${res.status}`);
+    const rel = await res.json();
+    const tag: string = rel.tag_name || '';
+    const assets: any[] = rel.assets || [];
+    // APK da ABI do aparelho; fallback universal.
+    let name = 'LinkFetcher.apk';
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const { abi } = await invoke<{ abi: string }>('plugin:ytdlp|appAbi');
+      const perAbi = abi ? `LinkFetcher-${abi}.apk` : '';
+      if (perAbi && assets.some(a => a?.name === perAbi)) name = perAbi;
+    } catch {
+    }
+    const apk = assets.find((a: any) => typeof a?.name === 'string' && a.name === name);
+    if (!tag || !apk?.browser_download_url) throw new Error('NO_APK');
+    if (compareVer(tag, current) > 0) {
+      return {
+        available: true,
+        tag,
+        info: {
+          tag,
+          apkUrl: apk.browser_download_url,
+          apkName: name,
+          body: typeof rel.body === 'string' ? rel.body : '',
+        },
+      };
+    }
+    return { available: false, tag };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function AndroidUpdater() {
   const { settings, updateSettings } = useApp();
   const en = settings.language === 'en';
@@ -38,53 +99,28 @@ export function AndroidUpdater() {
   const check = useCallback(async () => {
     setStage('checking');
     setError('');
-    // Timeout: fetch sem sinal pendura a UI em rede móvel ruim.
-    const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 15000);
     try {
-      const { getVersion } = await import('@tauri-apps/api/app');
-      const current = await getVersion();
-      const res = await fetch(LATEST_URL, {
-        headers: { Accept: 'application/vnd.github+json' },
-        signal: ctl.signal,
-      });
-      if (!res.ok) throw new Error(`GitHub HTTP ${res.status}`);
-      const rel = await res.json();
-      const tag: string = rel.tag_name || '';
-      const assets: any[] = rel.assets || [];
-      // APK da ABI do aparelho; fallback universal.
-      let name = 'LinkFetcher.apk';
-      try {
-        const { invoke } = await import('@tauri-apps/api/core');
-        const { abi } = await invoke<{ abi: string }>('plugin:ytdlp|appAbi');
-        const perAbi = abi ? `LinkFetcher-${abi}.apk` : '';
-        if (perAbi && assets.some(a => a?.name === perAbi)) name = perAbi;
-      } catch {
-      }
-      setApkName(name);
-      const apk = assets.find((a: any) => typeof a?.name === 'string' && a.name === name);
-      if (!tag || !apk?.browser_download_url) {
-        throw new Error(en ? 'No Android APK in latest release' : 'Release atual sem APK Android');
-      }
-      if (compareVer(tag, current) > 0) {
-        setRemote(tag);
-        setApkUrl(apk.browser_download_url);
+      const r = await checkAndroidUpdate();
+      if (r.available) {
+        setRemote(r.info.tag);
+        setApkUrl(r.info.apkUrl);
+        setApkName(r.info.apkName);
         setStage('available');
       } else {
-        setRemote(tag);
+        setRemote(r.tag);
         setStage('idle');
       }
     } catch (e: any) {
-      clearTimeout(timer);
       if (e?.name === 'AbortError') {
         setError(en ? 'Check timed out (15s)' : 'Verificação expirou (15s)');
+      } else if (e?.message === 'NO_APK') {
+        setError(en ? 'No Android APK in latest release' : 'Release atual sem APK Android');
       } else {
         setError(e?.message || (en ? 'Check failed' : 'Falha na verificação'));
       }
       setStage('error');
       return;
     }
-    clearTimeout(timer);
   }, [en]);
 
   const download = useCallback(async () => {

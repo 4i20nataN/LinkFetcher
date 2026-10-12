@@ -8,6 +8,7 @@ import type { Update } from '@tauri-apps/plugin-updater';
 import { useApp } from '../../context/AppContext';
 import { useTranslation } from '../../core/i18n';
 import { isAndroid } from '../../core/ytdlp/YtDlpAdapter';
+import { checkAndroidUpdate, type AndroidUpdateAvailable } from './AndroidUpdater';
 
 declare const __APP_VERSION__: string;
 
@@ -39,17 +40,55 @@ export default function UpdateBanner() {
   const [showNotes, setShowNotes] = useState(true);
 
   const tauriUpdateRef = useRef<Update | null>(null);
+  const androidUpdateRef = useRef<AndroidUpdateAvailable | null>(null);
 
-  // Verificação inicial com delay (só se auto-update ativo; Android pula).
+  // Verificação inicial com delay (só se auto-update ativo).
+  // Desktop: updater Tauri (2,5s). Android: GitHub API + popup igual (8s,
+  // dá tempo do boot assentar em rede móvel).
   // Import dinâmico: fora do boot mobile (opt-out com `false` explícito).
   useEffect(() => {
     if (settings.updates === false) return;
-    if (isAndroid()) return;
+    if (isAndroid()) {
+      const timer = setTimeout(() => {
+        checkAndroidForBanner();
+      }, 8000);
+      return () => clearTimeout(timer);
+    }
     const timer = setTimeout(() => {
       checkForUpdates();
     }, 2500);
     return () => clearTimeout(timer);
   }, [settings.updates]);
+
+  const checkAndroidForBanner = useCallback(async () => {
+    if (stage === 'downloading' || stage === 'ready') return;
+    setStage('checking');
+    setErrorMsg('');
+    try {
+      const r = await checkAndroidUpdate();
+      if (r.available && r.info) {
+        androidUpdateRef.current = r.info;
+        let current = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.2.0';
+        try {
+          const { getVersion } = await import('@tauri-apps/api/app');
+          current = await getVersion();
+        } catch {
+        }
+        setUpdateInfo({
+          version: r.info.tag,
+          currentVersion: current,
+          body: r.info.body || undefined,
+          date: undefined,
+        });
+        setStage('available');
+      } else {
+        setStage('idle');
+      }
+    } catch {
+      // Em dev/sem rede, não alarma no startup.
+      setStage('idle');
+    }
+  }, [stage]);
 
   const checkForUpdates = useCallback(async () => {
     if (stage === 'downloading' || stage === 'ready') return;
@@ -78,6 +117,29 @@ export default function UpdateBanner() {
   }, [stage]);
 
   const handleUpdateAndRestart = useCallback(async () => {
+    // Android: sideload via DownloadManager (sem relaunch); a notificação
+    // do sistema assume e abre o instalador. Fecha o popup sozinho.
+    if (isAndroid()) {
+      const info = androidUpdateRef.current;
+      if (!info) {
+        setErrorMsg(t('updFailGeneric'));
+        setStage('error');
+        return;
+      }
+      setStage('downloading');
+      setProgress(0);
+      setErrorMsg('');
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('plugin:ytdlp|updateDownload', { url: info.apkUrl, fileName: info.apkName });
+        setTimeout(() => setStage('dismissed'), 4000);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setErrorMsg(typeof msg === 'string' && msg ? msg : t('updFailGeneric'));
+        setStage('error');
+      }
+      return;
+    }
     if (!updateInfo) return;
     setStage('downloading');
     setProgress(0);
@@ -185,11 +247,15 @@ export default function UpdateBanner() {
                     </div>
                     <div className="flex items-center gap-2 mt-1 text-xs lf-text-secondary">
                       <span>{t('updCurrent')} <strong className="font-mono text-zinc-300">v{updateInfo.currentVersion}</strong></span>
-                      <span>&bull;</span>
-                      <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                        <ShieldCheck size={13} />
-                        {t('updSigOk')}
-                      </span>
+                      {!isAndroid() && (
+                        <>
+                          <span>&bull;</span>
+                          <span className="flex items-center gap-1 text-emerald-400 font-medium">
+                            <ShieldCheck size={13} />
+                            {t('updSigOk')}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -241,7 +307,7 @@ export default function UpdateBanner() {
                   className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 hover:brightness-110 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
                 >
                   <Download size={14} />
-                  {t('updInstall')}
+                  {isAndroid() ? t('updInstallApk') : t('updInstall')}
                 </AnimatedButton>
               </div>
             </div>
@@ -258,10 +324,11 @@ export default function UpdateBanner() {
                     {t('updDownloading')}
                   </h4>
                   <p className="text-xs text-zinc-400">
-                    {t('updRestartAuto')}
+                    {isAndroid() ? t('updViaNotification') : t('updRestartAuto')}
                   </p>
                 </div>
               </div>
+              {!isAndroid() && (
               <div className="text-right">
                 <span className="text-sm font-mono font-bold text-emerald-400">{progress}%</span>
                 {totalBytes > 0 && (
@@ -270,14 +337,17 @@ export default function UpdateBanner() {
                   </p>
                 )}
               </div>
+              )}
             </div>
 
+            {!isAndroid() && (
             <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden relative">
               <div
                 className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-full w-full origin-left transition-transform duration-300 rounded-full"
                 style={{ transform: `scaleX(${(progress / 100).toFixed(4)})` }}
               />
             </div>
+            )}
           </div>
         )}
 
