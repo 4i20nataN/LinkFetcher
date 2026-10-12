@@ -272,6 +272,67 @@ function escHtml(s) {
   }[c]));
 }
 
+function richText(s) {
+  // Escapa e quebra linhas; URLs viram links (parte-se antes de escapar
+  // p/ não quebrar `&` do href).
+  return String(s ?? '').split(/(https?:\/\/[^\s]+)/g).map((p, i) => {
+    if (i % 2 === 1) {
+      const url = escHtml(p);
+      return `<a href="${url}" style="color:#059669;font-weight:bold;word-break:break-all;">${url}</a>`;
+    }
+    return escHtml(p).replace(/\n/g, '<br/>');
+  }).join('');
+}
+
+function firstUrl(s) {
+  const m = String(s ?? '').match(/https?:\/\/[^\s]+/);
+  return m ? m[0] : null;
+}
+
+// E-mail de novidade (broadcast): mesmo terno do e-mail da chave, com
+// botão de download quando a mensagem traz link.
+function broadcastEmailHtml({ tag, subject, message }) {
+  const paras = String(message ?? '')
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => `<tr><td style="padding-top:10px;font-size:14px;line-height:21px;color:#475569;">${richText(p)}</td></tr>`)
+    .join('');
+  const url = firstUrl(message);
+  const cta = url
+    ? `<tr><td align="center" style="padding-top:22px;">
+<a href="${escHtml(url)}" style="display:inline-block;padding:13px 34px;border-radius:12px;background:#059669;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;">Baixar a nova versão</a>
+</td></tr>`
+    : '';
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>${escHtml(subject)}</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escHtml(subject)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 12px;">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
+<tr><td style="background:#0b1220;padding:26px 28px 20px;text-align:center;">
+<img src="${LOGO_URL}" alt="LinkFetcher" width="440" style="display:block;margin:0 auto;max-width:100%;height:auto;border:0;"/>
+<div style="margin-top:12px;"><span style="display:inline-block;padding:2px 10px;border-radius:9999px;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.4);color:#34d399;font-size:11px;font-weight:bold;letter-spacing:2px;">${escHtml(tag)}</span></div>
+</td></tr>
+<tr><td style="padding:28px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr><td style="font-size:20px;font-weight:bold;color:#0f172a;">${escHtml(subject)}</td></tr>
+${paras}
+${cta}
+<tr><td style="padding-top:18px;font-size:12px;line-height:18px;color:#94a3b8;">Você recebe porque comprou o LinkFetcher PRO. Sua chave continua válida — nada muda na ativação.</td></tr>
+</table>
+</td></tr>
+<tr><td style="background:#f8fafc;padding:14px 28px;text-align:center;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;">
+E-mail automático de novidade — responda se precisar de ajuda.
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
+}
+
 // Molde HTML do e-mail (tabelas + inline: compatível com Gmail/Outlook).
 // `rows` = blocos de conteúdo já escapados; texto puro segue em `text`.
 function keyEmailHtml({ preheader, title, lead, key, validity, steps, foot }) {
@@ -753,7 +814,12 @@ export default {
             'SELECT 1 AS x FROM broadcast_sends WHERE tag = ? AND email = ?',
           ).bind(tag, to).first();
           if (already) continue;
-          const r = await sendEmail(env, { to, subject, text: message });
+          const r = await sendEmail(env, {
+            to,
+            subject,
+            text: message,
+            html: broadcastEmailHtml({ tag, subject, message }),
+          });
           if (r.sent) {
             sent++;
             await env.DB.prepare(
