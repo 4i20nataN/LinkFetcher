@@ -14,19 +14,9 @@
 
 ![Analyzer — real video, options expanded](screenshots/01-analisar.webp)
 
-![PRO checkout — 5 plans](screenshots/03-pro.webp)
-
 ![Advanced tab](screenshots/02-avancado.webp)
 
 ![Playlist analyzed — bulk download](screenshots/06-playlist.webp)
-
-![Downloads — 5 done + 1 paused](screenshots/04-downloads.webp)
-
-![Favorites](screenshots/07-favoritos.webp)
-
-![Download later](screenshots/08-baixar-depois.webp)
-
-![Settings](screenshots/05-ajustes.webp)
 
 ## PRO plans
 
