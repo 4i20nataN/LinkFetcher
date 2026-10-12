@@ -12,6 +12,8 @@
 
 ## Screenshots
 
+![Mídia • Avançado • Playlist](screenshots/00-trio.webp)
+
 ![Analyzer — real video, options expanded](screenshots/01-analisar.webp)
 
 ![Advanced tab](screenshots/02-avancado.webp)
