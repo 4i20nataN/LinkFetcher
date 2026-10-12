@@ -166,10 +166,14 @@ jobs:
       - name: Avisar compradores por e-mail (update novo)
         # Requer o secret ADMIN_PASSWORD (mesmo valor do Worker). Sem ele,
         # o passo é pulado e o aviso sai manual via /api/admin/broadcast.
-        if: ${{ secrets.ADMIN_PASSWORD != '' }}
+        # (Checagem em shell: `secrets` no `if` quebra a avaliação do job.)
         env:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: |
+          if [ -z "${ADMIN_PASSWORD:-}" ]; then
+            echo "sem ADMIN_PASSWORD: pulo o broadcast (aviso manual via /api/admin/broadcast)"
+            exit 0
+          fi
           python3 - <<'EOF'
           import json, os, urllib.request
           tag = os.environ["GITHUB_REF_NAME"]
