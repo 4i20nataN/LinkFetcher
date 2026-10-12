@@ -394,7 +394,7 @@ export default function UpdateBanner() {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button
-                  onClick={checkForUpdates}
+                  onClick={() => (isAndroid() ? checkAndroidForBanner() : checkForUpdates())}
                   className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/15 text-white transition-colors"
                 >
                   {t('updRetry')}

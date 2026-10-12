@@ -264,7 +264,7 @@ async function sendEmail(env, { to, subject, text, html, attachments }) {
   }
 }
 
-const LOGO_URL = 'https://raw.githubusercontent.com/4i20nataN/LinkFatcher/v1.5.0/public/linkfetcher-banner.png';
+const LOGO_URL = 'https://raw.githubusercontent.com/4i20nataN/LinkFetcher/v1.5.0/public/linkfetcher-banner.png';
 
 function escHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({

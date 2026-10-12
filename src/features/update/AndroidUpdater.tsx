@@ -6,7 +6,7 @@ import { useApp } from '../../context/AppContext';
 /** Sideload de APK via releases do GitHub (o DownloadManager nativo instala). */
 
 const OWNER = '4i20nataN';
-const REPO = 'LinkFatcher';
+const REPO = 'LinkFetcher';
 const LATEST_URL = `https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`;
 
 function parseVer(v: string): number[] {

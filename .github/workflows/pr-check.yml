@@ -29,6 +29,9 @@ jobs:
       - name: Testes unitários
         run: npm test
 
+      - name: Testes do license server
+        run: npm run test:server
+
       - name: Smoke E2E (Chromium headless)
         run: |
           npx playwright install --with-deps chromium || npx playwright install chromium
