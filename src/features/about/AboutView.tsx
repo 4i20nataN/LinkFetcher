@@ -6,6 +6,7 @@ import { useApp } from '../../context/AppContext';
 import { useLicense, getLicense, clearLicense } from '../../core/license/licenseStore';
 import { isLicenseActive } from '../../core/license/license';
 import { LicenseModal } from '../../core/license/LicenseModal';
+import { SUPPORT_EMAIL } from '../../core/license/purchase';
 import { PrivacyPolicy } from '../privacy/PrivacyPolicy';
 import {
   Info, KeyRound, ShieldCheck, Copy, Check, Eye, EyeOff,
@@ -47,6 +48,14 @@ export function AboutView() {
   const supportHint = isEn
     ? 'Lost your key or having trouble? Use "Lost my key" in the PRO panel or reply to the email where you received your key.'
     : 'Perdeu a chave ou com problema? Use "Perdi minha chave" no painel PRO ou responda ao e-mail onde recebeu sua chave.';
+  const supportMailto = SUPPORT_EMAIL
+    ? `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
+      isEn ? 'LinkFetcher support' : 'Suporte LinkFetcher',
+    )}&body=${encodeURIComponent(
+      (isEn ? 'App version: ' : 'Versão do app: ') + version + '\n' +
+      (isEn ? 'Purchase contact (key email): ' : 'Contato da compra (e-mail da chave): ') + (lic?.contact || ''),
+    )}`
+    : null;
 
   const card = `rounded-2xl p-6 transition-all duration-300 cv-auto
     ${isLight
@@ -229,6 +238,15 @@ export function AboutView() {
               <p className={`${body} mb-3`}>
                 {supportHint}
               </p>
+              {supportMailto && (
+                <a
+                  href={supportMailto}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all"
+                >
+                  <MessageCircle size={14} />
+                  {isEn ? 'Contact support' : 'Falar com suporte'}
+                </a>
+              )}
             </div>
           </div>
 
