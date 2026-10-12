@@ -1,0 +1,560 @@
+// LinkFetcher License Server — Cloudflare Workers + D1 (100% gratuito).
+// Mesma API do server.mjs em Node: checkout Pix via Mercado Pago,
+// poll da chave e webhook. Persistência em D1 (sem disco/VPS).
+//
+// Rotas:
+//   GET  /api/health
+//   POST /api/checkout               { email, contact } -> { checkoutId, qrText, qrImage, expiresAt }
+//   GET  /api/key/:id?contact=...    -> { status, key? }
+//   POST /api/webhook/mercadopago    (Mercado Pago)
+
+const MP_API = 'https://api.mercadopago.com';
+const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+const enc = new TextEncoder();
+
+function b32enc(bytes) {
+  let out = '';
+  let acc = 0;
+  let bits = 0;
+  for (const b of bytes) {
+    acc = (acc << 8) | b;
+    bits += 8;
+    while (bits >= 5) {
+      bits -= 5;
+      out += ALPHABET[(acc >>> bits) & 31];
+    }
+  }
+  if (bits > 0) out += ALPHABET[(acc << (5 - bits)) & 31];
+  return out;
+}
+
+function hex(bytes) {
+  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+const CORS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET, POST, OPTIONS',
+  'access-control-allow-headers': 'content-type',
+  'access-control-max-age': '86400',
+};
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'content-type': 'application/json', ...CORS },
+  });
+}
+
+const priceOf = (env, row) => Number(row?.price ?? env.PRICE ?? '9.99');
+const daysOf = (env, row) => Number(row?.days ?? env.PLAN_DAYS ?? '30');
+
+// --- rate limit em memória (best-effort por isolate): 20 checkouts/min por IP ---
+const hits = new Map();
+function rateOk(ip) {
+  const now = Date.now();
+  const arr = (hits.get(ip) || []).filter((t) => now - t < 60_000);
+  arr.push(now);
+  hits.set(ip, arr);
+  return arr.length <= 20;
+}
+
+// --- webhook: extração do payment id (igual ao server/webhook.mjs) ---
+export function extractPaymentId(jsonBody, searchParams) {
+  if (jsonBody && jsonBody.type === 'payment' && jsonBody?.data?.id) {
+    return String(jsonBody.data.id);
+  }
+  const topic = searchParams.get('topic') || searchParams.get('type');
+  const id = searchParams.get('id') || searchParams.get('data.id');
+  if (id && (!topic || topic === 'payment')) return String(id);
+  return null;
+}
+
+// --- webhook: HMAC-SHA256 via WebCrypto (ts ±5min) ---
+export async function verifySignature({ secret, signatureHeader, requestId, dataId, nowMs = Date.now() }) {
+  if (!secret || !signatureHeader || !requestId || !dataId) return false;
+  const parts = Object.fromEntries(
+    String(signatureHeader)
+      .split(',')
+      .map((p) => {
+        const i = p.indexOf('=');
+        return i < 0 ? [] : [p.slice(0, i).trim(), p.slice(i + 1).trim()];
+      })
+      .filter((a) => a.length === 2),
+  );
+  const { ts, v1 } = parts;
+  if (!ts || !v1) return false;
+  if (Math.abs(nowMs - Number(ts) * 1000) > 5 * 60_000) return false;
+  const manifest = `id:${dataId};request-id:${requestId};ts:${ts};`;
+  const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
+    'sign',
+  ]);
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(manifest));
+  const expected = hex(sig).toLowerCase();
+  const got = String(v1).toLowerCase();
+  if (expected.length !== got.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ got.charCodeAt(i);
+  return diff === 0;
+}
+
+// --- Mercado Pago (fetch nativo; mesma conta do server/mp.mjs) ---
+async function createPixPayment(env, { amount, email, externalReference, notificationUrl, idempotencyKey }) {
+  if (!env.MP_ACCESS_TOKEN) throw new Error('MP_ACCESS_TOKEN ausente');
+  const exp = new Date(Date.now() + 35 * 60_000);
+  const res = await fetch(`${MP_API}/v1/payments`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${env.MP_ACCESS_TOKEN}`,
+      'content-type': 'application/json',
+      'x-idempotency-key': idempotencyKey,
+    },
+    body: JSON.stringify({
+      transaction_amount: Number(amount),
+      description: 'LinkFetcher PRO mensal',
+      payment_method_id: 'pix',
+      payer: { email },
+      external_reference: externalReference,
+      notification_url: notificationUrl,
+      date_of_expiration: exp.toISOString(),
+    }),
+  });
+  if (!res.ok) throw new Error(`mp-create ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return res.json();
+}
+
+async function getPayment(env, mpId) {
+  const res = await fetch(`${MP_API}/v1/payments/${encodeURIComponent(mpId)}`, {
+    headers: { authorization: `Bearer ${env.MP_ACCESS_TOKEN}` },
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+// --- emissão LF1 (mesmo formato do server/mint.mjs; WebCrypto puro, sem Buffer) ---
+let cachedJwkStr = '';
+let cachedKey = null;
+async function privateKey(env) {
+  const raw = env.LICENSE_PRIVATE_JWK || '';
+  if (!raw) throw new Error('LICENSE_PRIVATE_JWK ausente');
+  if (cachedKey && cachedJwkStr === raw) return cachedKey;
+  const jwk = JSON.parse(raw);
+  cachedKey = await crypto.subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  cachedJwkStr = raw;
+  return cachedKey;
+}
+
+export async function mintKeyFor(env, name, days) {
+  const exp = Math.floor(Date.now() / 1000) + Math.floor(Number(days)) * 86400;
+  const nb = enc.encode(String(name || '').trim()).slice(0, 24);
+  const payload = new Uint8Array(7 + nb.length);
+  payload[0] = 0x01;
+  payload[1] = 0x01;
+  new DataView(payload.buffer).setUint32(2, exp);
+  payload[6] = nb.length;
+  payload.set(nb, 7);
+  const sig = new Uint8Array(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, await privateKey(env), payload));
+  const raw = new Uint8Array(payload.length + sig.length);
+  raw.set(payload, 0);
+  raw.set(sig, payload.length);
+  const b32 = b32enc(raw);
+  const g = [];
+  for (let i = 0; i < b32.length; i += 4) g.push(b32.slice(i, i + 4));
+  return `LF1-${g.join('-')}`;
+}
+
+// --- e-mail OBRIGATÓRIO via Brevo (HTTP; grátis 300/dia, sem domínio).
+// Poll do app + retentativa cobrem falha transitória; sem BREVO_API_KEY/
+// SMTP_FROM nada é enviado (erro fica no log — configure antes de vender). ---
+async function sendKeyEmail(env, { to, key, days }) {
+  if (!env.BREVO_API_KEY || !env.SMTP_FROM) {
+    console.error('email NOT configured (BREVO_API_KEY/SMTP_FROM ausentes)');
+    return { sent: false, reason: 'email-not-configured' };
+  }
+  try {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': env.BREVO_API_KEY, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sender: { email: env.SMTP_FROM, name: 'LinkFetcher' },
+        to: [{ email: to }],
+        subject: 'Sua chave LinkFetcher PRO',
+        textContent: [
+          'Pagamento confirmado. Sua chave PRO:',
+          '',
+          key,
+          '',
+          `Validade: ${days} dias. Como ativar:`,
+          '1. Abra o LinkFetcher → Download Personalizado → Ativar PRO',
+          '2. Já tenho uma chave (cole a chave acima)',
+          '',
+          'Guarde este e-mail.',
+        ].join('\n'),
+      }),
+    });
+    if (!res.ok) {
+      console.error('email brevo:', res.status, (await res.text()).slice(0, 200));
+      return { sent: false, reason: 'send-failed' };
+    }
+    return { sent: true };
+  } catch (err) {
+    console.error('email error:', err?.message || err);
+    return { sent: false, reason: 'send-failed' };
+  }
+}
+
+// --- D1 ---
+async function getCheckout(env, id) {
+  return env.DB.prepare('SELECT * FROM checkouts WHERE checkout_id = ?').bind(id).first();
+}
+
+async function findByMpId(env, mpId) {
+  return env.DB.prepare('SELECT * FROM checkouts WHERE mp_id = ?').bind(String(mpId)).first();
+}
+
+async function saveCheckout(env, c) {
+  await env.DB.prepare(
+    `INSERT INTO checkouts
+     (checkout_id, mp_id, email, contact, price, days, status, license_key, created_at, updated_at, last_check, paid_at, email_sent)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(checkout_id) DO UPDATE SET
+       status=excluded.status, license_key=excluded.license_key,
+       updated_at=excluded.updated_at, last_check=excluded.last_check,
+       paid_at=excluded.paid_at, email_sent=excluded.email_sent`,
+  )
+    .bind(
+      c.checkout_id,
+      String(c.mp_id),
+      c.email,
+      c.contact,
+      Number(c.price),
+      Number(c.days),
+      c.status,
+      c.license_key || null,
+      c.created_at,
+      c.updated_at,
+      Number(c.last_check || 0),
+      c.paid_at || null,
+      c.email_sent ? 1 : 0,
+    )
+    .run();
+}
+
+// Transição pending→paid (webhook ou poll); idempotente. Igual a server/settle.mjs.
+async function settleCheckout(env, c) {
+  if (c.status === 'paid' && c.license_key) return c;
+  const pay = await getPayment(env, c.mp_id);
+  if (!pay || pay.status !== 'approved') {
+    c.status = pay?.status === 'rejected' || pay?.status === 'cancelled' ? pay.status : 'pending';
+    c.updated_at = new Date().toISOString();
+    return c;
+  }
+  const price = priceOf(env, c);
+  const amountOk = Math.abs(Number(pay.transaction_amount) - price) < 0.005 && pay.currency_id === 'BRL';
+  if (!amountOk) {
+    c.status = 'amount_mismatch';
+    c.updated_at = new Date().toISOString();
+    return c;
+  }
+  const days = daysOf(env, c);
+  c.license_key = await mintKeyFor(env, c.contact || c.email, days);
+  c.status = 'paid';
+  c.paid_at = new Date().toISOString();
+  c.updated_at = c.paid_at;
+  if (/@/.test(c.email || '')) {
+    const r = await sendKeyEmail(env, { to: c.email, key: c.license_key, days });
+    c.email_sent = r.sent ? 1 : 0;
+  }
+  return c;
+}
+
+function timingSafeEq(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+function adminOk(request, env) {
+  if (!env.ADMIN_PASSWORD) return false;
+  return timingSafeEq(String(request.headers.get('x-admin-key') || ''), String(env.ADMIN_PASSWORD));
+}
+
+const ADMIN_HTML = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>LinkFetcher PRO — vendas</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#0A0C12;color:#e2e8f0;margin:0;padding:1.2rem}
+h1{font-size:1.1rem}.cards{display:flex;gap:.6rem;flex-wrap:wrap;margin:1rem 0}
+.card{background:#15161c;border:1px solid #2a2d38;border-radius:.8rem;padding:.8rem 1rem;min-width:8rem}
+.card b{font-size:1.3rem;color:#10b981;display:block}
+table{width:100%;border-collapse:collapse;font-size:.8rem;margin-top:.5rem}
+th,td{text-align:left;padding:.45rem;border-bottom:1px solid #2a2d38}
+input,button{padding:.6rem .8rem;border-radius:.6rem;border:1px solid #2a2d38;font-size:.9rem}
+input{background:#15161c;color:#fff;width:100%;box-sizing:border-box}
+button{background:#059669;color:#fff;border:none;font-weight:bold;cursor:pointer;width:100%;margin-top:.5rem}
+.muted{color:#94a3b8;font-size:.8rem}
+</style></head><body>
+<h1>LinkFetcher PRO — vendas</h1>
+<div id="login">
+<input id="pw" type="password" placeholder="Senha do painel" autocomplete="off"/>
+<button onclick="enter()">Entrar</button>
+</div>
+<div id="panel" style="display:none">
+<div class="cards" id="cards"></div>
+<table><thead><tr><th>Data</th><th>E-mail</th><th>Valor</th><th>Status</th><th>E-mail chave</th></tr></thead>
+<tbody id="rows"></tbody></table>
+<p class="muted">Sem chaves aqui — só totais e status. Comprovante oficial: extrato do Mercado Pago.</p>
+</div>
+<script>
+const key = sessionStorage.getItem('lf-admin');
+if (key) load(key);
+function enter(){ const v = document.getElementById('pw').value; sessionStorage.setItem('lf-admin', v); load(v); }
+async function load(k){
+  const r = await fetch('/api/admin/sales', { headers: { 'x-admin-key': k } });
+  if (r.status === 401) { sessionStorage.removeItem('lf-admin'); alert('Senha errada'); return; }
+  if (!r.ok) { alert('Erro ' + r.status); return; }
+  const d = await r.json();
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  document.getElementById('login').style.display = 'none';
+  document.getElementById('panel').style.display = 'block';
+  document.getElementById('cards').innerHTML =
+    '<div class="card">Pagas<b>' + d.paid.count + '</b></div>' +
+    '<div class="card">Receita<b>' + esc(d.paid.revenue) + '</b></div>' +
+    '<div class="card">Pendentes<b>' + d.pending + '</b></div>';
+  document.getElementById('rows').innerHTML = d.rows.map(x =>
+    '<tr><td>' + esc(x.when) + '</td><td>' + esc(x.email) + '</td><td>' + esc(x.price) + '</td><td>' + esc(x.status) + '</td><td>' + (x.emailSent ? 'sim' : 'não') + '</td></tr>'
+  ).join('');
+}
+</script></body></html>`;
+
+export default {
+  async fetch(request, env, ctx) {
+    try {
+      const url = new URL(request.url);
+      const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+
+      // Preflight CORS (app Tauri/Android chama de http://tauri.localhost).
+      if (request.method === 'OPTIONS') {
+        return new Response(null, { status: 204, headers: { ...CORS } });
+      }
+
+      if (request.method === 'GET' && url.pathname === '/api/health') {
+        return json({ ok: true });
+      }
+
+      // Checkout: cria o Pix no MP.
+      if (request.method === 'POST' && url.pathname === '/api/checkout') {
+        if (!rateOk(ip)) return json({ error: 'rate-limited' }, 429);
+        let body;
+        try {
+          body = await request.json();
+        } catch {
+          return json({ error: 'bad-json' }, 400);
+        }
+        const email = String(body.email || '').trim().toLowerCase();
+        const contact = String(body.contact || email).trim().slice(0, 60);
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || !contact) {
+          return json({ error: 'bad-contact' }, 400);
+        }
+        const price = Number(env.PRICE || '9.99');
+        const days = Number(env.PLAN_DAYS || '30');
+        // Anti-cobrança-dupla: e-mail com PRO ainda válido não gera Pix novo —
+        // reenvia a chave e avisa (409). Expirado segue como renovação.
+        const prev = await env.DB.prepare(
+          `SELECT * FROM checkouts
+           WHERE lower(email) = ? AND status = 'paid' AND license_key IS NOT NULL
+           ORDER BY paid_at DESC LIMIT 1`,
+        ).bind(email).first();
+        if (prev) {
+          const validUntil = Date.parse(prev.paid_at || prev.created_at) + Number(prev.days || 30) * 86400_000;
+          if (validUntil > Date.now()) {
+            if (/@/.test(prev.email || '')) {
+              const r = await sendKeyEmail(env, { to: prev.email, key: prev.license_key, days: daysOf(env, prev) });
+              prev.email_sent = r.sent ? 1 : 0;
+              prev.updated_at = new Date().toISOString();
+              await saveCheckout(env, prev);
+            }
+            return json({ error: 'already-paid', validUntil: new Date(validUntil).toISOString() }, 409);
+          }
+        }
+        const checkoutId = crypto.randomUUID();
+        const base = (env.BASE_URL || url.origin).replace(/\/$/, '');
+        let mp;
+        try {
+          mp = await createPixPayment(env, {
+            amount: price,
+            email,
+            externalReference: `lf-${checkoutId}`,
+            notificationUrl: `${base}/api/webhook/mercadopago`,
+            idempotencyKey: checkoutId,
+          });
+        } catch (err) {
+          console.error('mp-create:', err?.message || err);
+          return json({ error: 'mp-failed' }, 502);
+        }
+        const now = new Date().toISOString();
+        await saveCheckout(env, {
+          checkout_id: checkoutId,
+          mp_id: String(mp.id),
+          email,
+          contact,
+          price,
+          days,
+          status: 'pending',
+          license_key: null,
+          created_at: now,
+          updated_at: now,
+          last_check: Date.now(),
+          paid_at: null,
+          email_sent: 0,
+        });
+        const tx = mp.point_of_interaction?.transaction_data || {};
+        return json(
+          {
+            checkoutId,
+            qrText: tx.qr_code || null,
+            qrImage: tx.qr_code_base64 ? `data:image/png;base64,${tx.qr_code_base64}` : null,
+            expiresAt: Date.now() + 35 * 60_000,
+          },
+          201,
+        );
+      }
+
+      // Poll da chave (só entrega ao contato da compra).
+      const keyMatch = url.pathname.match(/^\/api\/key\/([A-Za-z0-9-]+)$/);
+      if (request.method === 'GET' && keyMatch) {
+        const c = await getCheckout(env, keyMatch[1]);
+        if (!c) return json({ error: 'not-found' }, 404);
+        const who = String(url.searchParams.get('contact') || '').trim().toLowerCase();
+        const same = who && (who === String(c.email).toLowerCase() || who === String(c.contact).toLowerCase());
+        // Fallback anti-webhook-perdido: revalida no MP a cada 45s.
+        if (c.status === 'pending' && Date.now() - Number(c.last_check || 0) > 45_000) {
+          c.last_check = Date.now();
+          await settleCheckout(env, c);
+          await saveCheckout(env, c);
+        }
+        // Retentativa de e-mail: pago mas ainda não entregue → tenta a cada poll.
+        if (c.status === 'paid' && c.license_key && !c.email_sent && /@/.test(c.email || '')) {
+          const r = await sendKeyEmail(env, { to: c.email, key: c.license_key, days: daysOf(env, c) });
+          c.email_sent = r.sent ? 1 : 0;
+          c.updated_at = new Date().toISOString();
+          await saveCheckout(env, c);
+        }
+        if (c.status !== 'paid') return json({ status: c.status });
+        if (!same) return json({ error: 'contact-mismatch' }, 403);
+        return json({ status: 'paid', key: c.license_key, emailSent: !!c.email_sent });
+      }
+
+      // Recuperação de chave (trocou de aparelho, formatou, perdeu e-mail).
+      // Só REENVIA para o próprio e-mail da compra — a chave nunca volta
+      // no corpo da resposta (e-mail não é segredo; a chave, sim).
+      const recMatch = url.pathname === '/api/recover';
+      if (request.method === 'GET' && recMatch) {
+        if (!rateOk(ip)) return json({ error: 'rate-limited' }, 429);
+        const who = String(url.searchParams.get('contact') || '').trim().toLowerCase();
+        if (!who) return json({ error: 'bad-contact' }, 400);
+        const c = await env.DB.prepare(
+          `SELECT * FROM checkouts
+           WHERE (lower(email) = ? OR lower(contact) = ?) AND status = 'paid' AND license_key IS NOT NULL
+           ORDER BY paid_at DESC LIMIT 1`,
+        ).bind(who, who).first();
+        if (!c || !/@/.test(c.email || '')) return json({ status: 'not-found' });
+        const r = await sendKeyEmail(env, { to: c.email, key: c.license_key, days: daysOf(env, c) });
+        c.email_sent = r.sent ? 1 : 0;
+        c.updated_at = new Date().toISOString();
+        await saveCheckout(env, c);
+        return json({ status: r.sent ? 'sent' : 'send-failed', days: daysOf(env, c) });
+      }
+
+      // Painel de vendas (dono): HTML + JSON com senha (ADMIN_PASSWORD).
+      if (request.method === 'GET' && url.pathname === '/admin') {
+        return new Response(ADMIN_HTML, {
+          headers: {
+            'content-type': 'text/html; charset=utf-8',
+            'cache-control': 'no-store',
+            'x-content-type-options': 'nosniff',
+            'x-frame-options': 'DENY',
+            'referrer-policy': 'no-referrer',
+          },
+        });
+      }
+      if (request.method === 'GET' && url.pathname === '/api/admin/sales') {
+        if (!env.ADMIN_PASSWORD) {
+          console.error('ADMIN_PASSWORD ausente');
+          return json({ error: 'not-configured' }, 500);
+        }
+        if (!adminOk(request, env)) return json({ error: 'unauthorized' }, 401);
+        if (!rateOk(ip)) return json({ error: 'rate-limited' }, 429);
+        const totals = await env.DB.prepare(
+          `SELECT status, COUNT(*) AS n,
+            ROUND(COALESCE(SUM(CASE WHEN status='paid' THEN price ELSE 0 END),0),2) AS revenue
+           FROM checkouts GROUP BY status`,
+        ).all();
+        const rows = await env.DB.prepare(
+          `SELECT email, price, status, paid_at, created_at, email_sent
+           FROM checkouts ORDER BY created_at DESC LIMIT 100`,
+        ).all();
+        const brl = (v) => `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
+        const when = (r) => {
+          try {
+            return new Date(r.paid_at || r.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+          } catch { return '—'; }
+        };
+        const byStatus = (s) => (totals.results || []).find((t) => t.status === s);
+        return json({
+          paid: { count: byStatus('paid')?.n ?? 0, revenue: brl(byStatus('paid')?.revenue) },
+          pending: byStatus('pending')?.n ?? 0,
+          rows: (rows.results || []).map((r) => ({
+            when: when(r), email: r.email, price: brl(r.price),
+            status: r.status, emailSent: !!r.email_sent,
+          })),
+        });
+      }
+
+      // Webhook do Mercado Pago.
+      // Padrão do MP: responde 200 IMEDIATO (<22s) e processa depois
+      // (waitUntil) — evita reentrega duplicada por timeout.
+      if (request.method === 'POST' && url.pathname === '/api/webhook/mercadopago') {
+        const raw = await request.text();
+        let body = null;
+        try {
+          body = raw ? JSON.parse(raw) : null;
+        } catch {
+          body = null;
+        }
+        const paymentId = extractPaymentId(body, url.searchParams);
+        if (!env.MP_WEBHOOK_SECRET) {
+          console.error('MP_WEBHOOK_SECRET ausente');
+          return json({ error: 'not-configured' }, 500);
+        }
+        const ok = await verifySignature({
+          secret: env.MP_WEBHOOK_SECRET,
+          signatureHeader: request.headers.get('x-signature'),
+          requestId: request.headers.get('x-request-id'),
+          dataId: paymentId,
+        });
+        if (!paymentId || !ok) return json({ error: 'bad-signature' }, 401);
+        ctx.waitUntil((async () => {
+          try {
+            const c = await findByMpId(env, paymentId);
+            if (!c) return; // desconhecido: nada a liquidar
+            c.last_check = Date.now();
+            await settleCheckout(env, c);
+            await saveCheckout(env, c);
+          } catch (err) {
+            // Poll do app (45s) cobre a falha — nunca quebra a venda.
+            console.error('webhook settle:', err?.message || err);
+          }
+        })());
+        return json({ ok: true, received: true });
+      }
+
+      return json({ error: 'not-found' }, 404);
+    } catch (err) {
+      console.error('worker error:', err?.message || err);
+      return json({ error: 'internal' }, 500);
+    }
+  },
+};

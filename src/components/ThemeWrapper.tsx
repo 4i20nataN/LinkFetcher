@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { RENDER_PROFILE } from '../core/perf/renderProfile';
+import { isAndroid } from '../core/ytdlp/YtDlpAdapter';
 
 const ACCENT_MAP: Record<string, { primary: string; rgb: string; hover: string; glow: string }> = {
   indigo: { primary: '#6366f1', rgb: '99, 102, 241', hover: '#4f46e5', glow: 'rgba(79,70,229,0.20)' },
@@ -60,6 +61,31 @@ const EFFICIENT_FLAT_BG: Record<string, string> = {
 
 export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { settings } = useApp();
+  const [isMaximized, setIsMaximized] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || isAndroid()) return;
+    const tauri = '__TAURI__' in window || '__TAURI_INTERNALS__' in window;
+    if (!tauri) return;
+
+    let unlisten: (() => void) | undefined;
+    (async () => {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        const win = getCurrentWindow();
+        setIsMaximized(await win.isMaximized());
+        unlisten = await win.onResized(async () => {
+          try {
+            setIsMaximized(await win.isMaximized());
+          } catch {}
+        });
+      } catch {}
+    })();
+
+    return () => {
+      unlisten?.();
+    };
+  }, []);
 
   const themeClass = THEME_CLASSES[settings.themeMode] ?? THEME_CLASSES.dark;
 
@@ -74,25 +100,22 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
     '--color-primary-glow': accentVars.glow,
   } as React.CSSProperties), [accentVars.primary, accentVars.rgb, accentVars.hover, accentVars.glow]);
 
+  const isFramelessRounded = !isAndroid() && !isMaximized;
+
   return (
     <div
-      className={`h-screen transition-colors duration-300 select-none ${themeClass} ${RENDER_PROFILE === 'efficient' ? 'efficient' : 'full-noblur'} relative overflow-hidden`}
+      className={`h-screen transition-colors duration-300 select-none ${themeClass} ${RENDER_PROFILE === 'efficient' ? 'efficient' : 'full-noblur'} relative overflow-hidden border-0 outline-none ${
+        isFramelessRounded ? 'rounded-3xl shadow-2xl' : ''
+      }`}
       style={style}
     >
-      {RENDER_PROFILE === 'efficient' ? (
-        /* Perfil efficient: cor chapada, zero bitmap */
-        <div
-          className="absolute inset-0 z-[0] pointer-events-none"
-          style={{ backgroundColor: EFFICIENT_FLAT_BG[settings.themeMode] ?? EFFICIENT_FLAT_BG.dark }}
-        />
-      ) : (
-        <div
-          className="absolute inset-0 z-[0] pointer-events-none bg-cover bg-center bg-no-repeat transition-all duration-500"
-          style={{
-            backgroundImage: `url("${backgroundImage}")`,
-          }}
-        />
-      )}
+      <div
+        className="absolute inset-0 z-[0] pointer-events-none bg-cover bg-center bg-no-repeat transition-all duration-500"
+        style={{
+          backgroundColor: EFFICIENT_FLAT_BG[settings.themeMode] ?? EFFICIENT_FLAT_BG.dark,
+          backgroundImage: `url("${backgroundImage}")`,
+        }}
+      />
 
       {/* Glow estático: blur animado trava o raster no WebKitGTK;
           o wallpaper dá o movimento visual. */}

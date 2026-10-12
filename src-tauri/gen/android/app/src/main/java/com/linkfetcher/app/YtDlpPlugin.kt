@@ -110,6 +110,13 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
 
     private fun ensureInitialized() {
         try {
+            // stdout do Python em pipe sofre block-buffering (4-8KB): o
+            // progresso chegava em rajadas (0% → 100%). Desliga na origem;
+            // o filho herda o ambiente do app.
+            android.system.Os.setenv("PYTHONUNBUFFERED", "1", true)
+        } catch (_: Exception) { /* sem efeito no progresso ao vivo */
+        }
+        try {
             val ctx = activity.applicationContext
             YoutubeDL.getInstance().init(ctx)
             FFmpeg.getInstance().init(ctx)
@@ -135,13 +142,8 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
-    // Transporte DUPLO de progresso (regressão v1.4.0 revertida): `trigger()`
-    // (evento Tauri, `listen` no frontend) + `evaluateJavascript`
-    // (CustomEvent na window). O H4 removeu o 2º por "dobrar o IPC", mas no
-    // SM-A107M o `trigger()` não entrega progresso — o CustomEvent era o que
-    // funcionava em v1.3.1. Dedupe no engine (valores idempotentes + guards
-    // de status) absorve a duplicata. Não remover de novo sem prova no
-    // aparelho de que o `trigger()` sozinho sustenta o progresso.
+    // Transporte duplo de progresso: trigger() (Tauri listen) + evaluateJavascript
+    // (CustomEvent no window para WebView Android). O dedupe do engine absorve duplicatas.
     private fun emitOnUi(event: String, build: JSObject.() -> Unit) {
         val data = JSObject()
         data.build()
@@ -189,10 +191,7 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                 }
                 try {
                     val obj = JSObject(response.out)
-                    // H1: a lista `thumbnails` (N resoluções do mesmo frame)
-                    // nunca é consumida — só `thumbnail` (string). Remove p/
-                    // enxugar o IPC no armv7. Desktop mantém o dump cheio; o
-                    // frontend tolera a ausência (fallbacks em Providers.ts).
+                    // Remove a lista de thumbnails detalhadas para otimizar tráfego IPC; apenas thumbnail (string) é necessária.
                     obj.remove("thumbnails")
                     invoke.resolve(obj)
                 } catch (e: Exception) {
@@ -239,17 +238,9 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                 response.out.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.forEach { line ->
                     try {
                         val obj = JSONObject(line)
-                        val type = obj.optString("_type")
-                        // `_type: url` (redirect de watch?v+list) é um vídeo:
-                        // item, nunca cabeçalho — mesmo com playlist_count null.
-                        if (type == "url") {
-                            entries.put(obj)
-                            return@forEach
-                        }
-                        val countVal = if (obj.has("playlist_count") && !obj.isNull("playlist_count")) obj.optLong("playlist_count") else null
-                        val isPlaylist = type == "playlist" || countVal != null
+                        val isPlaylist = obj.optString("_type") == "playlist" || obj.has("playlist_count")
                         if (isPlaylist) {
-                            if (count == null && countVal != null) count = countVal
+                            if (count == null && obj.has("playlist_count")) count = obj.optLong("playlist_count")
                             if (title == null) {
                                 obj.optString("title").takeIf { it.isNotEmpty() }?.let { title = it }
                             }
@@ -337,16 +328,10 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
             val seen = mutableListOf<String>()
             var lastPercent = -1
             var processingSent = false
-            // Teto de 2 eventos/s: sem ele, download rápido emite ~100
-            // updates (1 por ponto de %) × 2 transportes = tempestade de
-            // renders que afoga o WebView no armv7 (notificação nativa anda,
-            // card atrasa "um tempão"). % é sempre o valor atual — pular
-            // intermediários não perde informação.
+            // Throttle de eventos de progresso: até 2 eventos/s para manter
+            // a interface fluida sem sobrecarregar a thread de UI do WebView.
             var lastEmitMs = 0L
-            // Sinais de vida sem % (fragmentos DASH/HLS, retries, avisos do
-            // extrator): sem eles a UI congela em 0% por minutos num stall
-            // real — o usuário chama de "bugado". Throttle de 3s; o engine
-            // limpa no próximo progresso/conclusão.
+            // Sinais de atividade (fragmentos, retries, avisos) durante operações sem percentual direto.
             var lastActivityMs = 0L
             fun emitActivity(kind: String, a: Int = -1, b: Int = -1, text: String? = null) {
                 val now = System.currentTimeMillis()
@@ -507,7 +492,7 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                 notifications.cancelDlNotification(args.id)
             } else {
                 lastPaths.remove(args.id)
-                notifications.showDlPaused(args.id, "")
+                notifications.showDlPaused(args.id, args.title)
             }
             invoke.resolve(JSObject().apply { put("success", killed) })
         } catch (e: Exception) {

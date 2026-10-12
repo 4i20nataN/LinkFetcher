@@ -13,7 +13,7 @@ import {
 } from '../../components/ThemeWrapper';
 import { DownloadEngine } from '../../core/engine/DownloadEngine';
 import { getLicense, useLicense } from '../../core/license/licenseStore';
-import { isLicenseActive } from '../../core/license/license';
+import { isLicenseActive, isLicenseGenuine } from '../../core/license/license';
 import type { FormatOptions } from '../downloads/FormatOptions';
 import { isPlaylistUrl } from '../../core/ytdlp/playlistUtils';
 import { adapterErrorMessage } from '../../core/ytdlp/YtDlpAdapter';
@@ -270,13 +270,13 @@ export const LinkAnalyzer: React.FC = () => {
     }
   };
 
-  const handleStartDownload = () => {
+  const handleStartDownload = async () => {
     if (!mediaInfo || !selectedFormat) {
       setError(settings.language === 'en' ? 'No format selected. Please wait for analysis to complete.' : 'Nenhum formato selecionado. Aguarde a analise completar.');
       return;
     }
-    // Personalizado exige licença (sem bypass pelos defaults).
-    if (!isLicenseActive(getLicense())) {
+    // Personalizado exige licença genuína (assinatura revalidada; sem bypass).
+    if (!isLicenseActive(getLicense()) || !(await isLicenseGenuine())) {
       setError(settings.language === 'en' ? 'Custom download is PRO — use Free Download or activate your key in the Custom Download panel.' : 'Download personalizado é PRO — use o Download Gratuito ou ative sua chave no painel Download Personalizado.');
       return;
     }
@@ -351,9 +351,9 @@ export const LinkAnalyzer: React.FC = () => {
 
   // Lote com config única: sem probe por item (o MediaInfo vem da entry
   // flat). custom = PRO, igual ao personalizado unitário.
-  const handleDownloadAllPlaylist = (kind: 'custom' | 'audio' | 'video') => {
+  const handleDownloadAllPlaylist = async (kind: 'custom' | 'audio' | 'video') => {
     if (!playlistInfo || playlistInfo.items.length === 0) return;
-    if (kind === 'custom' && !isLicenseActive(getLicense())) {
+    if (kind === 'custom' && (!isLicenseActive(getLicense()) || !(await isLicenseGenuine()))) {
       setError(settings.language === 'en' ? 'Bulk custom download is PRO — use a free preset or activate your key.' : 'Download em lote personalizado é PRO — use um preset gratuito ou ative sua chave.');
       return;
     }
@@ -456,8 +456,8 @@ export const LinkAnalyzer: React.FC = () => {
     const srcTitle = cover?.title || mediaInfo?.title;
     const srcThumb = cover?.thumbnailUrl || mediaInfo?.thumbnailUrl;
     if (!srcTitle || !srcThumb) return;
-    // Baixar capa exige licença ativa.
-    if (!isLicenseActive(getLicense())) {
+    // Baixar capa exige licença genuína (assinatura revalidada).
+    if (!isLicenseActive(getLicense()) || !(await isLicenseGenuine())) {
       setError(settings.language === 'en' ? 'Cover download is PRO — activate your key in the Custom Download panel.' : 'Baixar capa é PRO — ative sua chave no painel Download Personalizado.');
       return;
     }
@@ -596,15 +596,7 @@ export const LinkAnalyzer: React.FC = () => {
   const isPlLater = playlistInfo ? isDownloadLater(playlistInfo.url) : false;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 py-2 md:py-6 px-4">
-      <div className="text-center md:text-left space-y-2">
-        <p className="lf-text-secondary text-sm md:text-base">
-          {settings.language === 'en' 
-            ? 'Enter video, audio or image link from any supported platform to start.' 
-            : 'Insira o link de vídeos, áudios ou imagens de qualquer plataforma suportada para começar.'}
-        </p>
-      </div>
-
+    <div className="max-w-4xl mx-auto space-y-6 -mt-4 md:-mt-8 pt-1 md:pt-2 pb-2 md:pb-6 px-4">
       <AnalyzeForm
         url={url}
         setUrl={setUrl}
@@ -612,6 +604,11 @@ export const LinkAnalyzer: React.FC = () => {
         onPaste={handlePaste}
         onSubmit={handleSubmit}
         onClear={handleClearForm}
+        description={
+          settings.language === 'en'
+            ? 'Enter video, audio or image link from any supported platform to start.'
+            : 'Insira o link de vídeos, áudios ou imagens de qualquer plataforma suportada para começar.'
+        }
       />
 
       {error && (

@@ -1,7 +1,7 @@
 // Round-trip do licenciamento PRO com par gerado em tempo de teste.
 import { describe, it, expect } from 'vitest';
 import {
-  buildLicensePayload, encodeLicenseKey, base32Decode,
+  buildLicensePayload, encodeLicenseKey, base32Decode, keyBelongsToContact,
   verifyLicenseKey, LICENSE_KEY_PREFIX,
 } from './license';
 
@@ -43,6 +43,18 @@ describe('license PRO', () => {
     expect(chk.error).toBe('signature');
   });
 
+  it('rejeita 1 caractere digitável trocado (teste do usuário)', async () => {
+    const { pair, spki } = await freshPair();
+    const key = await mint(pair, 'natan.vanim@gmail.com', 0);
+    const idx = key.indexOf('-') + 5;
+    const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+    const tampered = key.slice(0, idx) + alphabet[(alphabet.indexOf(key[idx]) + 1) % alphabet.length] + key.slice(idx + 1);
+    expect(tampered).not.toBe(key);
+    const chk = await verifyLicenseKey(tampered, spki);
+    expect(chk.valid).toBe(false);
+    expect(chk.error).toBe('signature');
+  });
+
   it('rejeita chave de outro par', async () => {
     const a = await freshPair();
     const b = await freshPair();
@@ -62,5 +74,16 @@ describe('license PRO', () => {
     const { pair } = await freshPair();
     expect((await verifyLicenseKey('lixo', 'AAAA')).error).toBe('format');
     expect((await verifyLicenseKey(await mint(pair, 'W', 0), '')).error).toBe('unconfigured');
+  });
+
+  it('chave só ativa com o e-mail do comprador', async () => {
+    const { pair, spki } = await freshPair();
+    const key = await mint(pair, 'dono@email.com', 0);
+    const chk = await verifyLicenseKey(key, spki);
+    expect(chk.valid).toBe(true);
+    expect(keyBelongsToContact(chk.name, 'dono@email.com')).toBe(true);
+    expect(keyBelongsToContact(chk.name, 'DONO@email.com')).toBe(true);
+    expect(keyBelongsToContact(chk.name, 'outro@email.com')).toBe(false);
+    expect(keyBelongsToContact(chk.name, '')).toBe(false);
   });
 });

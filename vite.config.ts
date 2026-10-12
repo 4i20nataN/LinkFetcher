@@ -7,17 +7,13 @@ import packageJson from './package.json';
 export default defineConfig(() => {
   return {
     base: './',
-    plugins: [
-      react(),
-      tailwindcss(),
-      {
-        name: 'remove-crossorigin',
-        enforce: 'post',
-        transformIndexHtml(html) {
-          return html.replaceAll(' crossorigin', '');
-        },
+    plugins: [react(), tailwindcss(), {
+      name: 'remove-crossorigin',
+      enforce: 'post',
+      transformIndexHtml(html) {
+        return html.replaceAll(' crossorigin', '');
       },
-    ],
+    }],
     define: {
       __APP_VERSION__: JSON.stringify(packageJson.version),
     },

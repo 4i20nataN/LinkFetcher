@@ -1,5 +1,5 @@
 // Entrada do link + faixa de plataformas.
-import { useRef } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useTranslation } from '../../core/i18n';
 import {
@@ -19,9 +19,10 @@ export interface AnalyzeFormProps {
   onPaste: () => void;
   onSubmit: () => void;
   onClear: () => void;
+  description?: ReactNode;
 }
 
-export function AnalyzeForm({ url, setUrl, loading, onPaste, onSubmit, onClear }: AnalyzeFormProps) {
+export function AnalyzeForm({ url, setUrl, loading, onPaste, onSubmit, onClear, description }: AnalyzeFormProps) {
   const { settings } = useApp();
   const { t } = useTranslation(settings);
   const animationFrameRef = useRef<number | null>(null);
@@ -125,6 +126,14 @@ export function AnalyzeForm({ url, setUrl, loading, onPaste, onSubmit, onClear }
           <div className="tag bandcamp"><Music size={18} />Bandcamp</div>
         </div>
       </div>
+
+      {description && (
+        <div className="text-center md:text-left pt-2 pb-1">
+          <p className="lf-text-secondary text-sm md:text-base">
+            {description}
+          </p>
+        </div>
+      )}
 
       <div className="p-4 md:p-6 rounded-3xl glass-card shadow-2xl">
       <div className="flex flex-col md:flex-row gap-3">

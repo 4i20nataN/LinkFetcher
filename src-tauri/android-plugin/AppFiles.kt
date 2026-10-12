@@ -82,7 +82,7 @@ internal class AppFiles(private val activity: Activity) {
                 ) ?: return null
                 try {
                     resolver.openOutputStream(uri)?.use { out ->
-                        src.inputStream().use { it.copyTo(out) }
+                        src.inputStream().use { it.copyTo(out, bufferSize = 64 * 1024) }
                     } ?: return null
                     values.clear()
                     values.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
@@ -103,7 +103,7 @@ internal class AppFiles(private val activity: Activity) {
                 if (!pub.exists() && !pub.mkdirs()) return null
                 val dst = File(pub, src.name)
                 src.inputStream().use { input ->
-                    dst.outputStream().use { input.copyTo(it) }
+                    dst.outputStream().use { input.copyTo(it, bufferSize = 64 * 1024) }
                 }
                 android.media.MediaScannerConnection.scanFile(
                     activity, arrayOf(dst.absolutePath), null, null

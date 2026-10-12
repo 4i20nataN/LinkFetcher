@@ -7,7 +7,7 @@
     <meta name="description" content="LinkFetcher — Download de mídia inteligente com yt-dlp" />
     <title>LinkFetcher</title>
     <style>
-      html,body,#root{height:100%;margin:0;padding:0;overflow:hidden;background:#030406;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif}
+      html,body,#root{height:100%;margin:0;padding:0;overflow:hidden;background:transparent;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif}
       #root{display:flex;flex-direction:column;height:100%}
       .lf-startup-splash {
         display:flex;
@@ -121,7 +121,6 @@
       try {
         var s = JSON.parse(localStorage.getItem('universal_downloader_settings') || '{}');
         var bg = { light: '#f4f0e6', dark: '#0A0C12', gray: '#15161c', white: '#f7f9fc' }[s.themeMode] || '#0A0C12';
-        document.documentElement.style.background = bg;
         var sp = document.querySelector('.lf-startup-splash');
         if (sp) sp.style.background = bg;
       } catch (e) {}

@@ -24,7 +24,7 @@ export async function createPixPayment({ amount, email, externalReference, notif
       payer: { email },
       external_reference: externalReference,
       notification_url: notificationUrl,
-      date_of_expiration: exp.toISOString().replace(/\.\d+Z$/, '-03:00'),
+      date_of_expiration: exp.toISOString(),
     }),
   });
   if (!res.ok) throw new Error(`mp-create ${res.status}: ${(await res.text()).slice(0, 200)}`);

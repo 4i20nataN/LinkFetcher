@@ -4,6 +4,8 @@
 // Binário: ver(1B) | plan(1B=PRO) | exp(u32 BE, 0=vitalícia) | nameLen(1B)
 //          | name(≤24B) | sig(64B r||s sobre tudo antes)
 //
+import { getLicense, clearLicense } from './licenseStore';
+//
 // Privada fora do repo (só a pública embarca); sem vínculo de máquina.
 // Gerar: `scripts/mint-key.mjs --init` (1x); vender: `mint-key.mjs "Nome" [dias]`.
 
@@ -139,8 +141,43 @@ export async function verifyLicenseKey(
   return { valid: true, name, plan: 'PRO', expiresAt: exp };
 }
 
+/** A chave pertence ao contato da compra? (reativação exige os dois). */
+export function keyBelongsToContact(chkName: string | undefined, contact: string): boolean {
+  return (chkName ?? '').trim().toLowerCase() === contact.trim().toLowerCase()
+    && contact.trim().length > 0;
+}
+
 /** Registro ativo = existe e (vitalício ou não expirado). */
 export function isLicenseActive(rec: { expiresAt: number } | null | undefined): boolean {
   if (!rec) return false;
   return rec.expiresAt === 0 || rec.expiresAt * 1000 > Date.now();
+}
+
+// Revalida a assinatura da chave guardada (anti-localStorage forjado).
+// UI pode confiar em isLicenseActive; AÇÃO privilegiada exige esta.
+let genuineAt = 0;
+let genuineOk = false;
+
+/** true = chave guardada tem assinatura válida E expiração/nome íntegros. */
+export async function isLicenseGenuine(): Promise<boolean> {
+  const rec = getLicense();
+  if (!rec || !isLicenseActive(rec)) {
+    genuineOk = false;
+    return false;
+  }
+  const now = Date.now();
+  if (genuineOk && now - genuineAt < 60_000) return true;
+  const chk = await verifyLicenseKey(rec.key);
+  genuineAt = now;
+  const same =
+    chk.valid &&
+    (chk.expiresAt ?? -1) === rec.expiresAt &&
+    (chk.name ?? '') === rec.name;
+  if (!same) {
+    genuineOk = false;
+    clearLicense();
+    return false;
+  }
+  genuineOk = true;
+  return true;
 }

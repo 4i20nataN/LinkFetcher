@@ -9,6 +9,7 @@ import { ThemeWrapper } from './components/ThemeWrapper';
 import { LazyMotionProvider } from './animation/LazyMotionProvider';
 import { CSSPageTransition } from './animation/CSSPageTransition';
 import { isAndroid } from './core/ytdlp/YtDlpAdapter';
+import { WindowTitlebar } from './components/WindowTitlebar';
 const Sidebar = React.lazy(() => import('./components/Sidebar').then(m => ({ default: m.Sidebar })));
 const LinkAnalyzer = React.lazy(() => import('./features/analyzer/LinkAnalyzer').then(m => ({ default: m.LinkAnalyzer })));
 const YouTubeSearch = React.lazy(() => import('./features/youtube/YouTubeSearch').then(m => ({ default: m.YouTubeSearch })));
@@ -89,47 +90,50 @@ function DashboardContent() {
   }, [activeTab, views]);
 
   return (
-    <div className="h-full flex flex-col lg:flex-row overflow-hidden">
-      {needsSetup && !isAndroid() && (
-        <Suspense fallback={null}>
-          <BinarySetupOverlay onReady={() => setNeedsSetup(false)} />
-        </Suspense>
-      )}
-      {/* Navegação lateral */}
-      <div className="lf-suspense-sidebar">
-        <Suspense fallback={null}>
-          <Sidebar isOpen={sidebarOpen} toggleOpen={toggleSidebar} />
-        </Suspense>
-      </div>
-
-      {/* Painel principal */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain relative p-4 md:p-8 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-
-      {/* Banner de update (só desktop) */}
-        {!isAndroid() && (
+    <div className="h-full flex flex-col overflow-hidden">
+      {!isAndroid() && <WindowTitlebar />}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
+        {needsSetup && !isAndroid() && (
           <Suspense fallback={null}>
-            <UpdateBanner />
+            <BinarySetupOverlay onReady={() => setNeedsSetup(false)} />
           </Suspense>
         )}
-
-        {/* Transição entre abas */}
-        <div className="lf-animated-view">
-          {/* Keep-alive: trocar de aba nunca desmonta a fila de downloads. */}
-          <div
-            className="lf-suspense-view"
-            style={activeTab === 'manager' ? undefined : { display: 'none' }}
-          >
-            <Suspense fallback={null}>
-              <DownloadManager />
-            </Suspense>
-          </div>
-          {activeTab !== 'manager' && (
-            <CSSPageTransition activeKey={activeTab}>
-              {renderActiveView()}
-            </CSSPageTransition>
-          )}
+        {/* Navegação lateral */}
+        <div className="lf-suspense-sidebar">
+          <Suspense fallback={null}>
+            <Sidebar isOpen={sidebarOpen} toggleOpen={toggleSidebar} />
+          </Suspense>
         </div>
-      </main>
+
+        {/* Painel principal */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain relative p-4 md:p-8 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+
+        {/* Banner de update (só desktop) */}
+          {!isAndroid() && (
+            <Suspense fallback={null}>
+              <UpdateBanner />
+            </Suspense>
+          )}
+
+          {/* Transição entre abas */}
+          <div className="lf-animated-view">
+            {/* Keep-alive: trocar de aba nunca desmonta a fila de downloads. */}
+            <div
+              className="lf-suspense-view"
+              style={activeTab === 'manager' ? undefined : { display: 'none' }}
+            >
+              <Suspense fallback={null}>
+                <DownloadManager />
+              </Suspense>
+            </div>
+            {activeTab !== 'manager' && (
+              <CSSPageTransition activeKey={activeTab}>
+                {renderActiveView()}
+              </CSSPageTransition>
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

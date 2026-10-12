@@ -65,16 +65,18 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     };
     DownloadEngine.addListener(handleUpdate);
-    // Volta ao foreground: reconcilia `complete` perdido com WebView suspenso.
+    // Retorno ao foreground / foco: reconcilia jobs concluídos durante standby/segundo plano
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
-        DownloadEngine.reconcileStuck().catch(() => {});
+        DownloadEngine.reconcileStuck(true).catch(() => {});
       }
     };
     document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
     return () => {
       DownloadEngine.removeListener(handleUpdate);
       document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
     };
   }, []);
 

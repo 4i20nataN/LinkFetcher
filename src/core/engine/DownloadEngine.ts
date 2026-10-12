@@ -346,7 +346,7 @@ class DownloadEngineClass {
       this.cancelFns.delete(id);
     } else {
       // Sem handle local (ex. reload com nativo órfão): tenta matar direto.
-      this.forceNativeCancel(id, false);
+      this.forceNativeCancel(id, false, item.title);
     }
     this.stopPoll(id);
     this.unlistenFns.get(id)?.();
@@ -398,7 +398,7 @@ class DownloadEngineClass {
       try { cancelFn(true); } catch {}
       this.cancelFns.delete(id);
     } else {
-      this.forceNativeCancel(id, true);
+      this.forceNativeCancel(id, true, item.title);
     }
     this.stopPoll(id);
     this.unlistenFns.get(id)?.();
@@ -425,7 +425,7 @@ class DownloadEngineClass {
         try { cancelFn(true); } catch {}
         this.cancelFns.delete(id);
       } else {
-        this.forceNativeCancel(id, true);
+        this.forceNativeCancel(id, true, item.title);
       }
       this.stopPoll(id);
       this.unlistenFns.get(id)?.();
@@ -445,9 +445,9 @@ class DownloadEngineClass {
   // Mata um nativo órfão (sem handle local): reload com download correndo,
   // item pausado sem cancelFn, etc. Fire-and-forget — erro significa "nada
   // rodando", que já é o estado desejado.
-  private forceNativeCancel(id: string, cleanup: boolean) {
+  private forceNativeCancel(id: string, cleanup: boolean, title = '') {
     import('@tauri-apps/api/core').then(({ invoke }) =>
-      invoke('ytdlp_cancel', { id, cleanup }).catch(() => {})
+      invoke('ytdlp_cancel', { id, cleanup, title }).catch(() => {})
     ).catch(() => {});
   }
 
@@ -727,8 +727,8 @@ class DownloadEngineClass {
         this.unlistenFns.get(item.id)?.();
         this.unlistenFns.delete(item.id);
         const args = cleanup
-          ? { id: item.id, cleanup: true }
-          : { id: item.id };
+          ? { id: item.id, cleanup: true, title: item.title }
+          : { id: item.id, title: item.title };
         invoke('ytdlp_cancel', args).catch(() => {});
       });
 
@@ -868,9 +868,8 @@ class DownloadEngineClass {
     // Linha zerada num stall (throttle/429) não apaga a prova de vida: o
     // último sinal (`Iniciando…`, `Extraindo…`, `Tentando de novo…`,
     // `Mesclando…`) fica visível até os bytes voltarem a andar.
-    if (progressShowsMovement(data.downloaded, item.progress)) {
+    if (!item.processing && progressShowsMovement(data.downloaded, item.progress)) {
       item.activity = undefined;
-      item.processing = false;
     }
     if (data.downloaded && data.downloaded > 0) {
       item.sizeDownloaded = data.downloaded;
@@ -888,7 +887,6 @@ class DownloadEngineClass {
   }
 
   // Poll de segurança (só Android): se o job sumiu, reconcilia na hora.
-  // Erro = tenta no próximo tick.
   private async pollProgress(id: string) {
     const item = this.items.find(i => i.id === id);
     if (!item || item.status !== 'downloading') {
@@ -909,7 +907,7 @@ class DownloadEngineClass {
     }
     if (!snap || snap.active !== true) {
       this.stopPoll(id);
-      this.reconcileStuck().catch(() => {});
+      this.reconcileJob(id).catch(() => {});
       return;
     }
     if (typeof snap.percent !== 'number') return;
@@ -921,33 +919,15 @@ class DownloadEngineClass {
     });
   }
 
-  // Pós-background (Android): evento com WebView suspenso é descartado.
-  // Na volta, consulta o desfecho ao Kotlin sem reiniciar (só `finished`).
-  async reconcileStuck() {
+  // Reconciliação direta de um job específico consultando o estado Kotlin no Android
+  async reconcileJob(id: string) {
     if (typeof navigator === 'undefined' || !/Android/i.test(navigator.userAgent)) return;
-    const STALE_MS = 20_000;
-    const now = Date.now();
-    const stale = this.items.filter(i =>
-      i.status === 'downloading' && (now - (this.lastEventAt.get(i.id) ?? 0)) >= STALE_MS
-    );
-    if (stale.length === 0) return;
-    let invokeFn: ((cmd: string, args?: unknown) => Promise<unknown>) | null = null;
+    const cur = this.items.find(i => i.id === id);
+    if (!cur || cur.status !== 'downloading') return;
     try {
-      ({ invoke: invokeFn } = await import('@tauri-apps/api/core'));
-    } catch {
-      return;
-    }
-    let applied = false;
-    for (const item of stale) {
-      let st: any = null;
-      try {
-        st = await invokeFn!('ytdlp_job_state', { id: item.id });
-      } catch {
-        continue;
-      }
-      if (!st || st.state !== 'finished') continue;
-      const cur = this.items.find(i => i.id === item.id);
-      if (!cur || cur.status !== 'downloading') continue;
+      const { invoke } = await import('@tauri-apps/api/core');
+      const st: any = await invoke('ytdlp_job_state', { id });
+      if (!st || st.state !== 'finished') return;
       if (st.ok && st.filePath) {
         cur.status = 'completed';
         cur.progress = 100;
@@ -963,19 +943,37 @@ class DownloadEngineClass {
         cur.processing = false;
         cur.error = typeof st.error === 'string' && st.error
           ? st.error
-          : 'Download interrompido em segundo plano — toque para repetir';
+          : (this.settings.language === 'en'
+            ? 'Download interrupted in background — tap to retry'
+            : 'Download interrompido em segundo plano — toque para repetir');
       }
-      this.cancelFns.delete(item.id);
-      this.lastProgressNotify.delete(item.id);
-      this.lastEventAt.delete(item.id);
-      this.lastEventSig.delete(item.id);
-      this.unlistenFns.get(item.id)?.();
-      this.unlistenFns.delete(item.id);
-      this.touch(item.id);
+      this.cancelFns.delete(id);
+      this.lastProgressNotify.delete(id);
+      this.lastEventAt.delete(id);
+      this.lastEventSig.delete(id);
+      this.unlistenFns.get(id)?.();
+      this.unlistenFns.delete(id);
+      this.touch(id);
       this.notify();
-      applied = true;
+      this.processQueue();
+    } catch {
+      // Reconciliação silenciosa
     }
-    if (applied) this.processQueue();
+  }
+
+  // Pós-background (Android): evento com WebView suspenso é descartado.
+  // Na volta, consulta o desfecho ao Kotlin sem reiniciar (só `finished`).
+  async reconcileStuck(force = false) {
+    if (typeof navigator === 'undefined' || !/Android/i.test(navigator.userAgent)) return;
+    const STALE_MS = force ? 0 : 20_000;
+    const now = Date.now();
+    const stale = this.items.filter(i =>
+      i.status === 'downloading' && (force || (now - (this.lastEventAt.get(i.id) ?? 0)) >= STALE_MS)
+    );
+    if (stale.length === 0) return;
+    for (const item of stale) {
+      await this.reconcileJob(item.id);
+    }
   }
 
   // Progress helpers

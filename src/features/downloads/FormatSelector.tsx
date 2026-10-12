@@ -410,16 +410,18 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
         )}
       </div>
       {!proActive && (
-        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
-          <span className="p-1.5 rounded-full bg-emerald-500/15 text-emerald-400 shrink-0">
-            <Sparkles size={14} />
-          </span>
-          <p className="flex-1 fs-sm lf-text-secondary text-left">
-            {settings.language === 'en' ? 'Explore freely — activate PRO to edit.' : 'Explore à vontade — ative o PRO para editar.'}
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
+          <div className="flex items-center gap-2 flex-1">
+            <span className="p-1.5 rounded-full bg-emerald-500/15 text-emerald-400 shrink-0">
+              <Sparkles size={14} />
+            </span>
+            <p className="flex-1 fs-sm lf-text-secondary text-left">
+              {settings.language === 'en' ? 'Explore freely — activate PRO to edit.' : 'Explore à vontade — ative o PRO para editar.'}
+            </p>
+          </div>
           <button
             onClick={() => setShowLicense(true)}
-            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold whitespace-nowrap transition-all"
+            className="w-full sm:w-auto px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold whitespace-nowrap transition-all"
           >
             {settings.language === 'en' ? 'Activate PRO' : 'Ativar PRO'}
           </button>

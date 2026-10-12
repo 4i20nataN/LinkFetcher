@@ -34,6 +34,8 @@ class ExecuteArgs {
 class CancelArgs {
     var id: String = ""
     var cleanup: Boolean = false
+    // Título p/ a notificação de "Pausado" (vazio = genérico).
+    var title: String = ""
 }
 
 @InvokeArg

@@ -43,8 +43,8 @@ export const translations = {
     authorLabel: 'Autor:',
     unknown: 'Não especificado',
 
-    feat1Title: 'Análise Instantânea',
-    feat1Desc: 'Motor de decodificação automatizado de alta velocidade.',
+    feat1Title: 'Playlists Completas',
+    feat1Desc: 'Escaneia e baixa playlists inteiras de uma vez.',
     feat2Title: 'Download Seguro',
     feat2Desc: 'Arquivos baixados de forma segura, livre de anúncios ou pop-ups.',
     feat3Title: 'Compatibilidade Ampla',
@@ -392,8 +392,8 @@ export const translations = {
     authorLabel: 'Author:',
     unknown: 'Not specified',
 
-    feat1Title: 'Instant Analysis',
-    feat1Desc: 'Automated high-speed media decoding engine.',
+    feat1Title: 'Full Playlists',
+    feat1Desc: 'Scan and download entire playlists at once.',
     feat2Title: 'Secure Download',
     feat2Desc: 'Files downloaded safely, 100% free of ads and pop-ups.',
     feat3Title: 'Wide Compatibility',
