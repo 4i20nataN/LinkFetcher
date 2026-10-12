@@ -12,21 +12,21 @@
 
 ## Screenshots
 
-| Analyzer (real video, options expanded) | PRO checkout (5 plans) |
-|---|---|
-| ![Analyzer](screenshots/01-analisar.webp) | ![PRO plans](screenshots/03-pro.webp) |
+![Analyzer — real video, options expanded](screenshots/01-analisar.webp)
 
-| Advanced tab | Playlist analyzed (bulk download) |
-|---|---|
-| ![Advanced options](screenshots/02-avancado.webp) | ![Playlist](screenshots/06-playlist.webp) |
+![PRO checkout — 5 plans](screenshots/03-pro.webp)
 
-| Downloads (5 done + 1 paused) | Favorites |
-|---|---|
-| ![Downloads](screenshots/04-downloads.webp) | ![Favorites](screenshots/07-favoritos.webp) |
+![Advanced tab](screenshots/02-avancado.webp)
 
-| Download later | Settings |
-|---|---|
-| ![Download later](screenshots/08-baixar-depois.webp) | ![Settings](screenshots/05-ajustes.webp) |
+![Playlist analyzed — bulk download](screenshots/06-playlist.webp)
+
+![Downloads — 5 done + 1 paused](screenshots/04-downloads.webp)
+
+![Favorites](screenshots/07-favoritos.webp)
+
+![Download later](screenshots/08-baixar-depois.webp)
+
+![Settings](screenshots/05-ajustes.webp)
 
 ## PRO plans
 
