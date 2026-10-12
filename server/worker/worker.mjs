@@ -186,21 +186,23 @@ export async function mintKeyFor(env, name, days) {
 }
 
 // --- e-mail genérico via Brevo (chave usa este; broadcast também) ---
-async function sendEmail(env, { to, subject, text }) {
+async function sendEmail(env, { to, subject, text, html }) {
   if (!env.BREVO_API_KEY || !env.SMTP_FROM) {
     console.error('email NOT configured (BREVO_API_KEY/SMTP_FROM ausentes)');
     return { sent: false, reason: 'email-not-configured' };
   }
   try {
+    const payload = {
+      sender: { email: env.SMTP_FROM, name: 'LinkFetcher' },
+      to: [{ email: to }],
+      subject,
+      textContent: text,
+    };
+    if (html) payload.htmlContent = html;
     const res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: { 'api-key': env.BREVO_API_KEY, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        sender: { email: env.SMTP_FROM, name: 'LinkFetcher' },
-        to: [{ email: to }],
-        subject,
-        textContent: text,
-      }),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       console.error('email brevo:', res.status);
@@ -213,21 +215,89 @@ async function sendEmail(env, { to, subject, text }) {
   }
 }
 
+const LOGO_URL = 'https://raw.githubusercontent.com/4i20nataN/LinkFatcher/v1.5.0/public/linkfetcher-banner.png';
+
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+// Molde HTML do e-mail (tabelas + inline: compatível com Gmail/Outlook).
+// `rows` = blocos de conteúdo já escapados; texto puro segue em `text`.
+function keyEmailHtml({ preheader, title, lead, key, validity, steps, foot }) {
+  const stepRows = steps.map(
+    (s, i) => `<tr><td style="padding:7px 0;font-size:14px;line-height:20px;color:#334155;">
+      <span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:9999px;background:#ecfdf5;color:#059669;font-size:12px;font-weight:bold;margin-right:8px;">${i + 1}</span>${s}</td></tr>`,
+  ).join('');
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>${title}</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${preheader}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 12px;">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
+<tr><td style="background:#0b1220;padding:26px 28px 20px;text-align:center;">
+<img src="${LOGO_URL}" alt="LinkFetcher" width="440" style="display:block;margin:0 auto;max-width:100%;height:auto;border:0;"/>
+<div style="margin-top:12px;"><span style="display:inline-block;padding:2px 10px;border-radius:9999px;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.4);color:#34d399;font-size:11px;font-weight:bold;letter-spacing:2px;">PRO</span></div>
+</td></tr>
+<tr><td style="padding:28px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr><td style="font-size:20px;font-weight:bold;color:#0f172a;">${title}</td></tr>
+<tr><td style="padding-top:8px;font-size:14px;line-height:21px;color:#475569;">${lead}</td></tr>
+<tr><td style="padding-top:18px;">
+<div style="background:#0b1220;border:1px solid #1e293b;border-radius:12px;padding:16px;text-align:center;">
+<div style="font-size:11px;letter-spacing:2px;color:#94a3b8;font-weight:bold;margin-bottom:8px;">SUA CHAVE PRO</div>
+<div style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:22px;color:#34d399;word-break:break-all;">${key}</div>
+</div>
+</td></tr>
+<tr><td style="padding-top:14px;font-size:13px;color:#059669;font-weight:bold;">${validity}</td></tr>
+<tr><td style="padding-top:14px;font-size:15px;font-weight:bold;color:#0f172a;">Como ativar</td></tr>
+${stepRows}
+<tr><td style="padding-top:18px;font-size:12px;line-height:18px;color:#94a3b8;">${foot}</td></tr>
+</table>
+</td></tr>
+<tr><td style="background:#f8fafc;padding:14px 28px;text-align:center;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;">
+E-mail automático da sua compra — responda se precisar de ajuda.
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
+}
+
 async function sendKeyEmail(env, { to, key, days }) {
+  const text = [
+    'Bem-vindo ao PRO! Obrigado por apoiar o LinkFetcher.',
+    '',
+    'Sua chave PRO:',
+    '',
+    key,
+    '',
+    `Validade: ${days} dias. Como ativar:`,
+    '1. Abra o LinkFetcher → Download Personalizado → Ativar PRO',
+    '2. Já tenho uma chave (cole a chave acima)',
+    '',
+    'Guarde este e-mail. Qualquer dúvida, responda por aqui.',
+  ].join('\n');
+  const html = keyEmailHtml({
+    preheader: 'Obrigado por assinar o PRO — sua chave chegou.',
+    title: 'Bem-vindo ao PRO! 🎉',
+    lead: 'Obrigado por apoiar o LinkFetcher! Sua assinatura já está ativa — copie a chave abaixo e ative no app em menos de 1 minuto. Qualquer dúvida, é só responder este e-mail.',
+    key: escHtml(key),
+    validity: `Sua chave vale por ${days} dias. Bom proveito!`,
+    steps: [
+      'Abra o LinkFetcher → <b>Download Personalizado</b> → <b>Ativar PRO</b>',
+      'Toque em <b>Já tenho uma chave</b> e cole a chave acima',
+    ],
+    foot: 'Guarde este e-mail com carinho — é com ele que você recupera sua chave. Perdeu? No app: Download Personalizado → Ativar PRO → <b>Perdi minha chave</b>.',
+  });
   return sendEmail(env, {
     to,
     subject: 'Sua chave LinkFetcher PRO',
-    text: [
-      'Pagamento confirmado. Sua chave PRO:',
-      '',
-      key,
-      '',
-      `Validade: ${days} dias. Como ativar:`,
-      '1. Abra o LinkFetcher → Download Personalizado → Ativar PRO',
-      '2. Já tenho uma chave (cole a chave acima)',
-      '',
-      'Guarde este e-mail.',
-    ].join('\n'),
+    text,
+    html,
   });
 }
 
