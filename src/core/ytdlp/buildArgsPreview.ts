@@ -1,10 +1,6 @@
 const DEFAULT_FORMAT = 'bestvideo+bestaudio/best';
 
-/**
- * Injeta `[fps<=N]` nos seletores de vídeo (`bv*[...]` e `bestvideo` puro).
- * Espelho de `inject_fps_filter` (Rust args.rs): fallbacks intactos,
- * aspas dentro dos colchetes respeitadas.
- */
+/** Injeta [fps<=N] nos seletores de vídeo (espelho do Rust). */
 function injectFpsFilter(format: string, fps: number): string {
   const tag = `[fps<=${fps}]`;
   let out = '';
@@ -50,10 +46,7 @@ function injectFpsFilter(format: string, fps: number): string {
   return out;
 }
 
-/**
- * Build the yt-dlp args array from a DownloadItem — mirrors spawnDownload logic
- * exactly so the preview matches the real command. Pure function, zero Node deps.
- */
+/** Monta o preview dos args (espelha o spawn real; função pura). */
 export function buildArgsPreview(item: {
   url: string;
   formatString?: string;
@@ -123,8 +116,7 @@ export function buildArgsPreview(item: {
 
   if (item.writeSubs) args.push('--write-subs');
   if (item.writeAutoSubs) args.push('--write-auto-subs');
-  // Espelho do gate em args.rs: --sub-langs/--sub-format sem escrita são
-  // ignorados pelo yt-dlp (placebo) — o preview não deve mostrá-los.
+  // Sem escrita, --sub-langs/--sub-format são placebo: omite no preview.
   const subsActive = !!(item.writeSubs || item.writeAutoSubs || item.embedSubs);
   if (subsActive) {
     if (item.subLangs) args.push('--sub-langs', item.subLangs);

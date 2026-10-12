@@ -3,10 +3,10 @@
  * Consumed by 2 components (DownloadManager, Sidebar).
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import type { DownloadItem } from '../types';
 import { DownloadEngine } from '../core/engine/DownloadEngine';
-import { StorageService } from '../core/storage/Storage';
+import { useSettings } from './SettingsContext';
 import { isAndroid } from '../core/ytdlp/YtDlpAdapter';
 
 interface DownloadsContextType {
@@ -17,9 +17,14 @@ const DownloadsContext = createContext<DownloadsContextType | undefined>(undefin
 
 export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
-  // Ids já vistos: evita notificar itens concluídos antes do boot (histórico
-  // restaurado) e duplicar aviso no mesmo item.
+  // Ids já vistos: evita notificar o histórico restaurado no boot.
   const seenIds = useRef<Set<string> | null>(null);
+
+  const { settings } = useSettings();
+  // Settings via ref: o handler roda a cada tick — ler da store ali custa;
+  // o ref acompanha sem re-assinar o listener.
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
 
   useEffect(() => {
     const handleUpdate = (items: DownloadItem[]) => {
@@ -28,18 +33,17 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         seenIds.current = new Set(items.map(i => i.id));
         return;
       }
-      const settings = StorageService.getSettings();
-      if (settings.notifications === false) {
+      const s = settingsRef.current;
+      if (s.notifications === false) {
         for (const i of items) seenIds.current.add(i.id);
         return;
       }
-      // No Android o Kotlin emite notificações nativas (progresso + conclusão
-      // + falha): o caminho JS duplicaria o aviso — desktop apenas.
+      // No Android o Kotlin já notifica: o caminho JS duplicaria o aviso.
       if (isAndroid()) {
         for (const i of items) seenIds.current.add(i.id);
         return;
       }
-      const en = settings.language === 'en';
+      const en = s.language === 'en';
       for (const item of items) {
         if (seenIds.current.has(item.id)) continue;
         seenIds.current.add(item.id);
@@ -61,18 +65,18 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     };
     DownloadEngine.addListener(handleUpdate);
-    // Volta ao foreground: reconcilia downloads cujo `complete` se perdeu
-    // com o WebView suspenso (travariam em `downloading` com arquivo em
-    // disco). Fire-and-forget; o engine filtra (só Android, só stale).
+    // Retorno ao foreground / foco: reconcilia jobs concluídos durante standby/segundo plano
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
-        DownloadEngine.reconcileStuck().catch(() => {});
+        DownloadEngine.reconcileStuck(true).catch(() => {});
       }
     };
     document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
     return () => {
       DownloadEngine.removeListener(handleUpdate);
       document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
     };
   }, []);
 
@@ -96,8 +100,8 @@ export const useDownloads = () => {
 };
 
 /**
- * Contador barato p/ badges: reassina o engine e só propaga quando a
- * CONTAGEM muda — não re-renderiza a cada tick de progresso (4x/s).
+ * Contador barato p/ badges: só propaga quando a CONTAGEM muda (não a cada
+ * tick de progresso).
  */
 export const useDownloadCount = (statuses: string[]): number => {
   const key = statuses.join(',');

@@ -14,8 +14,7 @@ interface DlState {
   error?: string;
 }
 
-// Payload do evento `binary-download` (Rust): tipo independente do estado
-// local — interseção aqui colapsaria o union e quebrava `d.stage === 'done'`.
+// Payload do `binary-download`: tipo próprio (união colapsaria no `done`).
 interface DlEvent {
   stage: 'progress' | 'done' | 'error';
   file: string;
@@ -74,8 +73,7 @@ export const BinarySetupOverlay: React.FC<{ onReady: () => void }> = ({ onReady 
   const FFMPEG_FILE = isWindows ? t('setupFfmpegFileWin') : t('setupFfmpegFileNix');
   const noteKey = backendNoteKey(st.note);
 
-  // t() troca de identidade a cada render: depende só da string do idioma
-  // para não religar o effect de listen/check em loop.
+  // Depende só do idioma p/ não religar o effect a cada render.
   const lang = settings.language;
   const check = useCallback(async () => {
     const { invoke } = await import('@tauri-apps/api/core');
@@ -90,7 +88,7 @@ export const BinarySetupOverlay: React.FC<{ onReady: () => void }> = ({ onReady 
         return;
       }
     } catch {
-      // status indisponível = backend sem comandos: mostra erro com retry
+      // Sem status do backend: erro com retry.
       setSt({ stage: 'error', file: '', received: 0, total: 0, percent: 0, error: t('setupBackendError') });
       return;
     }
@@ -170,8 +168,8 @@ export const BinarySetupOverlay: React.FC<{ onReady: () => void }> = ({ onReady 
             </div>
             <div className="h-2 rounded-full lf-surface-raised overflow-hidden border lf-border">
               <div
-                className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-300 rounded-full"
-                style={{ width: `${st.percent}%` }}
+                className="h-full w-full origin-left bg-gradient-to-r from-indigo-500 to-emerald-400 transition-transform duration-300 rounded-full"
+                style={{ transform: `scaleX(${(st.percent / 100).toFixed(4)})` }}
               />
             </div>
             <div className="flex justify-between items-center text-[11px] lf-text-muted">

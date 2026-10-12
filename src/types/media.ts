@@ -18,8 +18,8 @@ export interface MediaInfo {
   title: string;
   author: string;
   channel: string;
-  duration: string; // e.g. "04:15"
-  durationSeconds: number; // e.g. 255
+  duration: string; // ex. "04:15"
+  durationSeconds: number; // ex. 255
   resolution?: string;
   sizeEst: string;
   formats: MediaFormat[];

@@ -1,15 +1,9 @@
-/**
- * AnimatedAccordion — accordion expand/collapse com spring height.
- *
- * Uso:
- *   <AnimatedAccordion isOpen={expanded}>
- *     <div>conteúdo expansível</div>
- *   </AnimatedAccordion>
- */
+/** Accordion expand/collapse com spring de altura. */
 
 import React from 'react';
 import { AnimatePresence, m } from 'motion/react';
 import { accordionExpand, transitions, tween } from './variants';
+import { RENDER_PROFILE } from '../core/perf/renderProfile';
 
 interface AnimatedAccordionProps {
   isOpen: boolean;
@@ -18,6 +12,8 @@ interface AnimatedAccordionProps {
 }
 
 export function AnimatedAccordion({ isOpen, children, className }: AnimatedAccordionProps) {
+  // No perfil efficient abre instantâneo (animar height trava o raster).
+  const instant = RENDER_PROFILE === 'efficient';
   return (
     <AnimatePresence initial={false}>
       {isOpen && (
@@ -26,11 +22,15 @@ export function AnimatedAccordion({ isOpen, children, className }: AnimatedAccor
           initial="hidden"
           animate="visible"
           exit="exit"
-          transition={{
-            height: transitions.accordionHeight,
-            opacity: transitions.accordionOpacity,
-          }}
-          className={className}
+          transition={
+            instant
+              ? { height: { duration: 0 }, opacity: { duration: 0 } }
+              : {
+                  height: transitions.accordionHeight,
+                  opacity: transitions.accordionOpacity,
+                }
+          }
+          className={className ? `overflow-hidden ${className}` : 'overflow-hidden'}
         >
           {children}
         </m.div>

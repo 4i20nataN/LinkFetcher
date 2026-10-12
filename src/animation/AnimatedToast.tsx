@@ -1,11 +1,4 @@
-/**
- * AnimatedToast — toast notification com slide from bottom.
- *
- * Uso:
- *   <AnimatedToast visible={showToast}>
- *     <div>Download concluído!</div>
- *   </AnimatedToast>
- */
+/** Toast com slide de baixo. */
 
 import React from 'react';
 import { AnimatePresence, m } from 'motion/react';

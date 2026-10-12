@@ -36,3 +36,19 @@ tmp/
 AGENTS.md
 CONTRIBUTING.md
 docs/
+
+# License server (segredos + base de vendas — NUNCA commitar)
+server/.env
+server/data/
+
+# Playwright (artefatos locais da bateria E2E)
+test-results/
+playwright-report/
+playwright/.cache/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example

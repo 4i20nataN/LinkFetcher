@@ -1,143 +1,29 @@
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ProviderRegistry, probePlaylistFull } from '../../core/plugins/Providers';
-import { MediaInfo, MediaFormat, PlaylistInfo } from '../../types';
-import { 
-  Play, Download, Clock, Star, ExternalLink, RefreshCw, 
-  Trash2, ShieldCheck, HelpCircle, AlertCircle, Info, FileVideo, Music, Image as ImageIcon,
-  ListMusic, ChevronDown, ChevronUp, Eye, Calendar, FolderOpen,
-  Camera, Globe, X, Cloud, Radio, MessageCircle, MessageSquare,
-  Film, Pin, Linkedin, Github, Heart, Send, Gamepad2, AtSign,
-  BookOpen, GitBranch, PenTool
+import { MediaInfo, MediaFormat, PlaylistInfo, PlatformId } from '../../types';
+import {
+  RefreshCw, ShieldCheck, HelpCircle, AlertCircle,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import { AnimatedCard } from '../../animation/AnimatedCard';
-import { AnimatedList } from '../../animation/AnimatedList';
-import { slideUp, slideUpStrong, scaleIn, fadeIn, transitions } from '../../animation/variants';
+import { scaleIn, fadeIn } from '../../animation/variants';
 import { useTranslation } from '../../core/i18n';
-import { 
-  getAccentBgClass, getAccentTextClass, getAccentBorderClass, getAccentRingClass 
+import {
+  getAccentTextClass
 } from '../../components/ThemeWrapper';
 import { DownloadEngine } from '../../core/engine/DownloadEngine';
+import { getLicense, useLicense } from '../../core/license/licenseStore';
+import { isLicenseActive, isLicenseGenuine } from '../../core/license/license';
 import type { FormatOptions } from '../downloads/FormatOptions';
-import { AUDIO_QUALITY_PRESETS } from '../downloads/constants';
-const FormatSelector = React.lazy(() => import('../downloads/FormatSelector').then(m => ({ default: m.FormatSelector })));
 import { isPlaylistUrl } from '../../core/ytdlp/playlistUtils';
 import { adapterErrorMessage } from '../../core/ytdlp/YtDlpAdapter';
-import { PlatformBadge } from '../../components/PlatformBadge';
+import { sanitizeUrl, formatUploadDate as fmtDate, pickQuickRefFormat, buildQuickOptions, buildBulkOptions, playlistItemToMedia, removePlaylistItem } from './analyzerUtils';
+import { LicenseModal } from '../../core/license/LicenseModal';
+import { AnalyzeForm } from './AnalyzeForm';
+import { PlaylistCard } from './PlaylistCard';
+import { MediaResultCard } from './MediaResultCard';
 
-const PLATFORM_ICONS: Record<string, LucideIcon> = {
-  youtube: Play,
-  tiktok: Music,
-  instagram: Camera,
-  facebook: Globe,
-  twitter: X,
-  soundcloud: Cloud,
-  twitch: Radio,
-  reddit: MessageCircle,
-  discord: MessageSquare,
-  kick: Play,
-  vimeo: Film,
-  pinterest: Pin,
-  linkedin: Linkedin,
-  github: Github,
-  patreon: Heart,
-  telegram: Send,
-  snapchat: Send,
-  steam: Gamepad2,
-  threads: AtSign,
-  medium: BookOpen,
-  behance: PenTool,
-  dribbble: PenTool,
-  gitlab: GitBranch,
-  tumblr: PenTool,
-  flickr: Camera,
-  mastodon: Radio,
-  bandcamp: Music,
-};
 
-const SummaryPanel: React.FC<{ formatOptions: FormatOptions; selectedFormat: MediaFormat | null; mediaInfo: MediaInfo }> = ({ formatOptions, selectedFormat, mediaInfo }) => {
-  const { settings } = useApp();
-  const { t } = useTranslation(settings);
-  const items: { icon: string; label: string }[] = [];
-
-  if (formatOptions.audioOnly) {
-    items.push({ icon: '🎵', label: formatOptions.audioFormat.toUpperCase() });
-    if (formatOptions.audioQuality) {
-      const qLabel = AUDIO_QUALITY_PRESETS.find(p => p.value === formatOptions.audioQuality)?.label
-        ?? formatOptions.audioQuality;
-      items.push({ icon: '🔊', label: formatOptions.audioQuality === '0' ? t('sumBestQuality') : qLabel });
-    }
-  } else {
-    if (formatOptions.videoFormat) items.push({ icon: '🎬', label: formatOptions.videoFormat.toUpperCase() });
-    // Extract resolution from format string pattern height<=XXXX
-    const fmt = formatOptions.format || '';
-    const heightMatch = fmt.match(/height[<=>]+(\d+)/);
-    if (heightMatch) {
-      const h = Number(heightMatch[1]);
-      const resMap: Record<number, string> = { 2160: '4K', 1440: '1440p', 1080: '1080p', 720: '720p', 480: '480p', 360: '360p' };
-      items.push({ icon: '📺', label: resMap[h] || `${h}p` });
-    } else if (fmt.includes('best') || fmt === '') {
-      items.push({ icon: '📺', label: t('sumBest') });
-    } else if (selectedFormat?.quality) {
-      items.push({ icon: '📺', label: selectedFormat.quality });
-    }
-    if (formatOptions.videoCodec) {
-      const codecMap: Record<string, string> = { h264: 'H.264', h265: 'H.265', vp9: 'VP9', av01: 'AV1' };
-      items.push({ icon: '🎞', label: codecMap[formatOptions.videoCodec] || formatOptions.videoCodec });
-    }
-  }
-
-  if (formatOptions.sponsorblockRemove && formatOptions.sponsorblockRemove !== '') {
-    const sb = formatOptions.sponsorblockRemove === 'all' ? t('sumAll') : formatOptions.sponsorblockRemove.replace(/,/g, ' + ');
-    items.push({ icon: '⚡', label: `SponsorBlock: ${sb}` });
-  }
-  if (formatOptions.downloadSections) items.push({ icon: '✂', label: `${t('sumCut')} ${formatOptions.downloadSections.replace(/\*/g, '')}` });
-  if (!formatOptions.audioOnly && formatOptions.fpsMax && formatOptions.fpsMax > 0) items.push({ icon: '🎞', label: `${formatOptions.fpsMax} FPS` });
-  if (formatOptions.writeSubs || formatOptions.writeAutoSubs) {
-    const lang = formatOptions.subLangs || 'en';
-    items.push({ icon: '📋', label: lang.toUpperCase() });
-  }
-  if (formatOptions.customFilename) items.push({ icon: '📁', label: formatOptions.customFilename });
-  if (formatOptions.descFormat && formatOptions.descFormat !== 'none' && mediaInfo.description) items.push({ icon: '📄', label: `${t('sumDesc')}${formatOptions.descFormat}` });
-
-  if (items.length === 0) return null;
-
-  return (
-    <div className="p-3 rounded-xl lf-surface-40 border lf-border glass-result">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-[10px] lf-text-muted font-medium uppercase tracking-wider">{t('sumResult')}</span>
-        <div className="flex-1 h-px bg-white/5" />
-      </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1">
-        {items.map((item, i) => (
-          <span key={i} className="flex items-center gap-1.5 text-[11px] lf-text-secondary">
-            <span className="text-[10px]">{item.icon}</span>
-            {item.label}
-          </span>
-        ))}
-        {mediaInfo.duration && (
-          <span className="flex items-center gap-1.5 text-[11px] lf-text-secondary">
-            <span className="text-[10px]">🕒</span>
-            {mediaInfo.duration}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const sanitizeUrl = (rawUrl: string): string => {
-  try {
-    const parsed = new URL(rawUrl);
-    parsed.searchParams.delete('t');
-    parsed.searchParams.delete('time_continue');
-    parsed.searchParams.delete('start');
-    return parsed.toString();
-  } catch {
-    return rawUrl;
-  }
-};
 
 export const LinkAnalyzer: React.FC = () => {
   const { 
@@ -157,48 +43,24 @@ export const LinkAnalyzer: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const animationFrameRef = useRef<number | null>(null);
   const handleAnalyzeRef = useRef<(url: string) => void>(() => {});
-  const smoothSetPlaybackRate = (element: HTMLElement | null, targetRate: number) => {
-    if (!element) return;
-    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-    
-    const animations = element.getAnimations();
-    if (animations.length === 0) return;
-    
-    const startRate = animations[0].playbackRate;
-    const duration = 400; // ms
-    let startTime: number | null = null;
-    
-    const animate = (currentTime: number) => {
-      if (!startTime) startTime = currentTime;
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      
-      const ease = 1 - Math.pow(1 - progress, 3); // cubic ease-out
-      const currentRate = startRate + (targetRate - startRate) * ease;
-      
-      animations.forEach(a => a.playbackRate = currentRate);
-      
-      if (progress < 1) {
-        animationFrameRef.current = requestAnimationFrame(animate);
-      }
-    };
-    
-    animationFrameRef.current = requestAnimationFrame(animate);
-  };
   const [mediaInfo, setMediaInfo] = useState<MediaInfo | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<MediaFormat | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  // Remonta o seletor a cada análise p/ descartar seleções obsoletas.
+  const [analysisSeq, setAnalysisSeq] = useState(0);
 
   const [probeLoading, setProbeLoading] = useState(false);
   const [probeError, setProbeError] = useState<string | null>(null);
   const [playlistInfo, setPlaylistInfo] = useState<PlaylistInfo | null>(null);
   const [playlistLoading, setPlaylistLoading] = useState(false);
   const [playlistExpanded, setPlaylistExpanded] = useState(false);
-  // Enfileiramento da playlist (pool de probes): progresso + cancelamento.
-  const [enqueueProgress, setEnqueueProgress] = useState<{ done: number; total: number } | null>(null);
-  const enqueueCancelRef = useRef(false);
+  // Modal PRO (desbloqueio a partir do card de playlist).
+  const [showLicense, setShowLicense] = useState(false);
+  // Mídia de referência p/ o painel global (1 probe no 1º item).
+  const [refMedia, setRefMedia] = useState<MediaInfo | null>(null);
+  const [refLoading, setRefLoading] = useState(false);
+  const playlistRef = useRef('');
   const [formatOptions, setFormatOptions] = useState<FormatOptions>({
     format: 'bestvideo+bestaudio/best',
     audioOnly: false,
@@ -218,11 +80,10 @@ export const LinkAnalyzer: React.FC = () => {
     bandLimit: 0,
   });
 
-  // Auto-analyze URL from search / download later trigger
   useEffect(() => {
     if (selectedUrl) {
       setUrl(selectedUrl);
-      setSelectedUrl(''); // Clear
+      setSelectedUrl('');
       const trimmed = selectedUrl.trim();
       if (trimmed && /^https?:\/\/.+/i.test(trimmed)) {
         const clean = sanitizeUrl(trimmed);
@@ -231,24 +92,6 @@ export const LinkAnalyzer: React.FC = () => {
     }
   }, [selectedUrl]);
 
-  // Listen for clipboard-detected URL from popup
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const url = (e as CustomEvent).detail?.url;
-      if (url) {
-        setUrl(url);
-        const trimmed = url.trim();
-        if (trimmed && /^https?:\/\/.+/i.test(trimmed)) {
-          const clean = sanitizeUrl(trimmed);
-          handleAnalyzeRef.current(clean);
-        }
-      }
-    };
-    window.addEventListener('clipboard:analyze', handler);
-    return () => window.removeEventListener('clipboard:analyze', handler);
-  }, []);
-
-  // Persist analyzer state to localStorage
   useEffect(() => {
     const saved = localStorage.getItem('universal_downloader_analyzer_state');
     if (saved) {
@@ -258,21 +101,43 @@ export const LinkAnalyzer: React.FC = () => {
         if (state.mediaInfo) setMediaInfo(state.mediaInfo);
         if (state.selectedFormat) setSelectedFormat(state.selectedFormat);
         if (state.formatOptions) setFormatOptions(state.formatOptions);
-      } catch { /* ignore */ }
+      } catch {}
     }
   }, []);
 
-  // Persist com debounce: o estado inclui o dump parseado (100KB–1MB) e o
-  // efeito anterior serializava a cada tecla/seleção na main thread.
+  // Persiste com debounce: o dump (100KB–1MB) trava a main thread.
   useEffect(() => {
     const t = setTimeout(() => {
       try {
         const state = { url, mediaInfo, selectedFormat, formatOptions };
         localStorage.setItem('universal_downloader_analyzer_state', JSON.stringify(state));
-      } catch { /* quota cheia: estado volátil, sem quebrar a análise */ }
+      } catch {}
     }, 800);
     return () => clearTimeout(t);
   }, [url, mediaInfo, selectedFormat, formatOptions]);
+
+  // Painel global com dados reais do 1º vídeo (resoluções, codecs, fps).
+  // 1 probe basta — o formatString resolve por vídeo no download.
+  // Falha aqui não trava o lote (presets gratuitos continuam valendo).
+  const fireReferenceProbe = (playlist: PlaylistInfo) => {
+    const first = playlist.items[0];
+    if (!first?.url) return;
+    playlistRef.current = playlist.id;
+    setRefMedia(null);
+    setRefLoading(true);
+    (async () => {
+      try {
+        const provider = ProviderRegistry.getProviderForUrl(first.url);
+        const info = await provider.analyze(first.url);
+        if (playlistRef.current !== playlist.id) return;
+        setRefMedia(info.formats && info.formats.length > 0 ? info : null);
+      } catch {
+        if (playlistRef.current === playlist.id) setRefMedia(null);
+      } finally {
+        if (playlistRef.current === playlist.id) setRefLoading(false);
+      }
+    })();
+  };
 
   const handleAnalyze = async (urlToAnalyze: string) => {
     const targetUrl = urlToAnalyze.trim();
@@ -282,6 +147,8 @@ export const LinkAnalyzer: React.FC = () => {
     setError(null);
     setMediaInfo(null);
     setSelectedFormat(null);
+    setRefMedia(null);
+    setRefLoading(false);
     setFormatOptions({
       format: 'bestvideo+bestaudio/best',
       audioOnly: false,
@@ -303,30 +170,40 @@ export const LinkAnalyzer: React.FC = () => {
     setSuccessMsg(null);
     setProbeError(null);
     setPlaylistInfo(null);
+    setShowCoverFormats(false);
 
-    // Check if URL is a playlist
     if (isPlaylistUrl(targetUrl)) {
       setPlaylistLoading(true);
       try {
         const playlist = await probePlaylistFull(targetUrl);
-        setPlaylistInfo(playlist);
         setPlaylistLoading(false);
+        if (playlist.items.length === 0) {
+          // Título sem itens (redirect morto, privada, bot-wall):
+          // erro claro em vez de card vazio com "Baixar Todos (0)".
+          setLoading(false);
+          setError(settings.language === 'en'
+            ? 'Playlist is empty or unavailable — check the link or try a single video.'
+            : 'Playlist vazia ou indisponível — confira o link ou tente um vídeo individual.');
+          return;
+        }
+        setPlaylistInfo(playlist);
         setLoading(false);
+        fireReferenceProbe(playlist);
         return;
       } catch (err: any) {
         setPlaylistLoading(false);
         setPlaylistInfo(null);
-        // Fall through to normal analysis if playlist probe fails
       }
     }
 
     try {
       const provider = ProviderRegistry.getProviderForUrl(targetUrl);
       const info = await provider.analyze(targetUrl);
-      
+
       setMediaInfo(info);
+      setAnalysisSeq(s => s + 1);
       if (info.formats && info.formats.length > 0) {
-        setSelectedFormat(info.formats[0]); // Default to first format
+        setSelectedFormat(info.formats[0]);
       }
     } catch (err: any) {
       setError(adapterErrorMessage(err, settings.language === 'en' ? 'Error analyzing link. Please verify if link is correct.' : 'Erro ao analisar o link. Verifique se o link está correto.'));
@@ -345,9 +222,34 @@ export const LinkAnalyzer: React.FC = () => {
     }
     
     trimmed = sanitizeUrl(trimmed);
-    setUrl(trimmed); // Atualiza o input visualmente com a URL limpa
+    setUrl(trimmed);
 
     await handleAnalyze(trimmed);
+  };
+
+  const handleClearForm = () => {
+    setUrl('');
+    setMediaInfo(null);
+    setSelectedFormat(null);
+    setProbeError(null);
+    setFormatOptions({
+      format: 'bestvideo+bestaudio/best',
+      audioOnly: false,
+      audioFormat: 'mp3',
+      audioQuality: '0',
+      writeSubs: false,
+      writeAutoSubs: false,
+      subLangs: '',
+      subFormat: '',
+      embedSubs: false,
+      writeThumbnail: false,
+      embedThumbnail: false,
+      embedMetadata: false,
+      videoOnly: false,
+      sponsorblockRemove: '',
+      fpsMax: 0,
+      bandLimit: 0,
+    });
   };
 
   const handlePaste = async () => {
@@ -368,9 +270,14 @@ export const LinkAnalyzer: React.FC = () => {
     }
   };
 
-  const handleStartDownload = () => {
+  const handleStartDownload = async () => {
     if (!mediaInfo || !selectedFormat) {
       setError(settings.language === 'en' ? 'No format selected. Please wait for analysis to complete.' : 'Nenhum formato selecionado. Aguarde a analise completar.');
+      return;
+    }
+    // Personalizado exige licença genuína (assinatura revalidada; sem bypass).
+    if (!isLicenseActive(getLicense()) || !(await isLicenseGenuine())) {
+      setError(settings.language === 'en' ? 'Custom download is PRO — use Free Download or activate your key in the Custom Download panel.' : 'Download personalizado é PRO — use o Download Gratuito ou ative sua chave no painel Download Personalizado.');
       return;
     }
 
@@ -380,15 +287,13 @@ export const LinkAnalyzer: React.FC = () => {
       formatOptions
     );
 
-    // Download description if format selected and description exists
-    // ('none' é truthy — precisa do !== explícito, senão cai no else e grava .txt)
+    // 'none' é truthy: o !== explícito evita gravar .txt indevido.
     if (formatOptions.descFormat && formatOptions.descFormat !== 'none' && mediaInfo.description) {
       const fmt = formatOptions.descFormat;
       const title = mediaInfo.title || 'video';
       const safeTitle = title.replace(/[<>:"/\\|?*]/g, '_').substring(0, 80);
       let content = '';
       let filename = '';
-      const fmtDate = (d: string) => /^\d{8}$/.test(d) ? `${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}` : d;
       if (fmt === 'md') {
         content = `# ${title}\n\n`;
         if (mediaInfo.channel) content += `**Canal:** ${mediaInfo.channel}\n`;
@@ -420,48 +325,52 @@ export const LinkAnalyzer: React.FC = () => {
 
     setSuccessMsg(settings.language === 'en' ? `Added to queue: ${mediaInfo.title.substring(0, 45)}...` : `Adicionado a fila: ${mediaInfo.title.substring(0, 45)}...`);
     
-    // Auto-redirect to downloads manager
     setTimeout(() => {
       setActiveTab('manager');
     }, 1200);
   };
 
-  const handleDownloadAllPlaylist = async () => {
-    if (!playlistInfo || playlistInfo.items.length === 0 || enqueueProgress) return;
+  const handleQuickDownload = (kind: 'audio' | 'video') => {
+    if (!mediaInfo) {
+      setError(settings.language === 'en' ? 'No format selected. Please wait for analysis to complete.' : 'Nenhum formato selecionado. Aguarde a analise completar.');
+      return;
+    }
+    const refFormat = pickQuickRefFormat(mediaInfo, kind);
+    if (!refFormat) {
+      setError(settings.language === 'en' ? 'No format selected. Please wait for analysis to complete.' : 'Nenhum formato selecionado. Aguarde a analise completar.');
+      return;
+    }
+    const quickOptions = buildQuickOptions(formatOptions, kind);
+    // Fire-and-forget: não publica no estado (não vaza o preset rápido).
+    DownloadEngine.addDownload(mediaInfo, refFormat, quickOptions);
+    setSuccessMsg(settings.language === 'en' ? `Added to queue: ${mediaInfo.title.substring(0, 45)}...` : `Adicionado a fila: ${mediaInfo.title.substring(0, 45)}...`);
+    setTimeout(() => {
+      setActiveTab('manager');
+    }, 1200);
+  };
 
-    // Pool de 3 probes concorrentes (sequencial levava N×~5-10s no armv7);
-    // cancelável pelo botão. `next` é seguro: JS é single-thread e o
-    // incremento ocorre de forma síncrona entre awaits.
-    enqueueCancelRef.current = false;
-    const items = playlistInfo.items;
-    setEnqueueProgress({ done: 0, total: items.length });
-    let next = 0;
-    const worker = async () => {
-      for (;;) {
-        if (enqueueCancelRef.current) return;
-        const i = next++;
-        if (i >= items.length) return;
-        const item = items[i];
-        try {
-          const provider = ProviderRegistry.getProviderForUrl(item.url);
-          const info = await provider.analyze(item.url);
-          if (!enqueueCancelRef.current && info.formats && info.formats.length > 0) {
-            DownloadEngine.addDownload(info, info.formats[0], formatOptions);
-          }
-        } catch (err) {
-          console.warn(`Failed to probe playlist item: ${item.title}`, err);
-        }
-        setEnqueueProgress((p) => (p ? { done: p.done + 1, total: p.total } : p));
-      }
-    };
-    await Promise.all([worker(), worker(), worker()]);
-
-    const cancelled = enqueueCancelRef.current;
-    setEnqueueProgress(null);
-    if (cancelled) return;
+  // Lote com config única: sem probe por item (o MediaInfo vem da entry
+  // flat). custom = PRO, igual ao personalizado unitário.
+  const handleDownloadAllPlaylist = async (kind: 'custom' | 'audio' | 'video') => {
+    if (!playlistInfo || playlistInfo.items.length === 0) return;
+    if (kind === 'custom' && (!isLicenseActive(getLicense()) || !(await isLicenseGenuine()))) {
+      setError(settings.language === 'en' ? 'Bulk custom download is PRO — use a free preset or activate your key.' : 'Download em lote personalizado é PRO — use um preset gratuito ou ative sua chave.');
+      return;
+    }
+    const opts = buildBulkOptions(formatOptions, kind);
+    opts.playlistName = playlistInfo.title;
+    const container = opts.audioOnly ? (opts.audioFormat || 'mp3') : (opts.videoFormat || 'mp4');
+    let added = 0;
+    for (const item of playlistInfo.items) {
+      if (!item.url) continue;
+      const media = playlistItemToMedia(playlistInfo, item, { audioOnly: !!opts.audioOnly, container });
+      DownloadEngine.addDownload(media, media.formats[0], opts);
+      added++;
+    }
+    const total = playlistInfo.items.length;
     setSuccessMsg(settings.language === 'en'
-      ? `Added ${playlistInfo.items.length} items to queue`
-      : `${playlistInfo.items.length} itens adicionados a fila`);
+      ? (added === total ? `Added ${added} items to queue` : `Added ${added} of ${total} items to queue`)
+      : (added === total ? `${added} itens adicionados a fila` : `${added} de ${total} itens adicionados a fila`));
     setTimeout(() => setActiveTab('manager'), 1200);
   };
 
@@ -492,19 +401,73 @@ export const LinkAnalyzer: React.FC = () => {
     }
   };
 
+  // Playlist salva como um item só (chave = URL): o clique em Favoritos /
+  // Baixar Depois re-analisa e volta ao fluxo de playlist.
+  const handleTogglePlaylistFav = () => {
+    if (!playlistInfo) return;
+    toggleFavorite({
+      id: playlistInfo.id,
+      title: playlistInfo.title,
+      url: playlistInfo.url,
+      platform: playlistInfo.platform,
+      thumbnailUrl: playlistInfo.thumbnailUrl
+    });
+  };
+
+  const handleTogglePlaylistLater = () => {
+    if (!playlistInfo) return;
+    if (isDownloadLater(playlistInfo.url)) {
+      removeFromDownloadLater(playlistInfo.url);
+    } else {
+      addToDownloadLater({
+        id: playlistInfo.id,
+        title: playlistInfo.title,
+        url: playlistInfo.url,
+        platform: playlistInfo.platform,
+        thumbnailUrl: playlistInfo.thumbnailUrl
+      });
+    }
+  };
+
+  const handleDownloadPlaylistCover = (targetExt?: 'jpg' | 'png' | 'webp') => {
+    if (!playlistInfo) return;
+    handleDownloadThumbnail(targetExt, {
+      title: playlistInfo.title,
+      thumbnailUrl: playlistInfo.thumbnailUrl,
+      platform: playlistInfo.platform,
+    });
+  };
+
+  const handleAnalyzePlaylistItem = (itemUrl: string) => {
+    const clean = sanitizeUrl(itemUrl.trim());
+    if (!clean) return;
+    setUrl(clean);
+    handleAnalyze(clean);
+  };
+
+  // Tira o item só da lista em tela (lote baixa o que sobrar).
+  const handleRemovePlaylistItem = (id: string) => {
+    setPlaylistInfo(prev => removePlaylistItem(prev, id));
+  };
+
   const [showCoverFormats, setShowCoverFormats] = useState(false);
 
-  const handleDownloadThumbnail = async (targetExt?: 'jpg' | 'png' | 'webp') => {
-    if (!mediaInfo || !mediaInfo.thumbnailUrl) return;
-    // Sem formato escolhido: abre o seletor
+  const handleDownloadThumbnail = async (targetExt?: 'jpg' | 'png' | 'webp', cover?: { title: string; thumbnailUrl: string; platform: PlatformId }) => {
+    const srcTitle = cover?.title || mediaInfo?.title;
+    const srcThumb = cover?.thumbnailUrl || mediaInfo?.thumbnailUrl;
+    if (!srcTitle || !srcThumb) return;
+    // Baixar capa exige licença genuína (assinatura revalidada).
+    if (!isLicenseActive(getLicense()) || !(await isLicenseGenuine())) {
+      setError(settings.language === 'en' ? 'Cover download is PRO — activate your key in the Custom Download panel.' : 'Baixar capa é PRO — ative sua chave no painel Download Personalizado.');
+      return;
+    }
     if (!targetExt) {
       setShowCoverFormats(v => !v);
       return;
     }
     setShowCoverFormats(false);
-    const titleBase = ((mediaInfo.title || 'video').replace(/[<>:"/\\|?*]/g, '_').substring(0, 80));
-    // Converte bytes (já em mãos) para o formato do botão via blob: limpo:
-    // blob: é same-origin, então o canvas nunca é contaminado — sem CORS.
+    const titleBase = ((srcTitle || 'video').replace(/[<>:"/\\|?*]/g, '_').substring(0, 80));
+    // blob: é same-origin: o canvas nunca contamina (sem CORS).
     const convertCoverBytes = (raw: Uint8Array, srcMime: string, target: 'jpg' | 'png' | 'webp'): Promise<Uint8Array> =>
       new Promise((resolve, reject) => {
         const objUrl = URL.createObjectURL(new Blob([raw as BlobPart], { type: srcMime }));
@@ -543,16 +506,14 @@ export const LinkAnalyzer: React.FC = () => {
       const isTauri = typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window);
       if (isTauri) {
         const { invoke } = await import('@tauri-apps/api/core');
-        // 1. Bytes via backend (sem CORS): vi_webp não envia ACAO, então
-        // carregar por <img> com crossOrigin jamais funcionaria aqui.
+        // 1. Bytes via backend (sem CORS: <img> com crossOrigin falharia).
         const fetched = await invoke<{ success: boolean; data: string; ext: string; size: number }>(
           'fs_fetch_cover',
-          { url: mediaInfo.thumbnailUrl },
+          { url: srcThumb },
         );
         const raw = Uint8Array.from(atob(fetched.data), (c) => c.charCodeAt(0));
         const realExt = (fetched.ext || 'jpg').toLowerCase();
-        // 2. Respeita o botão: converte para o formato escolhido; se a
-        // conversão falhar, entrega os bytes originais com a extensão real.
+        // 2. Converte p/ o formato do botão; se falhar, entrega o original.
         let outBytes = raw;
         let outExt = realExt;
         if (targetExt !== realExt) {
@@ -564,7 +525,6 @@ export const LinkAnalyzer: React.FC = () => {
             outExt = realExt;
           }
         }
-        // 3. Salva e registra nas Downloads como item concluído.
         const { writeFile } = await import('@tauri-apps/plugin-fs');
         const { join } = await import('@tauri-apps/api/path');
         let dir = settings.defaultDir || '';
@@ -582,12 +542,12 @@ export const LinkAnalyzer: React.FC = () => {
           throw new Error('write');
         }
         DownloadEngine.registerCompletedFile({
-          title: mediaInfo.title || titleBase,
+          title: srcTitle || titleBase,
           filePath,
           size: outBytes.length,
-          platform: mediaInfo.platform,
-          url: mediaInfo.thumbnailUrl,
-          thumbnailUrl: mediaInfo.thumbnailUrl,
+          platform: cover?.platform ?? mediaInfo?.platform ?? 'generic',
+          url: srcThumb,
+          thumbnailUrl: srcThumb,
           ext: outExt,
         });
         const shown = outExt.toUpperCase();
@@ -595,7 +555,6 @@ export const LinkAnalyzer: React.FC = () => {
         setTimeout(() => setSuccessMsg(null), 2000);
         return;
       }
-      // Web (sem Tauri): caminho antigo por canvas direto da URL.
       const mime = targetExt === 'jpg' ? 'image/jpeg' : targetExt === 'png' ? 'image/png' : 'image/webp';
       const quality = targetExt === 'png' ? undefined : 0.92;
       const filename = `${titleBase}_capa.${targetExt}`;
@@ -604,7 +563,7 @@ export const LinkAnalyzer: React.FC = () => {
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve();
         img.onerror = () => reject(new Error('img'));
-        img.src = mediaInfo.thumbnailUrl;
+        img.src = srcThumb;
       });
       const canvas = document.createElement('canvas');
       canvas.width = img.naturalWidth;
@@ -631,176 +590,27 @@ export const LinkAnalyzer: React.FC = () => {
     }
   };
 
-  const platformConfig = mediaInfo ? ProviderRegistry.getPlatformConfig(mediaInfo.platform) : null;
   const isFav = mediaInfo ? isFavorite(mediaInfo.originalUrl) : false;
   const isLater = mediaInfo ? isDownloadLater(mediaInfo.originalUrl) : false;
+  const isPlFav = playlistInfo ? isFavorite(playlistInfo.url) : false;
+  const isPlLater = playlistInfo ? isDownloadLater(playlistInfo.url) : false;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 py-2 md:py-6 px-4">
-      {/* Title Header */}
-      <div className="text-center md:text-left space-y-2">
-        <h2 className="font-display font-extrabold text-2xl md:text-4xl text-white tracking-tight leading-tight break-words">
-          {t('universalDownloader')}
-        </h2>
-        <p className="lf-text-secondary text-sm md:text-base">
-          {settings.language === 'en' 
-            ? 'Enter video, audio or image link from any supported platform to start.' 
-            : 'Insira o link de vídeos, áudios ou imagens de qualquer plataforma suportada para começar.'}
-        </p>
-      </div>
+    <div className="max-w-4xl mx-auto space-y-6 -mt-4 md:-mt-8 pt-1 md:pt-2 pb-2 md:pb-6 px-4">
+      <AnalyzeForm
+        url={url}
+        setUrl={setUrl}
+        loading={loading}
+        onPaste={handlePaste}
+        onSubmit={handleSubmit}
+        onClear={handleClearForm}
+        description={
+          settings.language === 'en'
+            ? 'Enter video, audio or image link from any supported platform to start.'
+            : 'Insira o link de vídeos, áudios ou imagens de qualquer plataforma suportada para começar.'
+        }
+      />
 
-      {/* Main Input Box */}
-      <div className="p-4 md:p-6 rounded-3xl glass-card shadow-2xl">
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="relative flex-1">
-            <input
-              type="text"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder={t('mainPlaceholder')}
-              autoComplete="off"
-                className={`
-                w-full pl-4 pr-12 py-3.5 rounded-xl lf-surface border lf-border text-sm text-white placeholder-zinc-500
-                focus:border-transparent focus:outline-none focus:ring-2 ${getAccentRingClass(settings)} transition-all
-              `}
-              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-            />
-            {url && (
-              <button
-                onClick={() => {
-                  setUrl('');
-                  setMediaInfo(null);
-                  setSelectedFormat(null);
-                  setProbeError(null);
-                  setFormatOptions({
-                    format: 'bestvideo+bestaudio/best',
-                    audioOnly: false,
-                    audioFormat: 'mp3',
-                    audioQuality: '0',
-                    writeSubs: false,
-                    writeAutoSubs: false,
-                    subLangs: '',
-                    subFormat: '',
-                    embedSubs: false,
-                    writeThumbnail: false,
-                    embedThumbnail: false,
-                    embedMetadata: false,
-                    videoOnly: false,
-                    sponsorblockRemove: '',
-                    fpsMax: 0,
-                    bandLimit: 0,
-                  });
-                }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-white/5 lf-text-secondary hover:text-white transition-colors"
-              >
-                <Trash2 size={16} />
-              </button>
-            )}
-          </div>
-          
-          <div className="flex gap-2">
-            <button
-              onClick={handlePaste}
-              type="button"
-              className="flex-1 md:flex-none px-4 py-3.5 rounded-xl lf-surface-raised hover:bg-zinc-850 text-zinc-200 border lf-border hover:text-white font-medium text-sm transition-all"
-            >
-              {t('btnPaste')}
-            </button>
-            <button
-              onClick={() => handleSubmit()}
-              disabled={loading || !url}
-              className={`
-                flex-1 md:flex-none px-6 py-3.5 rounded-xl text-white font-semibold text-sm transition-all shadow-lg
-                ${loading || !url 
-                  ? 'lf-surface-raised lf-text-muted cursor-not-allowed border lf-border shadow-none' 
-                  : `${getAccentBgClass(settings)} hover:shadow-indigo-500/20`
-                }
-              `}
-            >
-              {loading ? (
-                <span className="flex items-center gap-2 justify-center">
-                  <RefreshCw size={16} className="animate-spin" /> {settings.language === 'en' ? 'Analyzing...' : 'Analisando...'}
-                </span>
-              ) : (
-                t('btnAnalyze')
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Supported platforms strip */}
-        <div 
-          className="slider-container"
-          onMouseEnter={(e) => {
-            const row = e.currentTarget.querySelector('.scroll-row');
-            if (row) smoothSetPlaybackRate(row as HTMLElement, 0.35);
-          }}
-          onMouseLeave={(e) => {
-            const row = e.currentTarget.querySelector('.scroll-row');
-            if (row) smoothSetPlaybackRate(row as HTMLElement, 1);
-          }}
-        >
-          <div className="scroll-row" id="scrollRow">
-            <div className="tag youtube"><Play size={18} />YouTube</div>
-            <div className="tag tiktok"><Music size={18} />TikTok</div>
-            <div className="tag instagram"><Camera size={18} />Instagram</div>
-            <div className="tag facebook"><Globe size={18} />Facebook</div>
-            <div className="tag twitter"><X size={18} />X</div>
-            <div className="tag soundcloud"><Cloud size={18} />SoundCloud</div>
-            <div className="tag twitch"><Radio size={18} />Twitch</div>
-            <div className="tag reddit"><MessageCircle size={18} />Reddit</div>
-            <div className="tag discord"><MessageSquare size={18} />Discord</div>
-            <div className="tag kick"><Play size={18} />Kick</div>
-            <div className="tag vimeo"><Film size={18} />Vimeo</div>
-            <div className="tag pinterest"><Pin size={18} />Pinterest</div>
-            <div className="tag linkedin"><Linkedin size={18} />LinkedIn</div>
-            <div className="tag github"><Github size={18} />GitHub</div>
-            <div className="tag patreon"><Heart size={18} />Patreon</div>
-            <div className="tag telegram"><Send size={18} />Telegram</div>
-            <div className="tag snapchat"><Send size={18} />Snapchat</div>
-            <div className="tag steam"><Gamepad2 size={18} />Steam</div>
-            <div className="tag threads"><AtSign size={18} />Threads</div>
-            <div className="tag medium"><BookOpen size={18} />Medium</div>
-            <div className="tag behance"><PenTool size={18} />Behance</div>
-            <div className="tag dribbble"><PenTool size={18} />Dribbble</div>
-            <div className="tag gitlab"><GitBranch size={18} />GitLab</div>
-            <div className="tag tumblr"><PenTool size={18} />Tumblr</div>
-            <div className="tag flickr"><Camera size={18} />Flickr</div>
-            <div className="tag mastodon"><Radio size={18} />Mastodon</div>
-            <div className="tag bandcamp"><Music size={18} />Bandcamp</div>
-
-            <div className="tag youtube"><Play size={18} />YouTube</div>
-            <div className="tag tiktok"><Music size={18} />TikTok</div>
-            <div className="tag instagram"><Camera size={18} />Instagram</div>
-            <div className="tag facebook"><Globe size={18} />Facebook</div>
-            <div className="tag twitter"><X size={18} />X</div>
-            <div className="tag soundcloud"><Cloud size={18} />SoundCloud</div>
-            <div className="tag twitch"><Radio size={18} />Twitch</div>
-            <div className="tag reddit"><MessageCircle size={18} />Reddit</div>
-            <div className="tag discord"><MessageSquare size={18} />Discord</div>
-            <div className="tag kick"><Play size={18} />Kick</div>
-            <div className="tag vimeo"><Film size={18} />Vimeo</div>
-            <div className="tag pinterest"><Pin size={18} />Pinterest</div>
-            <div className="tag linkedin"><Linkedin size={18} />LinkedIn</div>
-            <div className="tag github"><Github size={18} />GitHub</div>
-            <div className="tag patreon"><Heart size={18} />Patreon</div>
-            <div className="tag telegram"><Send size={18} />Telegram</div>
-            <div className="tag snapchat"><Send size={18} />Snapchat</div>
-            <div className="tag steam"><Gamepad2 size={18} />Steam</div>
-            <div className="tag threads"><AtSign size={18} />Threads</div>
-            <div className="tag medium"><BookOpen size={18} />Medium</div>
-            <div className="tag behance"><PenTool size={18} />Behance</div>
-            <div className="tag dribbble"><PenTool size={18} />Dribbble</div>
-            <div className="tag gitlab"><GitBranch size={18} />GitLab</div>
-            <div className="tag tumblr"><PenTool size={18} />Tumblr</div>
-            <div className="tag flickr"><Camera size={18} />Flickr</div>
-            <div className="tag mastodon"><Radio size={18} />Mastodon</div>
-            <div className="tag bandcamp"><Music size={18} />Bandcamp</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Error View */}
       {error && (
         <AnimatedCard
           variant={fadeIn}
@@ -814,7 +624,6 @@ export const LinkAnalyzer: React.FC = () => {
         </AnimatedCard>
       )}
 
-      {/* Success Notification pop */}
       {successMsg && (
         <AnimatedCard
           variant={scaleIn}
@@ -825,7 +634,6 @@ export const LinkAnalyzer: React.FC = () => {
         </AnimatedCard>
       )}
 
-      {/* Skeleton Loading Card */}
       {loading && (
         <div className="p-4 md:p-6 rounded-2xl lf-surface-40 border lf-border animate-pulse space-y-6">
           <div className="flex flex-col md:flex-row gap-6">
@@ -852,308 +660,52 @@ export const LinkAnalyzer: React.FC = () => {
         </div>
       )}
 
-      {/* PLAYLIST LOADING STATE */}
-      {playlistLoading && (
-        <div className="p-6 rounded-3xl glass-card text-center space-y-3">
-          <div className="animate-spin w-8 h-8 border-2 border-t-transparent rounded-full mx-auto" />
-          <p className="lf-text-secondary text-sm">
-            {settings.language === 'en' ? 'Loading playlist...' : 'Carregando playlist...'}
-          </p>
-        </div>
+      <PlaylistCard
+        playlistLoading={playlistLoading}
+        playlistInfo={playlistInfo}
+        playlistExpanded={playlistExpanded}
+        setPlaylistExpanded={setPlaylistExpanded}
+        proActive={isLicenseActive(useLicense())}
+        onDownloadAll={handleDownloadAllPlaylist}
+        onUnlockPro={() => setShowLicense(true)}
+        refMedia={refMedia}
+        refLoading={refLoading}
+        formatOptions={formatOptions}
+        onFormatSelect={setFormatOptions}
+        onFormatChange={setSelectedFormat}
+        isFav={isPlFav}
+        isLater={isPlLater}
+        onToggleFav={handleTogglePlaylistFav}
+        onToggleLater={handleTogglePlaylistLater}
+        showCoverFormats={showCoverFormats}
+        onDownloadCover={handleDownloadPlaylistCover}
+        onAnalyzeItem={handleAnalyzePlaylistItem}
+        onRemoveItem={handleRemovePlaylistItem}
+      />
+
+      {showLicense && <LicenseModal onClose={() => setShowLicense(false)} />}
+
+      {mediaInfo && !loading && (
+        <MediaResultCard
+          mediaInfo={mediaInfo}
+          panelKey={`${mediaInfo.id}#${analysisSeq}`}
+          isFav={isFav}
+          isLater={isLater}
+          onToggleFav={handleToggleFav}
+          onToggleLater={handleToggleLater}
+          onDownloadThumbnail={handleDownloadThumbnail}
+          showCoverFormats={showCoverFormats}
+          probeLoading={probeLoading}
+          probeError={probeError}
+          formatOptions={formatOptions}
+          onFormatSelect={setFormatOptions}
+          onFormatChange={setSelectedFormat}
+          selectedFormat={selectedFormat}
+          onStartDownload={handleStartDownload}
+          onQuickDownload={handleQuickDownload}
+        />
       )}
 
-      {/* PLAYLIST PREVIEW CARD */}
-      <AnimatedList>
-        {playlistInfo && !playlistLoading && (
-          <AnimatedCard
-            variant={slideUpStrong}
-            className="p-5 rounded-3xl glass-card shadow-2xl space-y-4"
-          >
-            {/* Playlist Header */}
-            <div className="flex items-start gap-4">
-              <div className="w-14 h-14 rounded-xl bg-indigo-600/20 flex items-center justify-center shrink-0">
-                <ListMusic size={24} className={getAccentTextClass(settings)} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-base font-display font-bold text-zinc-100 truncate">
-                  {playlistInfo.title}
-                </h3>
-                <div className="flex items-center gap-3 mt-1">
-                  <span className="text-xs lf-text-secondary">
-                    {playlistInfo.items.length} {settings.language === 'en' ? 'items' : 'itens'}
-                  </span>
-                  {playlistInfo.totalDuration && playlistInfo.totalDuration > 0 && (
-                    <span className="text-xs lf-text-secondary">
-                      • {Math.floor(playlistInfo.totalDuration / 60)}min total
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Preview items (first 5) */}
-            <div className="space-y-1.5">
-              {playlistInfo.items.slice(0, playlistExpanded ? playlistInfo.items.length : 5).map((item, idx) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors"
-                >
-                  <span className="text-[10px] lf-text-secondary w-5 text-center shrink-0">
-                    {item.index}
-                  </span>
-                  <span className="text-xs text-zinc-300 truncate flex-1">
-                    {item.title}
-                  </span>
-                  {item.duration && (
-                    <span className="text-[10px] lf-text-secondary shrink-0">
-                      {Math.floor(item.duration / 60)}:{(item.duration % 60).toString().padStart(2, '0')}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Expand/Collapse */}
-            {playlistInfo.items.length > 5 && (
-              <button
-                onClick={() => setPlaylistExpanded(!playlistExpanded)}
-                className="w-full flex items-center justify-center gap-1 py-1.5 text-xs lf-text-secondary hover:text-zinc-300 transition-colors"
-              >
-                {playlistExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                {playlistExpanded
-                  ? settings.language === 'en' ? 'Show less' : 'Mostrar menos'
-                  : settings.language === 'en' ? `Show all ${playlistInfo.items.length}` : `Ver todos (${playlistInfo.items.length})`}
-              </button>
-            )}
-
-            {/* Download All Button (com progresso + cancelar durante o pool) */}
-            {enqueueProgress ? (
-              <div className="space-y-2">
-                <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-current opacity-80"
-                    style={{ width: `${Math.round((enqueueProgress.done / Math.max(1, enqueueProgress.total)) * 100)}%` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs lf-text-secondary">
-                    {enqueueProgress.done}/{enqueueProgress.total}
-                  </span>
-                  <button
-                    onClick={() => { enqueueCancelRef.current = true; }}
-                    className="px-4 py-2 rounded-xl text-xs font-bold lf-surface-raised border lf-border lf-text-secondary hover:text-white transition-all"
-                  >
-                    {settings.language === 'en' ? 'Cancel' : 'Cancelar'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-            <button
-              onClick={handleDownloadAllPlaylist}
-              className={`w-full py-2.5 rounded-xl font-display font-bold text-sm transition-all ${getAccentBgClass(settings)} hover:opacity-90 text-white shadow-lg`}
-            >
-              <span className="flex items-center justify-center gap-2">
-                <Download size={14} />
-                {settings.language === 'en' ? `Download All (${playlistInfo.items.length})` : `Baixar Todos (${playlistInfo.items.length})`}
-              </span>
-            </button>
-            )}
-          </AnimatedCard>
-        )}
-      </AnimatedList>
-
-      {/* RICH CONTENT CARD */}
-      <AnimatedList>
-        {mediaInfo && !loading && (
-          <AnimatedCard
-            variant={slideUpStrong}
-            className="p-4 md:p-6 rounded-3xl glass-card shadow-2xl space-y-6 overflow-hidden"
-          >
-            {/* Header / Thumbnail Block */}
-            <div className="flex flex-col md:flex-row gap-6">
-              {/* Thumbnail Container */}
-              <div className="relative group w-full md:w-64 h-40 rounded-xl shrink-0 overflow-hidden border lf-border lf-surface">
-                <img 
-                  src={mediaInfo.thumbnailUrl} 
-                  alt={mediaInfo.title}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  referrerPolicy="no-referrer"
-                  loading="lazy"
-                  decoding="async"
-                />
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white">
-                    <Play size={20} fill="currentColor" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Rich Metadata Information */}
-              <div className="flex-1 flex flex-col justify-between space-y-4">
-                <div className="space-y-2">
-                  <h3 className="font-display font-bold text-lg md:text-xl text-white leading-snug">
-                    {mediaInfo.title}
-                  </h3>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs lf-text-secondary font-medium font-sans">
-                    <span className="lf-text-secondary font-semibold">{t('authorLabel')} {mediaInfo.author}</span>
-                    {platformConfig && (
-                      <PlatformBadge platformId={mediaInfo.platform} name={platformConfig.name} color={platformConfig.color} variant="inline" />
-                    )}
-                    <span className="lf-text-faint">•</span>
-                    <span className="px-2 py-0.5 rounded-md bg-white/5 border lf-border text-[10px] uppercase font-mono tracking-wider flex items-center gap-1.5 lf-text-secondary">
-                      {mediaInfo.type === 'video' && <>{settings.iconStyle === 'emoji' ? <span>🎬</span> : <FileVideo size={10} className="text-violet-400" />} {settings.language === 'en' ? 'Video' : 'Vídeo'}</>}
-                      {mediaInfo.type === 'audio' && <>{settings.iconStyle === 'emoji' ? <span>🎵</span> : <Music size={10} className="text-rose-400" />} {settings.language === 'en' ? 'Audio' : 'Áudio'}</>}
-                      {mediaInfo.type === 'image' && <>{settings.iconStyle === 'emoji' ? <span>🖼️</span> : <ImageIcon size={10} className="text-cyan-400" />} {settings.language === 'en' ? 'Image' : 'Imagem'}</>}
-                    </span>
-                  </div>
-                  {/* Metadata: views, date, formats, duration */}
-                  <div className="flex flex-wrap items-center gap-x-1 text-[11px] lf-text-faint font-medium">
-                    {mediaInfo.views && (
-                      <span className="flex items-center gap-1 px-2">
-                        {settings.iconStyle === 'emoji' ? <span>👁️</span> : <Eye size={10} className="text-sky-400" />}
-                        <span className="lf-text-secondary">{mediaInfo.views}</span>
-                      </span>
-                    )}
-                    <span className="text-zinc-700">|</span>
-                    {mediaInfo.publishDate && (
-                      <span className="flex items-center gap-1 px-2">
-                        {settings.iconStyle === 'emoji' ? <span>📅</span> : <Calendar size={10} className="text-amber-400" />}
-                        <span className="lf-text-secondary">{mediaInfo.publishDate}</span>
-                      </span>
-                    )}
-                    <span className="text-zinc-700">|</span>
-                    <span className="flex items-center gap-1 px-2">
-                      {settings.iconStyle === 'emoji' ? <span>📁</span> : <FolderOpen size={10} className="text-emerald-400" />}
-                      <span className="lf-text-secondary">{mediaInfo.formats.length} {settings.language === 'en' ? 'formats' : 'formatos'}</span>
-                    </span>
-                    <span className="text-zinc-700">|</span>
-                    {mediaInfo.duration && (
-                      <span className="flex items-center gap-1 px-2">
-                        {settings.iconStyle === 'emoji' ? <span>⏱️</span> : <Clock size={10} className="text-violet-400" />}
-                        <span className="lf-text-secondary">{mediaInfo.duration}</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Actions Toolbelt (items-start: a coluna da capa cresce
-                    com a linha de formatos sem esticar os vizinhos) */}
-                <div className="flex flex-wrap items-start gap-2">
-                  <button
-                    onClick={handleToggleFav}
-                    className={`
-                      px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all
-                      ${isFav 
-                        ? `${getAccentBorderClass(settings)} bg-current text-white` 
-                        : 'lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850'
-                      }
-                    `}
-                    style={isFav ? { backgroundColor: `rgba(var(--color-primary-rgb), 0.1)`, color: 'var(--color-primary)' } : {}}
-                  >
-                    {settings.iconStyle === 'emoji' ? <span>⭐</span> : <Star size={14} fill={isFav ? 'currentColor' : 'none'} className={getAccentTextClass(settings)} />}
-                    {isFav ? (settings.language === 'en' ? 'Favorited' : 'Favoritado') : t('favorite')}
-                  </button>
-
-                  <button
-                    onClick={handleToggleLater}
-                    className={`
-                      px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all
-                      ${isLater 
-                        ? `${getAccentBorderClass(settings)} bg-current text-white` 
-                        : 'lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850'
-                      }
-                    `}
-                    style={isLater ? { backgroundColor: `rgba(var(--color-primary-rgb), 0.1)`, color: 'var(--color-primary)' } : {}}
-                  >
-                    {settings.iconStyle === 'emoji' ? <span>⏰</span> : <Clock size={14} className={getAccentTextClass(settings)} />}
-                    {t('laterBtn')}
-                  </button>
-
-                  {mediaInfo.type !== 'image' && (
-                    <div className="flex flex-col gap-1.5">
-                      <button
-                        onClick={() => handleDownloadThumbnail()}
-                        className="px-3.5 py-2 rounded-xl border lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850 text-xs font-semibold flex items-center gap-2 transition-all"
-                      >
-                        {settings.iconStyle === 'emoji' ? <span>🖼️</span> : <ImageIcon size={14} className={getAccentTextClass(settings)} />}
-                        {settings.language === 'en' ? 'Download Thumbnail' : 'Baixar Capa'}
-                      </button>
-                      {showCoverFormats && (
-                        <div className="flex gap-1.5">
-                          {(['jpg', 'png', 'webp'] as const).map(fmt => (
-                            <button
-                              key={fmt}
-                              onClick={() => handleDownloadThumbnail(fmt)}
-                              className="flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase lf-surface-40 lf-border lf-text-secondary hover:text-white transition-all"
-                            >
-                              {fmt}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <a
-                    href={mediaInfo.originalUrl}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="px-3.5 py-2 rounded-xl border lf-border lf-surface-40 lf-text-secondary hover:text-white hover:bg-zinc-850 text-xs font-semibold flex items-center gap-2 transition-all"
-                  >
-                    {settings.iconStyle === 'emoji' ? <span>🔗</span> : <ExternalLink size={14} className={getAccentTextClass(settings)} />}
-                    {t('btnOriginal')}
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            {/* Format Selector with Probe Options */}
-            <div className="border-t lf-border pt-6 space-y-5">
-              {probeLoading && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-zinc-500/10 border lf-border lf-text-secondary text-xs font-medium">
-                  <RefreshCw size={14} className="animate-spin" />
-                  {settings.language === 'en' ? 'Probing media info...' : 'Analisando informações da mídia...'}
-                </div>
-              )}
-              {probeError && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium">
-                  <AlertCircle size={14} />
-                  {settings.language === 'en' ? 'Probe error' : 'Erro na sonda'}: {probeError}
-                </div>
-              )}
-
-              <Suspense fallback={<div className="h-40 lf-surface-40 rounded-xl animate-pulse" />}>
-                <FormatSelector
-                  mediaInfo={mediaInfo}
-                  onFormatSelect={setFormatOptions}
-                  onFormatChange={setSelectedFormat}
-                  formatOptions={formatOptions}
-                />
-              </Suspense>
-            </div>
-
-            {/* Execute Download trigger */}
-            <div className="border-t lf-border pt-6 space-y-4">
-              <SummaryPanel formatOptions={formatOptions} selectedFormat={selectedFormat} mediaInfo={mediaInfo} />
-              <div className="flex justify-end">
-                <button
-                  onClick={handleStartDownload}
-                  disabled={!selectedFormat}
-                  className={`
-                    w-full sm:w-auto px-6 py-3 rounded-xl text-white font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition-all
-                    ${!selectedFormat ? 'bg-zinc-600 hover:bg-zinc-600 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500'} hover:scale-[1.02] active:scale-[0.98]
-                  `}
-                >
-                  <Download size={18} />
-                  {t('btnDownloadSelected')}
-                </button>
-              </div>
-            </div>
-          </AnimatedCard>
-        )}
-      </AnimatedList>
-
-      {/* Safety & Performance assurances info cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
           { title: t('feat1Title'), icon: RefreshCw, desc: t('feat1Desc') },

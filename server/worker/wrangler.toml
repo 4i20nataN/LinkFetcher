@@ -1,0 +1,22 @@
+name = "linkfetcher-licenses"
+main = "worker.mjs"
+compatibility_date = "2025-01-01"
+
+# Preço/dias da oferta (tem que bater com PRO_PLAN no app).
+[vars]
+PRICE = "9.99"
+PLAN_DAYS = "30"
+# Vazio = usa o origin do Worker p/ notification_url. Preencha com o
+# workers.dev (ou domínio próprio) depois do 1º deploy.
+BASE_URL = "https://linkfetcher-licenses.linkfetcher.workers.dev"
+# Remetente do e-mail da chave (tem que ser o e-mail verificado no Brevo).
+# FORA DO REPO: configure como segredo — `wrangler secret put SMTP_FROM`.
+# (O Worker lê env.SMTP_FROM igual; [vars] aqui exporia o endereço no git.)
+
+# D1 — crie antes: wrangler d1 create linkfetcher-licenses
+# e cole o database_id abaixo. Aplique o schema 1x:
+# wrangler d1 execute linkfetcher-licenses --file=./schema.sql
+[[d1_databases]]
+binding = "DB"
+database_name = "linkfetcher-licenses"
+database_id = "c37c4b47-eb82-4a8e-84b4-1abcd0032e94"

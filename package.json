@@ -1,22 +1,31 @@
 {
   "name": "linkfetcher",
   "private": true,
-  "version": "1.4.0",
+  "version": "1.5.1",
   "description": "LinkFetcher-Tauri - desktop yt-dlp frontend (Tauri v2)",
   "author": {
-    "name": "Natan Vanim",
-    "email": "natan.vanim@gmail.com"
+    "name": "LinkFetcher"
   },
   "type": "module",
   "scripts": {
     "dev:tauri": "vite --port 1420 --strictPort",
     "tauri:dev": "npx @tauri-apps/cli@2 dev",
     "build:frontend": "vite build",
+    "test": "vitest run",
+    "test:server": "node --test server/server.test.mjs",
+    "test:e2e": "playwright test",
+    "bump": "node scripts/bump-version.mjs",
+    "android:dev": "NDK_HOME=$HOME/Android/sdk/ndk/27.1.12297006 ANDROID_NDK_HOME=$NDK_HOME npx @tauri-apps/cli@2 android dev --host",
+    "android:sync": "node scripts/sync-android-plugin.mjs",
     "tauri": "tauri",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "deploy": "npm run build:frontend && wrangler deploy",
+    "preview": "npm run build:frontend && wrangler dev"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.63.1",
     "@emotion/is-prop-valid": "^1.4.0",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.1.14",
     "@tauri-apps/cli": "~2.11.5",
     "@types/node": "^22.14.0",
@@ -30,7 +39,9 @@
     "react-dom": "^19.0.1",
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "vitest": "^5.0.3",
+    "wrangler": "^4.149.0"
   },
   "dependencies": {
     "@tauri-apps/api": "~2.11.1",
@@ -39,6 +50,7 @@
     "@tauri-apps/plugin-fs": "~2.5.2",
     "@tauri-apps/plugin-notification": "~2.4.0",
     "@tauri-apps/plugin-process": "~2.3.1",
-    "@tauri-apps/plugin-updater": "~2.11.0"
+    "@tauri-apps/plugin-updater": "~2.11.0",
+    "qrcode": "^1.5.4"
   }
 }

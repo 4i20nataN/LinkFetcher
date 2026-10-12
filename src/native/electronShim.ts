@@ -1,8 +1,4 @@
-/**
- * electronShim.ts — Ponte transparente de compatibilidade Electron -> Tauri.
- * Permite que componentes legados (SettingsView, DownloadManager, LinkAnalyzer)
- * continuem consumindo APIs de filesystem e shell sem quebras em runtime.
- */
+/** Ponte de compatibilidade Electron → Tauri (filesystem/shell). */
 
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -22,8 +18,7 @@ export function setupElectronShim() {
           return path as unknown as T;
         }
         case 'shell:openPath': {
-          // Args top-level питом: o Tauri converte snake_case (Rust) <->
-          // camelCase (JS) sozinho — aqui vai camelCase, como o core espera.
+          // Tauri converte snake_case↔camelCase sozinho: aqui vai camelCase.
           const targetPath = (args[0] as string) || '';
           await invoke('fs_open_path', { targetPath });
           return undefined as unknown as T;
@@ -61,8 +56,7 @@ export function setupElectronShim() {
           return invoke<T>('ytdlp_status');
         }
         default: {
-          // Canais desktop-only caem aqui no mobile: debug em vez de warn
-          // para não poluir o console do Android a cada boot.
+          // Canal desktop-only no mobile: debug p/ não poluir o console.
           console.debug(`[electronShim] Unhandled invoke channel: ${channel}`);
           return Promise.resolve(undefined as unknown as T);
         }
@@ -72,7 +66,6 @@ export function setupElectronShim() {
     on: (channel: string, listener: (...args: unknown[]) => void) => {
       if (!eventListeners.has(channel)) {
         eventListeners.set(channel, new Set());
-        // Inicia listener correspondente no Tauri
         listen(channel, (event) => {
           const set = eventListeners.get(channel);
           set?.forEach(cb => cb(event.payload));
@@ -101,7 +94,6 @@ export function setupElectronShim() {
       set?.delete(listener);
     },
 
-    // ── Auto-Update API ───────────────────────────────────────────────────
     checkForUpdate: async () => ({ updateAvailable: false }),
     applyUpdate: async () => ({ ok: false, error: 'Auto-update managed by OS package manager' }),
     installUpdate: async () => ({ ok: false, error: 'Auto-update managed by OS package manager' }),
@@ -110,7 +102,6 @@ export function setupElectronShim() {
     setAutoCheck: () => {},
     getAutoCheck: async () => false,
 
-    // ── Clipboard monitoring API ─────────────────────────────────────────
     clipboardStartMonitoring: () => {},
     clipboardStopMonitoring: () => {},
     clipboardGetText: async () => {
@@ -123,7 +114,6 @@ export function setupElectronShim() {
     },
     onClipboardUrlDetected: () => () => {},
 
-    // ── Browser extension status ─────────────────────────────────────────
     isExtensionConnected: async () => false,
     onExtensionStatus: () => () => {},
   };

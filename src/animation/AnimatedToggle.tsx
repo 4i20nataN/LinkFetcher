@@ -1,11 +1,4 @@
-/**
- * AnimatedToggle — toggle knob com spring animation.
- *
- * Uso:
- *   <div className="w-9 h-5 rounded-full bg-zinc-700">
- *     <AnimatedToggle active={value} />
- *   </div>
- */
+/** Knob de toggle com spring. */
 
 import React from 'react';
 import { m } from 'motion/react';

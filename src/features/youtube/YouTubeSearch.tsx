@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { SearchResult } from '../../types';
 import { Search, Globe, Play, ArrowRight, Eye, AlertCircle } from 'lucide-react';
@@ -22,7 +22,6 @@ function cacheGet(key: string): SearchResult[] | undefined {
     searchCache.delete(key);
     return undefined;
   }
-  // LRU: re-insere para marcar como recente.
   searchCache.delete(key);
   searchCache.set(key, hit);
   return hit.value;
@@ -46,7 +45,7 @@ const SearchResultCard = React.memo<{
     animateKey={video.url}
     variant={scaleIn}
     onClick={() => onSelect(video.url)}
-    className="group rounded-2xl glass-card p-3 transition-all duration-300 cursor-pointer flex flex-col justify-between hover:bg-white/10"
+    className="group rounded-2xl glass-card p-3 transition-all duration-300 cursor-pointer flex flex-col justify-between hover:bg-white/10 [content-visibility:auto] [contain-intrinsic-size:auto_280px]"
   >
     <div>
       <div className="relative aspect-video rounded-xl overflow-hidden border lf-border lf-surface shrink-0">
@@ -97,6 +96,23 @@ export const YouTubeSearch: React.FC = () => {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const searchSeq = useRef(0);
+  const lastSearchId = useRef<string | null>(null);
+
+  // Mata o yt-dlp da busca anterior (best-effort): sem isso, pesquisar
+  // em sequência empilha processos e tudo fica lento.
+  const killPreviousSearch = useCallback((id: string | null) => {
+    if (!id) return;
+    import('@tauri-apps/api/core')
+      .then(({ invoke }) => invoke('ytdlp_cancel', { id }).catch(() => {}))
+      .catch(() => {});
+  }, []);
+
+  // Desmontou com busca em voo: não deixa órfão (lê o ref no cleanup).
+  useEffect(() => {
+    return () => killPreviousSearch(lastSearchId.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSelectVideo = useCallback((videoUrl: string) => {
     setSelectedUrl(videoUrl);
@@ -111,8 +127,12 @@ export const YouTubeSearch: React.FC = () => {
     if (!query.trim()) return;
 
     abortRef.current?.abort();
+    killPreviousSearch(lastSearchId.current);
     const controller = new AbortController();
     abortRef.current = controller;
+    searchSeq.current += 1;
+    const searchId = `search-${Date.now().toString(36)}-${searchSeq.current}`;
+    lastSearchId.current = searchId;
 
     const cacheKey = query.trim().toLowerCase();
     const cached = cacheGet(cacheKey);
@@ -128,7 +148,8 @@ export const YouTubeSearch: React.FC = () => {
       const data: SearchResult[] = await searchVideosWithAdapter({
         query: query.trim(),
         platform: 'youtube',
-        maxResults: 10
+        maxResults: 10,
+        searchId,
       });
       if (!controller.signal.aborted) {
         setResults(data);
@@ -147,7 +168,6 @@ export const YouTubeSearch: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 py-2 md:py-6 px-4">
-      {/* Title Header */}
       <div className="text-center md:text-left space-y-2">
         <div className="flex items-center gap-2 justify-center md:justify-start">
           <Globe size={28} className={getAccentTextClass(settings)} />
@@ -160,7 +180,6 @@ export const YouTubeSearch: React.FC = () => {
         </p>
       </div>
 
-      {/* Search Input bar */}
       <form onSubmit={handleSearch} className="flex gap-3">
         <div className="relative flex-1">
           <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 lf-text-muted" />
@@ -187,7 +206,6 @@ export const YouTubeSearch: React.FC = () => {
         </button>
       </form>
 
-      {/* Error state */}
       {error && (
         <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
           <AlertCircle size={16} />
@@ -195,7 +213,6 @@ export const YouTubeSearch: React.FC = () => {
         </div>
       )}
 
-      {/* Results View */}
       <div className="space-y-4">
         <div className="flex items-center justify-between text-xs lf-text-muted font-medium">
           <span>
@@ -207,7 +224,6 @@ export const YouTubeSearch: React.FC = () => {
         </div>
 
         {searching ? (
-          /* Loading states */
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[1, 2, 4, 5].map((i) => (
               <div key={i} className="rounded-2xl glass-card p-3 animate-pulse space-y-4">
@@ -220,7 +236,6 @@ export const YouTubeSearch: React.FC = () => {
             ))}
           </div>
         ) : (
-          /* Search results Grid */
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <AnimatedList>
               {results.map((video) => (

@@ -4,7 +4,6 @@ import { probeUrlWithAdapter } from '../ytdlp/YtDlpAdapter';
 import type { PlatformConfig } from './platformConfigs';
 import { matchPlatformForUrl } from './platformConfigs';
 
-// Helper to generate a random number within a range
 const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 async function probeWithYtdlp(url: string, options?: { proxy?: string }): Promise<Record<string, unknown>> {
@@ -16,7 +15,7 @@ function resolveFormatSize(f: Record<string, unknown>, totalDuration: number): {
   const approx = (f.filesize_approx as number) || 0;
   let bytes = raw || approx;
 
-  // Fallback: compute from total bitrate (tbr, in kbps) * duration
+  // Sem tamanho: estima via bitrate total × duração.
   if (!bytes && totalDuration > 0) {
     const tbr = (f.tbr as number) || 0;
     if (tbr > 0) {
@@ -36,8 +35,7 @@ function resolveFormatSize(f: Record<string, unknown>, totalDuration: number): {
 
 function buildMediaInfoFromProbe(metadata: Record<string, unknown>, url: string, platform: PlatformId): MediaInfo {
   const totalDuration = (metadata.duration as number) || 0;
-  // Idiomas de legenda do probe (`subtitles` = manuais,
-  // `automatic_captions` = geradas). Chaves ordenadas, minúsculas.
+  // Legendas do probe: manuais (`subtitles`) + geradas (`automatic_captions`).
   const probeSubLangs = (v: unknown): string[] => {
     if (!v || typeof v !== 'object') return [];
     return Object.keys(v as Record<string, unknown>)
@@ -51,12 +49,7 @@ function buildMediaInfoFromProbe(metadata: Record<string, unknown>, url: string,
       const formatNote = ((f.format_note as string) || '').toLowerCase();
       const vcodec = (f.vcodec as string) || 'none';
       const acodec = (f.acodec as string) || 'none';
-      // Exclude storyboards (YouTube's scrubber-preview thumbnail sprites, ext
-      // "mhtml") and any other format that carries neither video nor audio —
-      // these aren't real downloadable media, but nothing filtered them out
-      // before, so a storyboard entry sorting first in the array (formats[0]
-      // is used as the default selection) would make the app try to download
-      // it instead of the actual video.
+      // Filtra storyboards/mídia vazia: senão viram a seleção padrão (formats[0]).
       if (ext === 'mhtml' || formatNote === 'storyboard') return false;
       if (vcodec === 'none' && acodec === 'none') return false;
       return true;

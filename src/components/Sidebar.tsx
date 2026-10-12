@@ -11,8 +11,7 @@ import { useTranslation, TranslationKey } from '../core/i18n';
 export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = React.memo(({ isOpen, toggleOpen }) => {
   const { settings } = useSettings();
   const { activeTab, setActiveTab } = useNavigation();
-  // Badge via contador (só muda de verdade) — a Sidebar não re-renderiza
-  // a cada tick de progresso do engine.
+  // Badge via contador: evita re-render a cada tick do engine.
   const activeBadge = useDownloadCount(['downloading', 'queued']);
   const { t } = useTranslation(settings);
 
@@ -23,69 +22,69 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
     { id: 'favorites', label: t('favorites'), icon: '⭐', desc: t('favoritesDesc') },
     { id: 'later', label: t('downloadLater'), icon: '⏰', desc: t('laterDesc') },
     { id: 'settings', label: t('settings'), icon: '⚙️', desc: t('settingsDesc') },
-    { id: 'privacy', label: t('privacy'), icon: '🛡️', desc: t('privacyDesc') }
+    { id: 'about', label: t('about'), icon: 'ℹ️', desc: t('aboutTabDesc') }
   ];
 
   return (
     <>
-      {/* Header bar (narrow viewport) */}
-      <header className="lg:hidden min-h-16 border-b lf-border bg-black/40 backdrop-blur-md sticky top-0 z-50 flex items-center justify-between px-4 safe-top">
-        <div className="flex items-center gap-2">
+      <header className="lg:hidden min-h-20 py-3 border-b lf-border bg-black/40 backdrop-blur-md sticky top-0 z-50 flex items-center justify-between px-5 safe-top">
+        <div className="flex items-center gap-3">
           <img
             src={getThemeLogo(settings)}
             alt="LinkFetcher"
-            width={36}
-            height={36}
-            className="w-9 h-9 rounded-xl object-cover shrink-0"
+            width={48}
+            height={48}
+            className="w-12 h-12 rounded-2xl object-cover shrink-0"
             decoding="async"
           />
-          <span className="font-display font-bold text-lg tracking-tight">LinkFetcher</span>
+          <div className="flex flex-col">
+            <span className="font-display font-extrabold text-xl tracking-tight leading-tight">LinkFetcher</span>
+            <span className="text-[11px] lf-text-secondary font-mono tracking-wider uppercase opacity-80">
+              {t('mediaDownloader')}
+            </span>
+          </div>
         </div>
         <button 
           onClick={toggleOpen} 
-          className="p-2 rounded-lg hover:bg-white/5 transition-colors"
+          className="p-2.5 rounded-xl hover:bg-white/5 transition-colors"
           aria-label={isOpen ? (settings.language === 'en' ? 'Close menu' : 'Fechar menu') : (settings.language === 'en' ? 'Open menu' : 'Abrir menu')}
         >
-          {isOpen ? <X size={22} /> : <Menu size={22} />}
+          {isOpen ? <X size={26} /> : <Menu size={26} />}
         </button>
       </header>
 
-      {/* Backdrop for drawer (narrow viewport) */}
       <AnimatedBackdrop
         visible={isOpen}
         onClick={toggleOpen}
         className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-sm"
       />
 
-      {/* Navigation Drawer */}
       <nav 
         className={`
-          fixed top-16 bottom-0 left-0 z-40 w-64 glass-sidebar p-4
+          fixed top-20 bottom-0 left-0 z-40 w-64 glass-sidebar p-4
           lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:glass-sidebar lg:p-6
           transition-transform duration-300 transform
           ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
       >
       <div className="h-full overflow-y-auto">
-        {/* Title branding on desktop */}
-        <div className="hidden lg:flex items-center gap-3 mb-10">
+        <div className="hidden lg:flex items-center gap-3.5 mb-10">
           <img
             src={getThemeLogo(settings)}
             alt="LinkFetcher"
-            width={44}
-            height={44}
-            className="w-11 h-11 rounded-2xl object-cover shrink-0"
+            width={48}
+            height={48}
+            className="w-12 h-12 rounded-2xl object-cover shrink-0"
             decoding="async"
           />
           <div>
-            <h1 className="font-display font-extrabold text-xl tracking-tight text-white leading-tight">
+            <h1 className="font-display font-extrabold text-xl tracking-tight leading-tight">
               LinkFetcher
             </h1>
             <p className="text-xs lf-text-secondary font-mono tracking-wider uppercase">{t('mediaDownloader')}</p>
           </div>
         </div>
 
-        {/* Sidebar Sections */}
         <div className="space-y-1.5 pb-4">
           {menuItems.map((item) => {
             const Icon = item.icon;
@@ -110,7 +109,6 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
                   }
                 `}
               >
-                {/* Active Highlight Pill */}
                 {isActive && (
                   <TabIndicator
                     layoutId="active-sidebar-pill"
@@ -119,7 +117,6 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
                   />
                 )}
                 
-                {/* Active Left Indicator Bar */}
                 {isActive && (
                   <TabIndicator
                     layoutId="active-sidebar-bar"
@@ -132,7 +129,6 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
                     className={`
                       text-xl transition-transform duration-300 group-hover:scale-110 
                       ${!isActive ? 'opacity-50 group-hover:opacity-100' : ''}
-                      ${!isActive && !settings.colorfulIcons ? 'grayscale group-hover:grayscale-0' : ''}
                     `}
                   >
                     {item.icon}
@@ -145,7 +141,6 @@ export const Sidebar: React.FC<{ isOpen: boolean; toggleOpen: () => void }> = Re
                   </div>
                 </div>
 
-                {/* Badge for active downloads */}
                 {item.badge !== undefined && item.badge > 0 && (
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold z-10 ${getAccentBgClass(settings)} text-white ${RENDER_PROFILE === 'efficient' ? '' : 'animate-pulse'}`}>
                     {item.badge}

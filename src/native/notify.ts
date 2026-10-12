@@ -1,10 +1,4 @@
-/**
- * notify.ts — aviso de sistema ao concluir/falhar download.
- * Caminho primário: `tauri-plugin-notification` (desktop + Android; no
- * Android 13+ pede POST_NOTIFICATIONS em runtime). Fallback: Web
- * Notification API (quando o plugin não está disponível).
- * Tudo best-effort: notificação nunca quebra o fluxo do download.
- */
+/** Aviso de sistema ao concluir/falhar download (best-effort). */
 
 function isTauri(): boolean {
   return typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window);
@@ -25,7 +19,6 @@ export async function sendDownloadNotification(title: string, body: string): Pro
         return;
       }
     } catch {
-      // plugin indisponível — tenta a API Web abaixo
     }
   }
   try {
@@ -38,6 +31,5 @@ export async function sendDownloadNotification(title: string, body: string): Pro
       }
     }
   } catch {
-    // ambiente sem notificações — silencioso
   }
 }

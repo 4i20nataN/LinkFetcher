@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FavoriteItem } from '../../types';
-import { Star, Link2, ExternalLink, ArrowRight, Trash2, Edit2, Check, FileText, Download } from 'lucide-react';
+import { Star, ArrowRight, Trash2, Edit2, Check, FileText, Download, ListMusic } from 'lucide-react';
 import { AnimatedCard } from '../../animation/AnimatedCard';
 import { AnimatedList } from '../../animation/AnimatedList';
 import { scaleIn } from '../../animation/variants';
@@ -11,12 +11,16 @@ import {
 } from '../../components/ThemeWrapper';
 import { ProviderRegistry } from '../../core/plugins/Providers';
 import { PlatformBadge } from '../../components/PlatformBadge';
+import { isPlaylistUrl } from '../../core/ytdlp/playlistUtils';
 
 export const FavoritesView: React.FC = () => {
   const { settings, favorites, toggleFavorite, updateFavoriteNotes, setSelectedUrl, setActiveTab } = useApp();
   const { t } = useTranslation(settings);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editNotes, setEditNotes] = useState('');
+  // Cap de render: mesmo padrão da fila de downloads.
+  const LIST_PAGE = 60;
+  const [visibleCount, setVisibleCount] = useState(LIST_PAGE);
 
   const handleStartEditing = (fav: FavoriteItem) => {
     setEditingId(fav.id);
@@ -52,7 +56,6 @@ export const FavoritesView: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 py-2 md:py-6 px-4">
-      {/* Title Header with Export Button */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b lf-border pb-4">
         <div className="text-center md:text-left space-y-1">
           <h2 className="font-display font-extrabold text-3xl md:text-4xl text-white tracking-tight">
@@ -78,7 +81,6 @@ export const FavoritesView: React.FC = () => {
       </div>
 
       {favorites.length === 0 ? (
-        /* Empty State */
         <div className="p-16 text-center rounded-3xl glass-card border-dashed flex flex-col items-center justify-center space-y-4">
           <div className="p-4 rounded-2xl lf-surface-raised lf-text-muted">
             {settings.iconStyle === 'emoji' ? <span className="text-3xl">⭐</span> : <Star size={32} className={getAccentTextClass(settings)} />}
@@ -91,22 +93,21 @@ export const FavoritesView: React.FC = () => {
           </div>
         </div>
       ) : (
-        /* Favorites Grid */
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <AnimatedList initial={false}>
-            {favorites.map((fav) => {
+            {favorites.slice(0, visibleCount).map((fav) => {
               const platform = ProviderRegistry.getPlatformConfig(fav.platform);
               const isEditing = editingId === fav.id;
+              const isPlaylist = isPlaylistUrl(fav.url);
 
               return (
                 <AnimatedCard
                   animateKey={fav.id}
                   variant={scaleIn}
-                  className="p-4 rounded-2xl glass-card flex flex-col justify-between space-y-4 group hover:bg-white/10 transition-colors"
+                  className="rounded-2xl glass-card flex flex-col group hover:bg-white/10 transition-colors overflow-hidden [content-visibility:auto] [contain-intrinsic-size:auto_320px]"
                 >
-                  <div className="flex gap-4">
-                    {/* Thumbnail */}
-                    <div className="relative w-24 h-24 rounded-lg overflow-hidden border lf-border lf-surface shrink-0">
+                  <div className="relative w-full h-36 overflow-hidden border-b lf-border lf-surface shrink-0">
+                    {fav.thumbnailUrl ? (
                       <img
                         src={fav.thumbnailUrl}
                         alt={fav.title}
@@ -115,26 +116,35 @@ export const FavoritesView: React.FC = () => {
                         loading="lazy"
                         decoding="async"
                       />
-                      {platform && (
-                        <PlatformBadge platformId={fav.platform} name={platform.name} color={platform.color} variant="overlay" />
-                      )}
-                    </div>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-white/[0.03]">
+                        {settings.iconStyle === 'emoji' ? <span className="text-3xl">⭐</span> : <Star size={28} className="lf-text-muted" />}
+                      </div>
+                    )}
+                    {platform && (
+                      <PlatformBadge platformId={fav.platform} name={platform.name} color={platform.color} variant="overlay" />
+                    )}
+                  </div>
 
-                    {/* Metadata details */}
-                    <div className="min-w-0 flex-1 space-y-1">
+                  <div className="p-4 flex flex-col justify-between space-y-4 flex-1">
+                    <div className="min-w-0 space-y-1">
                       <span className="text-[9px] font-semibold lf-text-muted block font-mono uppercase tracking-wider">
                         {t('dateAdded')} {new Date(fav.dateAdded).toLocaleDateString()}
                       </span>
-                      <h4 className="font-semibold text-xs text-white leading-snug line-clamp-2">
+                      <h4 className="font-semibold text-sm text-white leading-snug line-clamp-2">
                         {fav.title}
                       </h4>
                       <p className="text-[10px] lf-text-secondary block truncate font-mono">
                         {fav.url}
                       </p>
+                      {isPlaylist && (
+                        <span className="inline-flex px-2 py-0.5 rounded-md bg-white/5 border lf-border text-[10px] uppercase font-mono tracking-wider items-center gap-1.5 lf-text-secondary">
+                          {settings.iconStyle === 'emoji' ? <span>📋</span> : <ListMusic size={12} className="text-indigo-400" />}
+                          Playlist
+                        </span>
+                      )}
                     </div>
-                  </div>
 
-                  {/* Notes Segment */}
                   <div className="p-3 rounded-lg bg-white/5 border lf-border">
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-[9px] font-bold lf-text-muted font-mono uppercase flex items-center gap-1">
@@ -180,7 +190,6 @@ export const FavoritesView: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Card bottom footer actions */}
                   <div className="pt-2 border-t lf-border flex justify-between items-center text-xs">
                     <button
                       onClick={() => toggleFavorite({ id: fav.id, title: fav.title, url: fav.url, platform: fav.platform, thumbnailUrl: fav.thumbnailUrl })}
@@ -190,16 +199,6 @@ export const FavoritesView: React.FC = () => {
                     </button>
 
                     <div className="flex items-center gap-2">
-                      <a
-                        href={fav.url}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="p-1.5 rounded-lg border border-zinc-800 hover:border-zinc-700 lf-surface-raised lf-text-secondary hover:text-white transition-colors"
-                        title={settings.language === 'en' ? 'View original' : 'Ver original'}
-                      >
-                        {settings.iconStyle === 'emoji' ? <span>🔗</span> : <ExternalLink size={13} className={getAccentTextClass(settings)} />}
-                      </a>
-                      
                       <button
                         onClick={() => handleAnalyze(fav.url)}
                         className={`
@@ -211,10 +210,21 @@ export const FavoritesView: React.FC = () => {
                       </button>
                     </div>
                   </div>
+                  </div>
                 </AnimatedCard>
               );
             })}
           </AnimatedList>
+          {favorites.length > visibleCount && (
+            <button
+              onClick={() => setVisibleCount(c => c + LIST_PAGE)}
+              className="w-full py-2.5 rounded-xl lf-surface-40 border lf-border lf-text-secondary hover:text-white text-xs font-semibold transition-colors"
+            >
+              {settings.language === 'en'
+                ? `Show more (${favorites.length - visibleCount} remaining)`
+                : `Mostrar mais (${favorites.length - visibleCount} restantes)`}
+            </button>
+          )}
         </div>
       )}
     </div>

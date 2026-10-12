@@ -1,14 +1,4 @@
-/**
- * AnimatedCard — card com animação de entrada/saída.
- *
- * Suporta variantes pré-definidas (slideUp, scaleIn, etc.)
- * e personalização via props.
- *
- * Uso:
- *   <AnimatedCard variant="slideUp" className="p-4 rounded-xl">
- *     conteúdo
- *   </AnimatedCard>
- */
+/** Card com animação de entrada/saída. */
 
 import React from 'react';
 import { m, type Variants } from 'motion/react';

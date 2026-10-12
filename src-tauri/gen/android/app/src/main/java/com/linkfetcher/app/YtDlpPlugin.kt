@@ -8,7 +8,6 @@ import android.webkit.MimeTypeMap
 import android.webkit.WebView
 import androidx.core.content.FileProvider
 import app.tauri.annotation.Command
-import app.tauri.annotation.InvokeArg
 import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSObject
@@ -23,54 +22,10 @@ import java.util.concurrent.ConcurrentHashMap
 
 private const val TAG = "YtDlpPlugin"
 
-@InvokeArg
-class ProbeArgs {
-    var url: String = ""
-    var proxy: String? = null
-}
-
-@InvokeArg
-class SearchArgs {
-    var query: String = ""
-    var platform: String = "youtube"
-    var maxResults: Int? = null
-    var proxy: String? = null
-}
-
-@InvokeArg
-class ExecuteArgs {
-    var argv: List<String> = emptyList()
-    var processId: String = ""
-    // Rust marca true quando `--ppa` (normalizar/nitidez) foi removido do
-    // argv mobile: o arquivo sai sem os filtros — avisa em vez de calar.
-    var warnFilters: Boolean = false
-    // Subpasta pública de destino (Downloads/<subdir>). Nulo/vazio = padrão.
-    var publicSubdir: String? = null
-    // Título p/ a notificação nativa de progresso/conclusão.
-    var title: String = ""
-}
-
-@InvokeArg
-class CancelArgs {
-    var id: String = ""
-    var cleanup: Boolean = false
-}
-
-@InvokeArg
-class OpenArgs {
-    var path: String = ""
-}
-
-@InvokeArg
-class UpdateDownloadArgs {
-    var url: String = ""
-    var fileName: String = ""
-}
-
-@InvokeArg
-class UpdatesEnabledArgs {
-    var enabled: Boolean = true
-}
+// Fonte canônica: este arquivo + os demais `*.kt` de `src-tauri/android-plugin/`
+// são copiados para `gen/` pelo `scripts/sync-android-plugin.mjs` (o CI
+// valida com `--check`). Edite AQUI, nunca no `gen/` — `android init`
+// apaga customização manual de lá.
 
 @TauriPlugin
 class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
@@ -84,6 +39,9 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
     )
     private val lastPaths = ConcurrentHashMap<String, String>()
     private var webView: WebView? = null
+    // Colaboradores sem estado do plugin (só Activity): notificações e arquivos.
+    private val notifications = DlNotifications(activity)
+    private val appFiles = AppFiles(activity)
     // Jobs ativos (processId → início) + desfechos recentes: o `trigger()`
     // não enfileira — evento emitido com o WebView suspenso (minimizar/sair)
     // é descartado e o JS nunca recebe o `complete`, travando o item em
@@ -97,7 +55,11 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
     // PULLAR o estado 1x/s (só Android). Push (trigger + CustomEvent) já
     // falhou das duas formas neste aparelho — poll via invoke é
     // request/response e não depende de listener, timing nem foreground.
-    private val lastProgress = ConcurrentHashMap<String, MobileProgress>()
+    private val lastProgress = ConcurrentHashMap<String, YtDlpParsing.MobileProgress>()
+    // Jobs que entraram em pós-processamento (ffmpeg: extração/merge):
+    // o poll `jobProgress` expõe p/ o engine marcar `processing` mesmo
+    // com o push morto. Limpo junto com lastProgress (retry/fim).
+    private val processingJobs = ConcurrentHashMap<String, Boolean>()
     private data class FinishedJob(val ok: Boolean, val filePath: String?, val size: Long, val error: String?, val at: Long)
     private val finishedJobs = ConcurrentHashMap<String, FinishedJob>()
     private fun rememberFinished(id: String, job: FinishedJob) {
@@ -152,6 +114,13 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
 
     private fun ensureInitialized() {
         try {
+            // stdout do Python em pipe sofre block-buffering (4-8KB): o
+            // progresso chegava em rajadas (0% → 100%). Desliga na origem;
+            // o filho herda o ambiente do app.
+            android.system.Os.setenv("PYTHONUNBUFFERED", "1", true)
+        } catch (_: Exception) { /* sem efeito no progresso ao vivo */
+        }
+        try {
             val ctx = activity.applicationContext
             YoutubeDL.getInstance().init(ctx)
             FFmpeg.getInstance().init(ctx)
@@ -177,13 +146,8 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
-    // Transporte DUPLO de progresso (regressão v1.4.0 revertida): `trigger()`
-    // (evento Tauri, `listen` no frontend) + `evaluateJavascript`
-    // (CustomEvent na window). O H4 removeu o 2º por "dobrar o IPC", mas no
-    // SM-A107M o `trigger()` não entrega progresso — o CustomEvent era o que
-    // funcionava em v1.3.1. Dedupe no engine (valores idempotentes + guards
-    // de status) absorve a duplicata. Não remover de novo sem prova no
-    // aparelho de que o `trigger()` sozinho sustenta o progresso.
+    // Transporte duplo de progresso: trigger() (Tauri listen) + evaluateJavascript
+    // (CustomEvent no window para WebView Android). O dedupe do engine absorve duplicatas.
     private fun emitOnUi(event: String, build: JSObject.() -> Unit) {
         val data = JSObject()
         data.build()
@@ -226,16 +190,14 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                 val response = YoutubeDL.getInstance().execute(request, "probe-${System.nanoTime()}")
                 Log.i(TAG, "probe em ${System.currentTimeMillis() - t0}ms exit=${response.exitCode}")
                 if (response.exitCode != 0) {
-                    invoke.reject(cleanError(response.err.ifBlank { response.out }))
+                    invoke.reject(YtDlpParsing.cleanError(response.err.ifBlank { response.out }))
                     return@cmd
                 }
                 try {
                     val obj = JSObject(response.out)
-                    // H1: a lista `thumbnails` (N resoluções do mesmo frame)
-                    // nunca é consumida — só `thumbnail` (string). Remove p/
-                    // enxugar o IPC no armv7. Desktop mantém o dump cheio; o
-                    // frontend tolera a ausência (fallbacks em Providers.ts).
-                    obj.remove("thumbnails")
+                    // Enxuta antes do IPC (ver slimProbe): o dump cheio
+                    // trava o parse em aparelho fraco.
+                    YtDlpParsing.slimProbe(obj)
                     invoke.resolve(obj)
                 } catch (e: Exception) {
                     invoke.reject("probe: JSON inválido: ${e.message}")
@@ -272,7 +234,7 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                 }
                 val response = YoutubeDL.getInstance().execute(request, "playlist-${System.nanoTime()}")
                 if (response.exitCode != 0 && response.out.isBlank()) {
-                    invoke.reject(cleanError(response.err.ifBlank { response.out }))
+                    invoke.reject(YtDlpParsing.cleanError(response.err.ifBlank { response.out }))
                     return@cmd
                 }
                 val entries = JSONArray()
@@ -322,7 +284,7 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
             ensureInitialized()
             try {
                 val max = args.maxResults ?: 10
-                val request = YoutubeDLRequest(buildSearchQuery(args.platform, args.query, max))
+                val request = YoutubeDLRequest(YtDlpParsing.buildSearchQuery(args.platform, args.query, max))
                 request.addOption("--flat-playlist")
                 request.addOption("--dump-json")
                 request.addOption("--no-download")
@@ -334,13 +296,13 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                 }
                 val response = YoutubeDL.getInstance().execute(request, "search-${System.nanoTime()}")
                 if (response.exitCode != 0 && response.out.isBlank()) {
-                    invoke.reject(cleanError(response.err.ifBlank { response.out }))
+                    invoke.reject(YtDlpParsing.cleanError(response.err.ifBlank { response.out }))
                     return@cmd
                 }
                 val results = JSONArray()
                 response.out.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.forEach { line ->
                     try {
-                        results.put(mapSearchItem(JSONObject(line)))
+                        results.put(YtDlpParsing.mapSearchItem(JSONObject(line)))
                     } catch (_: Exception) { /* ignora */ }
                 }
                 invoke.resolve(JSObject().apply { put("results", results) })
@@ -371,17 +333,33 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
             val seen = mutableListOf<String>()
             var lastPercent = -1
             var processingSent = false
-            // Teto de 2 eventos/s: sem ele, download rápido emite ~100
-            // updates (1 por ponto de %) × 2 transportes = tempestade de
-            // renders que afoga o WebView no armv7 (notificação nativa anda,
-            // card atrasa "um tempão"). % é sempre o valor atual — pular
-            // intermediários não perde informação.
+            // Throttle de eventos de progresso: até 2 eventos/s para manter
+            // a interface fluida sem sobrecarregar a thread de UI do WebView.
             var lastEmitMs = 0L
-            // Sinais de vida sem % (fragmentos DASH/HLS, retries, avisos do
-            // extrator): sem eles a UI congela em 0% por minutos num stall
-            // real — o usuário chama de "bugado". Throttle de 3s; o engine
-            // limpa no próximo progresso/conclusão.
+            // Sinais de atividade (fragmentos, retries, avisos) durante operações sem percentual direto.
             var lastActivityMs = 0L
+            // Caminho único de ingestão (snapshot p/ poll + emit throttled):
+            // linha parseada e % da lib convergem aqui, sem divergir.
+            fun ingestProgress(p: YtDlpParsing.MobileProgress) {
+                // Snapshot p/ `jobProgress` (poll do engine): guarda TODA
+                // atualização, sem o teto de 500ms do emit.
+                lastProgress[args.processId] = p
+                val nowMs = System.currentTimeMillis()
+                if (p.percent.toInt() != lastPercent && (lastPercent == -1 || nowMs - lastEmitMs >= 500)) {
+                    lastPercent = p.percent.toInt()
+                    lastEmitMs = nowMs
+                    emitOnUi("yt-dlp-progress") {
+                        put("id", args.processId)
+                        put("type", "progress")
+                        put("percent", p.percent)
+                        put("speed", p.speed)
+                        put("eta", p.eta)
+                        put("downloaded", p.downloaded)
+                        put("total", p.total)
+                    }
+                    notifications.showDlProgress(args.processId, args.title, p.percent.toInt())
+                }
+            }
             fun emitActivity(kind: String, a: Int = -1, b: Int = -1, text: String? = null) {
                 val now = System.currentTimeMillis()
                 if (now - lastActivityMs < 3_000) return
@@ -401,10 +379,20 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                 // um `finished` velho nunca reconciliar a nova execução.
                 finishedJobs.remove(args.processId)
                 lastProgress.remove(args.processId)
+                processingJobs.remove(args.processId)
                 val request = YoutubeDLRequest(emptyList<String>())
                 request.addCommands(args.argv)
-                val response = YoutubeDL.getInstance().execute(request, args.processId) { _, _, line ->
-                    parseDestination(line)?.let {
+                val response = YoutubeDL.getInstance().execute(request, args.processId) { libProgress, _, line ->
+                    // A lib calcula % sozinha (fragmentos HLS, total
+                    // desconhecido): cobre linhas que o parse não entende.
+                    // Fora de 0..100 (NaN cai aqui) = indeterminado, ignora.
+                    if (libProgress >= 0f && libProgress <= 100f) {
+                        val prev = lastProgress[args.processId]
+                        ingestProgress(YtDlpParsing.MobileProgress(
+                            libProgress.toDouble(), prev?.speed ?: 0.0, prev?.eta ?: 0.0,
+                            prev?.downloaded ?: 0L, prev?.total ?: 0L))
+                    }
+                    YtDlpParsing.parseDestination(line)?.let {
                         captured = it
                         seen.add(it)
                         lastPaths[args.processId] = it
@@ -412,61 +400,45 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                     // Pós-processamento (ffmpeg embarcado: extração MP3, merge,
                     // embed) não imprime % — sem este evento a UI congela em
                     // 100% sem explicação (o DownloadEngine já trata `processing`).
-                    if (!processingSent && isPostProcessorLine(line)) {
+                    if (!processingSent && YtDlpParsing.isPostProcessorLine(line)) {
                         processingSent = true
+                        processingJobs[args.processId] = true
                         emitOnUi("yt-dlp-progress") {
                             put("id", args.processId)
                             put("type", "processing")
                         }
-                        showDlProcessing(args.processId, args.title)
+                        notifications.showDlProcessing(args.processId, args.title)
                     }
-                    parseProgress(line)?.let { p ->
-                        // Snapshot p/ `jobProgress` (poll do engine): guarda
-                        // TODA linha parseada, sem o teto de 500ms do emit.
-                        lastProgress[args.processId] = p
-                        val nowMs = System.currentTimeMillis()
-                        if (p.percent.toInt() != lastPercent && (lastPercent == -1 || nowMs - lastEmitMs >= 500)) {
-                            lastPercent = p.percent.toInt()
-                            lastEmitMs = nowMs
-                            emitOnUi("yt-dlp-progress") {
-                                put("id", args.processId)
-                                put("type", "progress")
-                                put("percent", p.percent)
-                                put("speed", p.speed)
-                                put("eta", p.eta)
-                                put("downloaded", p.downloaded)
-                                put("total", p.total)
-                            }
-                            showDlProgress(args.processId, args.title, p.percent.toInt())
-                        }
-                    } ?: parseActivity(line)?.let { a ->
+                    YtDlpParsing.parseProgress(line)?.let { p ->
+                        ingestProgress(p)
+                    } ?: YtDlpParsing.parseActivity(line)?.let { a ->
                         // Linha sem % mas com informação (fragmento/retry/aviso).
                         when (a) {
-                            is ActivitySignal.Fragment -> emitActivity("fragment", a.current, a.total)
-                            is ActivitySignal.Retry -> emitActivity("retry")
-                            is ActivitySignal.Line -> emitActivity("line", text = a.text)
+                            is YtDlpParsing.ActivitySignal.Fragment -> emitActivity("fragment", a.current, a.total)
+                            is YtDlpParsing.ActivitySignal.Retry -> emitActivity("retry")
+                            is YtDlpParsing.ActivitySignal.Line -> emitActivity("line", text = a.text)
                         }
                     }
                 }
                 if (response.exitCode != 0) {
-                    val msg = cleanError(response.err.ifBlank { response.out })
+                    val msg = YtDlpParsing.cleanError(response.err.ifBlank { response.out })
                     emitOnUi("yt-dlp-progress") {
                         put("id", args.processId)
                         put("type", "error")
                         put("message", msg)
                     }
-                    showDlError(args.processId, args.title, msg)
+                    notifications.showDlError(args.processId, args.title, msg)
                     rememberFinished(args.processId, FinishedJob(false, null, 0, msg, System.currentTimeMillis()))
                     invoke.reject(msg)
                     return@cmd
                 }
                 val finalPath = seen.asReversed().firstOrNull { File(it).exists() }
-                    ?: newestFile(lastPaths[args.processId])
+                    ?: appFiles.newestFile(lastPaths[args.processId])
                     // Último recurso (só quando nada foi visto): o arquivo pode
                     // pousar no disco depois das callbacks (conversão ffmpeg
                     // lenta em aparelho fraco). Poll curto (5s): cada segundo
                     // aqui é uma thread do pool bloqueada.
-                    ?: waitForRecentFile(outputDirFromArgv(args.argv), startMs, 5_000)
+                    ?: YtDlpParsing.waitForRecentFile(YtDlpParsing.outputDirFromArgv(args.argv), startMs, 5_000)
                 lastPaths.remove(args.processId)
                 if (finalPath == null) {
                     // Diagnóstico: destinos vistos + conteúdo da pasta + cauda
@@ -493,7 +465,7 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                 // Pasta privada do app é invisível (Files/Downloads, players):
                 // publica cópia na coleção pública p/ o usuário achar o arquivo.
                 // Best-effort: nunca falha o download se a publicação falhar.
-                val publicUri = publishToPublicDownloads(File(finalPath), args.publicSubdir)
+                val publicUri = appFiles.publishToPublicDownloads(File(finalPath), args.publicSubdir)
                 val filtersNote = if (args.warnFilters)
                     "Filtros de áudio/vídeo indisponíveis no mobile — arquivo salvo sem normalização/nitidez."
                 else null
@@ -505,7 +477,7 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                     if (publicUri != null) put("publicUri", publicUri)
                     if (filtersNote != null) put("subWarning", filtersNote)
                 }
-                showDlComplete(args.processId, args.title, File(finalPath))
+                notifications.showDlComplete(args.processId, args.title, File(finalPath))
                 rememberFinished(args.processId, FinishedJob(true, finalPath, size, null, System.currentTimeMillis()))
                 invoke.resolve(JSObject().apply {
                     put("filePath", finalPath)
@@ -521,12 +493,13 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                     put("type", "error")
                     put("message", msg)
                 }
-                showDlError(args.processId, args.title, msg)
+                notifications.showDlError(args.processId, args.title, msg)
                 rememberFinished(args.processId, FinishedJob(false, null, 0, msg, System.currentTimeMillis()))
                 invoke.reject(msg)
             } finally {
                 activeJobs.remove(args.processId)
                 lastProgress.remove(args.processId)
+                processingJobs.remove(args.processId)
             }
         }
     }
@@ -537,11 +510,11 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
         try {
             val killed = YoutubeDL.getInstance().destroyProcessById(args.id)
             if (args.cleanup) {
-                lastPaths.remove(args.id)?.let { removeTempVariants(File(it)) }
-                cancelDlNotification(args.id)
+                lastPaths.remove(args.id)?.let { YtDlpParsing.removeTempVariants(File(it)) }
+                notifications.cancelDlNotification(args.id)
             } else {
                 lastPaths.remove(args.id)
-                showDlPaused(args.id, "")
+                notifications.showDlPaused(args.id, args.title)
             }
             invoke.resolve(JSObject().apply { put("success", killed) })
         } catch (e: Exception) {
@@ -601,6 +574,7 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                 res.put("eta", p.eta)
                 res.put("downloaded", p.downloaded)
                 res.put("total", p.total)
+                if (processingJobs[id] == true) res.put("processing", true)
             }
             invoke.resolve(res)
         } catch (e: Exception) {
@@ -608,149 +582,6 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
-    // ---- notificações nativas de download ----
-    // O WebView não tem Notification API e o plugin JS não cobre progresso:
-    // o próprio plugin emite (throttle já feito pelo % inteiro). Toque abre o
-    // arquivo (concluído) ou o app (andamento). Best-effort com try/catch.
-
-    private val dlChannelId = "linkfetcher_downloads"
-
-    private fun dlNotifyId(processId: String): Int =
-        processId.hashCode().let { if (it == Int.MIN_VALUE) 0 else kotlin.math.abs(it) }
-
-    private fun notificationManager(): android.app.NotificationManager? = try {
-        activity.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-    } catch (_: Exception) { null }
-
-    private fun ensureDlChannel() {
-        if (android.os.Build.VERSION.SDK_INT < 26) return
-        try {
-            val nm = notificationManager() ?: return
-            if (nm.getNotificationChannel(dlChannelId) == null) {
-                nm.createNotificationChannel(
-                    android.app.NotificationChannel(
-                        dlChannelId, "Downloads",
-                        android.app.NotificationManager.IMPORTANCE_DEFAULT
-                    )
-                )
-            }
-        } catch (_: Exception) { }
-    }
-
-    private fun appLaunchPending(): android.app.PendingIntent? {
-        // Corpo em bloco (não expressão): `return` antecipado não é
-        // permitido em expression body.
-        return try {
-            val launch = activity.packageManager.getLaunchIntentForPackage(activity.packageName) ?: return null
-            android.app.PendingIntent.getActivity(
-                activity, 0, launch,
-                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
-            )
-        } catch (_: Exception) { null }
-    }
-
-    private fun fileViewPending(file: File): android.app.PendingIntent? {
-        return try {
-            val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.fileprovider", file)
-            val mime = MimeTypeMap.getSingleton()
-                .getMimeTypeFromExtension(file.extension.lowercase()) ?: "*/*"
-            val view = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, mime)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            val chooser = Intent.createChooser(view, file.name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            android.app.PendingIntent.getActivity(
-                activity, file.absolutePath.hashCode(), chooser,
-                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
-            )
-        } catch (_: Exception) { null }
-    }
-
-    private fun showDlProgress(processId: String, title: String, percent: Int) {
-        try {
-            ensureDlChannel()
-            val nm = notificationManager() ?: return
-            val n = androidx.core.app.NotificationCompat.Builder(activity, dlChannelId)
-                .setSmallIcon(android.R.drawable.stat_sys_download)
-                .setContentTitle(title.ifBlank { "Baixando…" })
-                .setContentText("$percent%")
-                .setProgress(100, percent.coerceIn(0, 100), false)
-                .setOngoing(true)
-                .setOnlyAlertOnce(true)
-                .setContentIntent(appLaunchPending())
-                .build()
-            nm.notify(dlNotifyId(processId), n)
-        } catch (_: Exception) { }
-    }
-
-    private fun showDlProcessing(processId: String, title: String) {
-        try {
-            ensureDlChannel()
-            val nm = notificationManager() ?: return
-            val n = androidx.core.app.NotificationCompat.Builder(activity, dlChannelId)
-                .setSmallIcon(android.R.drawable.stat_sys_download)
-                .setContentTitle(title.ifBlank { "Baixando…" })
-                .setContentText("Processando…")
-                .setProgress(0, 0, true)
-                .setOngoing(true)
-                .setOnlyAlertOnce(true)
-                .setContentIntent(appLaunchPending())
-                .build()
-            nm.notify(dlNotifyId(processId), n)
-        } catch (_: Exception) { }
-    }
-
-    private fun showDlPaused(processId: String, title: String) {
-        try {
-            ensureDlChannel()
-            val nm = notificationManager() ?: return
-            val n = androidx.core.app.NotificationCompat.Builder(activity, dlChannelId)
-                .setSmallIcon(android.R.drawable.stat_sys_download)
-                .setContentTitle(title.ifBlank { "Download" })
-                .setContentText("Pausado")
-                .setOngoing(false)
-                .setOnlyAlertOnce(true)
-                .setContentIntent(appLaunchPending())
-                .build()
-            nm.notify(dlNotifyId(processId), n)
-        } catch (_: Exception) { }
-    }
-
-    private fun showDlComplete(processId: String, title: String, file: File) {
-        try {
-            ensureDlChannel()
-            val nm = notificationManager() ?: return
-            val n = androidx.core.app.NotificationCompat.Builder(activity, dlChannelId)
-                .setSmallIcon(android.R.drawable.stat_sys_download_done)
-                .setContentTitle("Download concluído")
-                .setContentText(title.ifBlank { file.name })
-                .setOngoing(false)
-                .setAutoCancel(true)
-                .setContentIntent(fileViewPending(file) ?: appLaunchPending())
-                .build()
-            nm.notify(dlNotifyId(processId), n)
-        } catch (_: Exception) { }
-    }
-
-    private fun showDlError(processId: String, title: String, msg: String) {
-        try {
-            ensureDlChannel()
-            val nm = notificationManager() ?: return
-            val n = androidx.core.app.NotificationCompat.Builder(activity, dlChannelId)
-                .setSmallIcon(android.R.drawable.stat_notify_error)
-                .setContentTitle("Falha no download")
-                .setContentText((title.ifBlank { "Download" } + " · " + msg).take(140))
-                .setOngoing(false)
-                .setAutoCancel(true)
-                .setContentIntent(appLaunchPending())
-                .build()
-            nm.notify(dlNotifyId(processId), n)
-        } catch (_: Exception) { }
-    }
-
-    private fun cancelDlNotification(processId: String) {
-        try { notificationManager()?.cancel(dlNotifyId(processId)) } catch (_: Exception) { }
-    }
 
     // ---- auto-update sideload (sem Play Store) ----
     // Baixa o APK da release via DownloadManager do sistema (notificação,
@@ -824,6 +655,15 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
             invoke.reject("URL ou nome de APK inválidos")
             return
         }
+        // Allowlist: update só via HTTPS do GitHub (pós-XSS não desvia p/ APK alheio).
+        val updateUri = android.net.Uri.parse(args.url)
+        val updateHost = (updateUri.host ?: "").lowercase()
+        val updateHostOk = updateHost == "github.com" || updateHost.endsWith(".github.com") ||
+            updateHost == "objects.githubusercontent.com" || updateHost == "release-assets.githubusercontent.com"
+        if (updateUri.scheme?.lowercase() != "https" || !updateHostOk) {
+            invoke.reject("URL de atualização não confiável")
+            return
+        }
         try {
             val dm = activity.getSystemService(android.app.DownloadManager::class.java)
                 ?: return invoke.reject("DownloadManager indisponível")
@@ -887,97 +727,6 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
 
     // ---- arquivos ----
 
-    // Jail: `openFile`/`publishFile` só operam dentro dos diretórios privados
-    // do app (canonical, sem `..`/symlink escape). Path fora → reject, nunca
-    // intent nem cópia pública. Nulo = fora da jail.
-    private fun jailedAppFile(raw: String): File? {
-        val canon = try {
-            File(raw.trim().trim('\'', '"')).canonicalPath
-        } catch (_: Exception) {
-            return null
-        }
-        val roots = listOfNotNull(
-            try { activity.getExternalFilesDir(null)?.canonicalPath } catch (_: Exception) { null },
-            try { activity.filesDir?.canonicalPath } catch (_: Exception) { null },
-            try { activity.cacheDir?.canonicalPath } catch (_: Exception) { null },
-            try { activity.externalCacheDir?.canonicalPath } catch (_: Exception) { null },
-        )
-        if (roots.none { canon == it || canon.startsWith("$it/") }) return null
-        return File(canon)
-    }
-
-    // Copia o arquivo final (pasta privada do app, invisível ao usuário) para
-    // a coleção pública de Downloads, onde aparece no app Files, gerenciadores
-    // e players. Retorna a URI pública ou null (best-effort: o download já
-    // concluiu — publicação nunca falha a operação).
-    // SDK 29+: MediaStore com RELATIVE_PATH (sem permissão).
-    // SDK 24-28: pasta pública + MediaScanner (precisa da permissão
-    // WRITE_EXTERNAL_STORAGE, já declarada com maxSdkVersion=28).
-    private fun publishToPublicDownloads(src: File, subdir: String? = null): String? {
-        // Nulo (frontend antigo) = padrão "LinkFetcher". String vazia = raiz de
-        // Downloads (escolha explícita do usuário). Qualquer valor suspeito é
-        // sanitizado — nunca escreve fora de Downloads.
-        val clean = if (subdir == null) "LinkFetcher"
-        else subdir.substringAfterLast('/').trim()
-            .replace(Regex("[^\\p{L}\\p{N} _.-]"), "")
-            .replace(Regex("\\.+"), ".")
-            .take(32).trim().trim('.')
-        val relPath = if (clean.isEmpty()) Environment.DIRECTORY_DOWNLOADS
-            else "${Environment.DIRECTORY_DOWNLOADS}/$clean"
-        return try {
-            if (android.os.Build.VERSION.SDK_INT >= 29) {
-                val mime = MimeTypeMap.getSingleton()
-                    .getMimeTypeFromExtension(src.extension.lowercase())
-                    ?: "application/octet-stream"
-                val values = android.content.ContentValues().apply {
-                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, src.name)
-                    put(android.provider.MediaStore.Downloads.MIME_TYPE, mime)
-                    put(
-                        android.provider.MediaStore.Downloads.RELATIVE_PATH,
-                        relPath
-                    )
-                    put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
-                }
-                val resolver = activity.contentResolver
-                val uri = resolver.insert(
-                    android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values
-                ) ?: return null
-                try {
-                    resolver.openOutputStream(uri)?.use { out ->
-                        src.inputStream().use { it.copyTo(out) }
-                    } ?: return null
-                    values.clear()
-                    values.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
-                    resolver.update(uri, values, null, null)
-                } catch (e: Exception) {
-                    try { resolver.delete(uri, null, null) } catch (_: Exception) { }
-                    throw e
-                }
-                Log.i(TAG, "publicado em $relPath: $uri")
-                uri.toString()
-            } else {
-                val pub = if (clean.isEmpty()) Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_DOWNLOADS
-                ) else File(
-                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                    clean
-                )
-                if (!pub.exists() && !pub.mkdirs()) return null
-                val dst = File(pub, src.name)
-                src.inputStream().use { input ->
-                    dst.outputStream().use { input.copyTo(it) }
-                }
-                android.media.MediaScannerConnection.scanFile(
-                    activity, arrayOf(dst.absolutePath), null, null
-                )
-                Log.i(TAG, "publicado (legado): ${dst.absolutePath}")
-                dst.absolutePath
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "publish falhou (best-effort): ${e.message}")
-            null
-        }
-    }
 
     @Command
     fun getDownloadsDir(invoke: Invoke) {
@@ -997,7 +746,7 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
     fun publishFile(invoke: Invoke) {
         try {
             val args = invoke.parseArgs(OpenArgs::class.java)
-            val file = jailedAppFile(args.path)
+            val file = appFiles.jailedAppFile(args.path)
             if (file == null) {
                 Log.e(TAG, "publishFile: fora da pasta do app: ${args.path}")
                 invoke.reject("arquivo fora da pasta do app")
@@ -1007,7 +756,7 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                 invoke.reject("arquivo não encontrado")
                 return
             }
-            val uri = publishToPublicDownloads(file, null)
+            val uri = appFiles.publishToPublicDownloads(file, null)
             if (uri == null) {
                 invoke.reject("falha ao publicar em Downloads")
                 return
@@ -1023,7 +772,7 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
     @Command
     fun openFile(invoke: Invoke) {
         val args = invoke.parseArgs(OpenArgs::class.java)
-        val file = jailedAppFile(args.path)
+        val file = appFiles.jailedAppFile(args.path)
         if (file == null) {
             Log.e(TAG, "openFile: fora da pasta do app: ${args.path}")
             invoke.reject("arquivo fora da pasta do app")
@@ -1060,278 +809,4 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
-    // ---- helpers ----
-
-    private data class MobileProgress(
-        val percent: Double,
-        val speed: Double,
-        val eta: Double,
-        val downloaded: Long,
-        val total: Long
-    )
-
-    // `at` aceita "Unknown speed" (2 tokens): sem o grupo guloso a linha era
-    // descartada e o progresso congelava nesses trechos.
-    private val progressRegex =
-        """\[download\]\s+(NA|\d+(?:\.\d+)?)%\s+of\s+(~?\S+)\s+at\s+(.+?)\s+ETA\s+(\S+)""".toRegex()
-
-    private fun parseSize(s: String): Long {
-        val t = s.trim().trimStart('~')
-        fun num(suffix: String, mult: Long): Long? =
-            t.takeIf { it.endsWith(suffix) }?.dropLast(suffix.length)
-                ?.toDoubleOrNull()?.let { (it * mult).toLong() }
-        return num("GiB", 1024L * 1024 * 1024)
-            ?: num("MiB", 1024L * 1024)
-            ?: num("KiB", 1024L)
-            ?: num("B", 1)
-            ?: t.toDoubleOrNull()?.toLong()
-            ?: 0L
-    }
-
-    private fun parseSpeed(s: String): Double {
-        val t = s.trim()
-        if (t == "NA" || t == "Unknown" || t == "Unknown speed") return 0.0
-        fun num(suffix: String, mult: Double): Double? =
-            t.takeIf { it.endsWith(suffix) }?.dropLast(suffix.length)
-                ?.toDoubleOrNull()?.let { it * mult }
-        return num("GiB/s", 1024.0 * 1024 * 1024)
-            ?: num("MiB/s", 1024.0 * 1024)
-            ?: num("KiB/s", 1024.0)
-            ?: num("B/s", 1.0)
-            ?: t.toDoubleOrNull()
-            ?: 0.0
-    }
-
-    private fun parseEta(s: String): Double {
-        val parts = s.trim().split(':')
-        var total = 0.0
-        for (p in parts) {
-            total = total * 60.0 + (p.toDoubleOrNull() ?: return 0.0)
-        }
-        return total
-    }
-
-    private fun parseProgress(line: String): MobileProgress? {
-        val m = progressRegex.find(line.trim()) ?: return null
-        // Percentual desconhecido ("NA"): sem base para % — ignora a linha.
-        val percent = m.groupValues[1].toDoubleOrNull() ?: return null
-        val total = parseSize(m.groupValues[2])
-        val downloaded = (percent / 100.0 * total).toLong()
-        return MobileProgress(
-            percent,
-            parseSpeed(m.groupValues[3]),
-            parseEta(m.groupValues[4]),
-            downloaded,
-            total
-        )
-    }
-
-    private fun parseDestination(line: String): String? {
-        val t = line.trim()
-        val dest = "Destination: "
-        val di = t.indexOf(dest)
-        if (di >= 0) return t.substring(di + dest.length).trim()
-        val mergePrefix = "Merging formats into \""
-        val mi = t.indexOf(mergePrefix)
-        if (mi >= 0) {
-            val rest = t.substring(mi + mergePrefix.length)
-            val end = rest.indexOf('"')
-            if (end > 0) return rest.substring(0, end)
-        }
-        val marker = " has already been downloaded"
-        val ai = t.indexOf(marker)
-        if (ai >= 0) {
-            val di2 = t.indexOf("[download] ")
-            if (di2 >= 0) return t.substring(di2 + "[download] ".length, ai).trim()
-        }
-        return null
-    }
-
-    private fun isPostProcessorLine(line: String): Boolean {
-        val t = line.trim()
-        return t.startsWith("[ExtractAudio]")
-            || t.startsWith("[Merger]")
-            || t.startsWith("[VideoConvertor]")
-            || t.startsWith("[VideoRemuxer]")
-            || t.startsWith("[EmbedSubtitle]")
-            || t.startsWith("[Metadata]")
-            || t.startsWith("[ThumbnailsConvertor]")
-    }
-
-    // Sinais de vida sem % (só avaliado quando parseProgress falha): o
-    // engine exibe como atividade ("Fragmento 12/120", "Tentando de novo…")
-    // em vez de 0% morto. Nunca duplica: postprocessor/destination passam
-    // por aqui e não casam nenhum padrão.
-    private sealed interface ActivitySignal {
-        data class Fragment(val current: Int, val total: Int) : ActivitySignal
-        object Retry : ActivitySignal
-        data class Line(val text: String) : ActivitySignal
-    }
-
-    private val fragmentRegex =
-        """\[download\]\s+Downloading fragment (\d+) of (\d+)""".toRegex()
-
-    private fun parseActivity(line: String): ActivitySignal? {
-        val t = line.trim()
-        if (t.isEmpty()) return null
-        fragmentRegex.find(t)?.let {
-            val c = it.groupValues[1].toIntOrNull()
-            val n = it.groupValues[2].toIntOrNull()
-            if (c != null && n != null) return ActivitySignal.Fragment(c, n)
-        }
-        if (t.contains("Retrying", ignoreCase = true) || t.contains("Got error", ignoreCase = true)) {
-            return ActivitySignal.Retry
-        }
-        if (t.startsWith("WARNING") || t.startsWith("ERROR")) {
-            return ActivitySignal.Line(t)
-        }
-        return null
-    }
-
-    private fun newestFile(known: String?): String? {
-        known?.takeIf { File(it).exists() }?.let { return it }
-        val dir = try {
-            activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: return null
-        } catch (_: Exception) {
-            return null
-        }
-        return dir.listFiles()
-            ?.filter { f -> f.isFile && !isTempArtifact(f.name) && !isSidecar(f.name) }
-            ?.maxByOrNull { it.lastModified() }
-            ?.absolutePath
-    }
-
-    private fun isTempArtifact(name: String): Boolean {
-        return name.contains(".part") || name.endsWith(".ytdl") || name.endsWith(".temp") ||
-            name.endsWith(".tmp") || name.endsWith(".new") || name.contains(".cuttmp.") ||
-            name.endsWith(".cuttmp") || name.contains("-Frag")
-    }
-
-    // Sidecars (legenda/capa/metadados) nunca são o arquivo final: sem este
-    // filtro o fallback podia devolver um .vtt/.jpg como "download concluído".
-    private fun isSidecar(name: String): Boolean {
-        val n = name.lowercase()
-        return n.endsWith(".vtt") || n.endsWith(".srt") || n.endsWith(".ass") ||
-            n.endsWith(".lrc") || n.endsWith(".srv1") || n.endsWith(".srv2") ||
-            n.endsWith(".ttml") || n.endsWith(".description") ||
-            n.endsWith(".info.json") || n.endsWith(".annotations.xml")
-    }
-
-    // Pasta de saída a partir do `-o` do argv (`/dir/nome.%(ext)s` → `/dir`).
-    private fun outputDirFromArgv(argv: List<String>): File? {
-        val i = argv.indexOf("-o")
-        if (i < 0 || i + 1 >= argv.size) return null
-        val tpl = argv[i + 1]
-        val cut = tpl.indexOf("%(").takeIf { it >= 0 } ?: tpl.length
-        return File(tpl.substring(0, cut)).parentFile?.takeIf { it.isDirectory }
-    }
-
-    // Aguarda (poll 500ms) um arquivo novo não-temporário na pasta — cobre o
-    // caso em que o mp3 Convertido pousa depois do retorno das callbacks.
-    private fun waitForRecentFile(dir: File?, sinceMs: Long, timeoutMs: Long): String? {
-        if (dir == null) return null
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (System.currentTimeMillis() < deadline) {
-            val best = dir.listFiles()
-                ?.filter { f -> f.isFile && !isTempArtifact(f.name) && !isSidecar(f.name) && f.lastModified() >= sinceMs && f.length() > 0 }
-                ?.maxByOrNull { it.lastModified() }
-            if (best != null) return best.absolutePath
-            try {
-                Thread.sleep(500)
-            } catch (_: InterruptedException) {
-                break
-            }
-        }
-        return null
-    }
-
-    private fun removeTempVariants(base: File): Int {
-        var removed = 0
-        if (isTempArtifact(base.name) && base.delete()) removed++
-        for (suffix in listOf(".part", ".ytdl", ".temp", ".tmp", ".new")) {
-            if (File(base.absolutePath + suffix).delete()) removed++
-        }
-        base.parentFile?.listFiles()?.forEach { f ->
-            if (f.name.startsWith(base.name) && f.name.length > base.name.length &&
-                (f.name.contains(".cuttmp.") || f.name.contains("-Frag")) && f.delete()
-            ) removed++
-        }
-        return removed
-    }
-
-    private fun cleanError(stderr: String): String {
-        fun isNoise(l: String): Boolean {
-            val t = l.trim()
-            if (t.isEmpty()) return true
-            return (t.contains("frame=") && t.contains("fps=")) ||
-                (t.startsWith("size=") && t.contains("time=")) ||
-                (t.contains("bitrate=") && t.contains("speed=")) ||
-                t.startsWith("elapsed=") ||
-                progressRegex.containsMatchIn(t)
-        }
-        val kept = stderr.split('\n', '\r').map { it.trim() }.filter { !isNoise(it) }
-        var msg = kept.takeLast(8).joinToString(" · ").trim()
-        if (msg.isEmpty()) {
-            msg = stderr.split('\n', '\r').map { it.trim() }
-                .filter { it.isNotEmpty() }.lastOrNull() ?: "erro desconhecido"
-        }
-        for (prefix in listOf("ERROR: ", "Error: ")) {
-            if (msg.startsWith(prefix)) {
-                msg = msg.removePrefix(prefix)
-                break
-            }
-        }
-        return if (msg.length > 500) msg.take(497) + "..." else msg
-    }
-
-    private fun buildSearchQuery(platform: String, query: String, max: Int): String {
-        fun enc(s: String): String {
-            val sb = StringBuilder()
-            for (b in s.toByteArray(Charsets.UTF_8)) {
-                val c = b.toInt() and 0xFF
-                if (c in 0x30..0x39 || c in 0x41..0x5A || c in 0x61..0x7A || c == '-'.code || c == '_'.code ||
-                    c == '.'.code || c == '!'.code || c == '~'.code || c == '*'.code || c == '\''.code ||
-                    c == '('.code || c == ')'.code
-                ) sb.append(c.toChar()) else sb.append('%').append(String.format("%02X", c))
-            }
-            return sb.toString()
-        }
-        return when (platform) {
-            "youtube" -> "ytsearch$max:$query"
-            "vimeo" -> "https://vimeo.com/search?q=${enc(query)}"
-            "dailymotion" -> "https://www.dailymotion.com/search/${enc(query)}/videos"
-            "bilibili" -> "https://search.bilibili.com/all?keyword=${enc(query)}"
-            "soundcloud" -> "scsearch$max:$query"
-            else -> "ytsearch$max:$query"
-        }
-    }
-
-    private fun mapSearchItem(item: JSONObject): JSONObject {
-        fun str(vararg keys: String): String {
-            for (k in keys) {
-                val v = item.optString(k, "")
-                if (v.isNotEmpty()) return v
-            }
-            return ""
-        }
-        var thumbnail = str("thumbnail")
-        if (thumbnail.isEmpty()) {
-            val thumbs = item.optJSONArray("thumbnails")
-            if (thumbs != null && thumbs.length() > 0) {
-                thumbnail = thumbs.optJSONObject(0)?.optString("url", "") ?: ""
-            }
-        }
-        val out = JSObject()
-        out.put("id", str("id"))
-        val title = str("title")
-        out.put("title", title.ifEmpty { "Unknown" })
-        out.put("url", str("url", "webpage_url"))
-        out.put("thumbnail", thumbnail)
-        out.put("duration", item.optDouble("duration", 0.0))
-        out.put("duration_string", str("duration_string").ifEmpty { "0:00" })
-        out.put("view_count", item.optLong("view_count", 0L))
-        out.put("uploader", str("uploader", "channel"))
-        out.put("description", str("description"))
-        return out
-    }
 }

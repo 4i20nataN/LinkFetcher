@@ -1,9 +1,4 @@
-/**
- * AnimatedBackdrop — backdrop fade in/out para overlays.
- *
- * Uso:
- *   <AnimatedBackdrop visible={isOpen} onClick={handleClose} />
- */
+/** Backdrop com fade p/ overlays. */
 
 import React from 'react';
 import { AnimatePresence, m } from 'motion/react';

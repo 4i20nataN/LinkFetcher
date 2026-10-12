@@ -10,7 +10,7 @@ declare global {
       on: (channel: string, listener: (...args: unknown[]) => void) => () => void;
       off: (channel: string, listener: (...args: unknown[]) => void) => void;
 
-      // ── Auto-Update API ───────────────────────────────────────────────────
+      // Auto-update
       checkForUpdate: () => Promise<{
         updateAvailable: boolean;
         version?: string;
@@ -38,13 +38,13 @@ declare global {
       setAutoCheck: (enabled: boolean) => void;
       getAutoCheck: () => Promise<boolean>;
 
-      // ── Clipboard monitoring API ─────────────────────────────────────────
+      // Monitoramento de clipboard
       clipboardStartMonitoring: () => void;
       clipboardStopMonitoring: () => void;
       clipboardGetText: () => Promise<string>;
       onClipboardUrlDetected: (cb: (url: string) => void) => () => void;
 
-      // ── Browser extension status ─────────────────────────────────────────
+      // Extensão do navegador
       isExtensionConnected: () => Promise<boolean>;
       onExtensionStatus: (cb: (connected: boolean) => void) => () => void;
     };

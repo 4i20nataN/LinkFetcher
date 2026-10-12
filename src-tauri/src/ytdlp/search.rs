@@ -11,6 +11,10 @@ pub struct SearchOptions {
     pub max_results: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proxy: Option<String>,
+    /// Id p/ cancelamento (abort no frontend mata o yt-dlp órfão).
+    #[serde(rename = "searchId")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search_id: Option<String>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -34,9 +38,7 @@ fn str_field(v: &serde_json::Value, keys: &[&str]) -> String {
         .to_owned()
 }
 
-/// `encodeURIComponent` mínimo (sem nova dep): codifica tudo exceto
-/// `A-Za-z0-9 -_.!~*'()`, igual ao JS. Usado só nas URLs diretas,
-/// como em YtDlpSearch.ts:22,24,28.
+/// `encodeURIComponent` mínimo p/ URLs diretas (sem nova dep).
 fn pct_encode(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
@@ -51,7 +53,7 @@ fn pct_encode(s: &str) -> String {
     out
 }
 
-/// YtDlpSearch.ts:16-35 — mapeamento plataforma→query, literal.
+/// Mapeia plataforma→query de busca.
 fn build_query(platform: &str, query: &str, max: u32) -> String {
     match platform {
         "youtube" => format!("ytsearch{max}:{query}"),
@@ -69,16 +71,14 @@ fn build_query(platform: &str, query: &str, max: u32) -> String {
     }
 }
 
-/// YtDlpSearch.ts:37-73 — mesmos args, mesmo NDJSON, mesmos 9 fallbacks.
+/// Mesmos args/NDJSON/fallbacks do frontend.
 #[cfg(target_os = "android")]
 #[tauri::command]
 pub async fn ytdlp_search(
     app: AppHandle,
     options: SearchOptions,
 ) -> Result<Vec<SearchResult>, String> {
-    // O plugin Kotlin resolve um objeto `{results: [...]}` (o `invoke.resolve`
-    // só aceita `JSObject`): desserializa o envelope e devolve o vetor, que é
-    // o contrato do comando no desktop e o que o frontend espera.
+    // Envelope `{results}` pois `invoke.resolve` exige `JSObject`.
     #[derive(serde::Deserialize)]
     struct SearchResponse {
         #[serde(default)]
@@ -88,7 +88,7 @@ pub async fn ytdlp_search(
     Ok(res.results)
 }
 
-/// YtDlpSearch.ts:37-73 — mesmos args, mesmo NDJSON, mesmos 9 fallbacks.
+/// Mesmos args/NDJSON/fallbacks do frontend.
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub async fn ytdlp_search(
@@ -101,6 +101,8 @@ pub async fn ytdlp_search(
         "--flat-playlist".into(),
         "--dump-json".into(),
         "--no-download".into(),
+        // Zero resíduo fora dos downloads (paridade com probe/download).
+        "--no-cache-dir".into(),
     ];
     if let Some(p) = &options.proxy {
         args.push("--proxy".into());
@@ -108,18 +110,66 @@ pub async fn ytdlp_search(
     }
     args.extend(super::binary::js_runtime_args());
     args.push(build_query(&options.platform, &options.query, max));
-    let out = tokio::process::Command::new(&bin)
-        .args(&args)
-        .output()
-        .await
-        .map_err(|e| e.to_string())?;
-    if !out.status.success() {
+    let mut cmd = tokio::process::Command::new(&bin);
+    cmd.args(&args);
+    cmd.stdout(std::process::Stdio::piped());
+    cmd.stderr(std::process::Stdio::piped());
+    let mut spawned = cmd.spawn().map_err(|e| e.to_string())?;
+    // Tira os pipes antes de registrar: o waiter nunca segura o lock do
+    // filho (poll com try_wait), então o kill do `ytdlp_cancel` entra na
+    // hora em vez de enfileirar atrás da espera. Kill de busca nunca apaga
+    // .part (cleanup=false): só interrompe o yt-dlp órfão.
+    let stdout = spawned.stdout.take();
+    let stderr = spawned.stderr.take();
+    let registered_sid = options.search_id.clone().unwrap_or_else(|| {
+        format!(
+            "search-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        )
+    });
+    let arc = std::sync::Arc::new(tokio::sync::Mutex::new(spawned));
+    crate::fs::register_cancel(registered_sid.clone(), arc.clone());
+    let exit_status = loop {
+        let exited = arc.lock().await.try_wait();
+        let exited = match exited {
+            Ok(v) => v,
+            Err(e) => {
+                let _ = crate::fs::unregister_cancel(&registered_sid);
+                return Err(e.to_string());
+            }
+        };
+        match exited {
+            Some(st) => break st,
+            // Busca plana resolve em segundos: poll de 50ms é ruído zero.
+            None => tokio::time::sleep(std::time::Duration::from_millis(50)).await,
+        }
+    };
+    let _ = crate::fs::unregister_cancel(&registered_sid);
+    // Morto por sinal = cancelado pelo frontend (o abort descarta o erro).
+    if exit_status.code().is_none() {
+        return Err("busca cancelada".into());
+    }
+    let mut out_buf = Vec::new();
+    if let Some(mut so) = stdout {
+        use tokio::io::AsyncReadExt as _;
+        let _ = so.read_to_end(&mut out_buf).await;
+    }
+    let mut err_buf = Vec::new();
+    if let Some(mut se) = stderr {
+        use tokio::io::AsyncReadExt as _;
+        let _ = se.read_to_end(&mut err_buf).await;
+    }
+    if !exit_status.success() {
         return Err(format!(
             "Search failed: {}",
-            String::from_utf8_lossy(&out.stderr)
+            String::from_utf8_lossy(&err_buf)
         ));
     }
-    let text = String::from_utf8_lossy(&out.stdout);
+    let text = String::from_utf8_lossy(&out_buf);
     let mut results = Vec::new();
     for line in text.lines().map(str::trim).filter(|l| !l.is_empty()) {
         let Ok(item) = serde_json::from_str::<serde_json::Value>(line) else {

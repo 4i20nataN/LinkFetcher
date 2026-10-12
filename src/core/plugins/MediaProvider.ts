@@ -5,13 +5,9 @@ export interface MediaProvider {
   name: string;
   domains: RegExp[];
   
-  /**
-   * Validates if the given URL belongs to this platform provider.
-   */
+  /** Diz se este provider atende a URL. */
   canHandle(url: string): boolean;
 
-  /**
-   * Analyzes the URL and extracts metadata.
-   */
+  /** Analisa a URL e extrai os metadados. */
   analyze(url: string): Promise<MediaInfo>;
 }

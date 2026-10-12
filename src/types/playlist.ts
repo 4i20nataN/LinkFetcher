@@ -7,6 +7,10 @@ export interface PlaylistItem {
   thumbnailUrl: string;
   duration?: number;
   index: number;
+  /** Canal/uploader da entry flat. */
+  uploader?: string;
+  /** view_count da entry flat. */
+  views?: number;
 }
 
 export interface PlaylistInfo {
@@ -19,4 +23,6 @@ export interface PlaylistInfo {
   platform: PlatformId;
   url: string;
   items: PlaylistItem[];
+  /** Canal do 1º item (cabeçalho sem probe extra). */
+  channel?: string;
 }

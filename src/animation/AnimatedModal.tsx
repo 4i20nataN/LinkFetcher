@@ -1,13 +1,4 @@
-/**
- * AnimatedModal — modal com backdrop + animação de scale.
- *
- * Backdrop e card animam juntos. Card usa spring para efeito "pop".
- *
- * Uso:
- *   <AnimatedModal open={isOpen} onClose={handleClose}>
- *     <div className="p-6">conteúdo do modal</div>
- *   </AnimatedModal>
- */
+/** Modal com backdrop + scale (efeito "pop"). */
 
 import React from 'react';
 import { AnimatePresence, m } from 'motion/react';
@@ -18,15 +9,13 @@ interface AnimatedModalProps {
   open: boolean;
   onClose: () => void;
   children: React.ReactNode;
-  /** classes do card interno */
   cardClassName?: string;
   /** ID do modal para acessibilidade */
   id?: string;
 }
 
 export function AnimatedModal({ open, onClose, children, cardClassName, id }: AnimatedModalProps) {
-  // Perfil efficient (raster por software): sem scale/y no card — só fade curto.
-  // Animar escala+posição de um card grande repinta tudo a cada frame.
+  // No perfil efficient usa só fade curto (scale repinta o card todo).
   const efficient = RENDER_PROFILE === 'efficient';
   return (
     <AnimatePresence>
@@ -60,5 +49,4 @@ export function AnimatedModal({ open, onClose, children, cardClassName, id }: An
   );
 }
 
-// Re-export tween for convenience
 import { tween } from './variants';

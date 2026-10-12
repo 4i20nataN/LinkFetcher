@@ -9,9 +9,8 @@ import { ThemeWrapper } from './components/ThemeWrapper';
 import { LazyMotionProvider } from './animation/LazyMotionProvider';
 import { CSSPageTransition } from './animation/CSSPageTransition';
 import { isAndroid } from './core/ytdlp/YtDlpAdapter';
+import { WindowTitlebar } from './components/WindowTitlebar';
 const Sidebar = React.lazy(() => import('./components/Sidebar').then(m => ({ default: m.Sidebar })));
-const ClipboardPopup = React.lazy(() => import('./components/ClipboardPopup').then(m => ({ default: m.ClipboardPopup })));
-const FirstRunClipboardPrompt = React.lazy(() => import('./components/FirstRunClipboardPrompt').then(m => ({ default: m.FirstRunClipboardPrompt })));
 const LinkAnalyzer = React.lazy(() => import('./features/analyzer/LinkAnalyzer').then(m => ({ default: m.LinkAnalyzer })));
 const YouTubeSearch = React.lazy(() => import('./features/youtube/YouTubeSearch').then(m => ({ default: m.YouTubeSearch })));
 const DownloadManager = React.lazy(() => import('./features/downloads/DownloadManager').then(m => ({ default: m.DownloadManager })));
@@ -19,18 +18,15 @@ const FavoritesView = React.lazy(() => import('./features/favorites/FavoritesVie
 const DownloadLaterView = React.lazy(() => import('./features/later/DownloadLaterView').then(m => ({ default: m.DownloadLaterView })));
 const SettingsView = React.lazy(() => import('./features/settings/SettingsView').then(m => ({ default: m.SettingsView })));
 const PrivacyPolicy = React.lazy(() => import('./features/privacy/PrivacyPolicy').then(m => ({ default: m.PrivacyPolicy })));
+const AboutView = React.lazy(() => import('./features/about/AboutView').then(m => ({ default: m.AboutView })));
 const UpdateBanner = React.lazy(() => import('./features/update/UpdateBanner').then(m => ({ default: m.default })));
 const BinarySetupOverlay = React.lazy(() => import('./features/setup/BinarySetupOverlay').then(m => ({ default: m.BinarySetupOverlay })));
 
 function DashboardContent() {
   const { activeTab, setActiveTab, settings } = useApp();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [clipboardPopupUrl, setClipboardPopupUrl] = useState('');
-  const [showClipboardPopup, setShowClipboardPopup] = useState(false);
-  const [showFirstRunPrompt, setShowFirstRunPrompt] = useState(!settings.clipboardFirstRunDone);
-  // Callbacks estáveis: evitam re-render de Sidebar/popups memoizados a cada tick.
+  // Callbacks estáveis: evitam re-render de Sidebar memoizada a cada tick.
   const toggleSidebar = useCallback(() => setSidebarOpen(v => !v), []);
-  const dismissClipboardPopup = useCallback(() => setShowClipboardPopup(false), []);
 
   const isTauri = typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window);
   // No Android o yt-dlp é embarcado (ytdlp_status sempre ready): sem overlay
@@ -49,48 +45,6 @@ function DashboardContent() {
     })();
   }, [settings.updates]);
 
-  // ── Clipboard monitoring lifecycle ────────────────────────────────────────
-  // Polling real via plugin nativo (2s): mostra popup ao copiar um link.
-  useEffect(() => {
-    if (!settings.clipboardMonitoringEnabled) return;
-
-    let stopped = false;
-    let lastSeen = '';
-    let timer: ReturnType<typeof setInterval> | undefined;
-
-    (async () => {
-      const { readClipboardText, looksLikeUrl } = await import('./native/clipboard');
-      if (stopped) return;
-      const poll = async () => {
-        try {
-          const text = (await readClipboardText()).trim();
-          if (text && text !== lastSeen && looksLikeUrl(text)) {
-            lastSeen = text;
-            setClipboardPopupUrl(text);
-            setShowClipboardPopup(true);
-          } else if (text) {
-            lastSeen = text;
-          }
-        } catch {
-          // clipboard indisponível — tenta de novo no próximo ciclo
-        }
-      };
-      await poll();
-      if (!stopped) timer = setInterval(poll, 2000);
-    })();
-
-    return () => {
-      stopped = true;
-      if (timer) clearInterval(timer);
-    };
-  }, [settings.clipboardMonitoringEnabled]);
-
-  const handleAnalyzeClipboardUrl = useCallback((url: string) => {
-    setActiveTab('analyze');
-    // Dispatch custom event so LinkAnalyzer picks up the URL
-    window.dispatchEvent(new CustomEvent('clipboard:analyze', { detail: { url } }));
-  }, [setActiveTab]);
-
   const views = useMemo(() => ({
     analyze: LinkAnalyzer,
     search: YouTubeSearch,
@@ -99,6 +53,7 @@ function DashboardContent() {
     later: DownloadLaterView,
     settings: SettingsView,
     privacy: PrivacyPolicy,
+    about: AboutView,
   } as const), []);
 
   const renderActiveView = useCallback(() => {
@@ -135,65 +90,50 @@ function DashboardContent() {
   }, [activeTab, views]);
 
   return (
-    <div className="h-full flex flex-col lg:flex-row overflow-hidden">
-      {needsSetup && !isAndroid() && (
-        <Suspense fallback={null}>
-          <BinarySetupOverlay onReady={() => setNeedsSetup(false)} />
-        </Suspense>
-      )}
-      {/* Sidebar Navigation — lazy loaded */}
-      <div className="lf-suspense-sidebar">
-        <Suspense fallback={null}>
-          <Sidebar isOpen={sidebarOpen} toggleOpen={toggleSidebar} />
-        </Suspense>
-      </div>
-
-      {/* Main Panel */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain relative p-4 md:p-8">
-
-        {/* Auto-Update Banner — lazy loaded (desktop only: sem plugin no mobile) */}
-        {!isAndroid() && (
+    <div className="h-full flex flex-col overflow-hidden">
+      {!isAndroid() && <WindowTitlebar />}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
+        {needsSetup && !isAndroid() && (
           <Suspense fallback={null}>
-            <UpdateBanner />
+            <BinarySetupOverlay onReady={() => setNeedsSetup(false)} />
           </Suspense>
         )}
-
-        {/* Dynamic transition container */}
-        <div className="lf-animated-view">
-          {/* Downloads com keep-alive: trocar de aba nunca desmonta a fila —
-              o ciclo de vida da view não pode pausar, resetar scroll/filtros
-              nem congelar o progresso de downloads em curso. */}
-          <div
-            className="lf-suspense-view"
-            style={activeTab === 'manager' ? undefined : { display: 'none' }}
-          >
-            <Suspense fallback={null}>
-              <DownloadManager />
-            </Suspense>
-          </div>
-          {activeTab !== 'manager' && (
-            <CSSPageTransition activeKey={activeTab}>
-              {renderActiveView()}
-            </CSSPageTransition>
-          )}
+        {/* Navegação lateral */}
+        <div className="lf-suspense-sidebar">
+          <Suspense fallback={null}>
+            <Sidebar isOpen={sidebarOpen} toggleOpen={toggleSidebar} />
+          </Suspense>
         </div>
-      </main>
 
-      {/* Clipboard link detection popup — lazy loaded */}
-      <Suspense fallback={null}>
-        <ClipboardPopup
-          url={showClipboardPopup ? clipboardPopupUrl : ''}
-          onDismiss={dismissClipboardPopup}
-          onAnalyze={handleAnalyzeClipboardUrl}
-        />
-      </Suspense>
+        {/* Painel principal */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain relative p-4 md:p-8 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
 
-      {/* First-run clipboard prompt — lazy loaded */}
-      {showFirstRunPrompt && (
-        <Suspense fallback={null}>
-          <FirstRunClipboardPrompt onDismiss={() => setShowFirstRunPrompt(false)} />
-        </Suspense>
-      )}
+        {/* Banner de update (só desktop) */}
+          {!isAndroid() && (
+            <Suspense fallback={null}>
+              <UpdateBanner />
+            </Suspense>
+          )}
+
+          {/* Transição entre abas */}
+          <div className="lf-animated-view">
+            {/* Keep-alive: trocar de aba nunca desmonta a fila de downloads. */}
+            <div
+              className="lf-suspense-view"
+              style={activeTab === 'manager' ? undefined : { display: 'none' }}
+            >
+              <Suspense fallback={null}>
+                <DownloadManager />
+              </Suspense>
+            </div>
+            {activeTab !== 'manager' && (
+              <CSSPageTransition activeKey={activeTab}>
+                {renderActiveView()}
+              </CSSPageTransition>
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
