@@ -3,6 +3,7 @@
 package com.linkfetcher.app
 
 import app.tauri.plugin.JSObject
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
@@ -134,8 +135,46 @@ internal object YtDlpParsing {
         return null
     }
 
-    fun isTempArtifact(name: String): Boolean {
-        return name.contains(".part") || name.endsWith(".ytdl") || name.endsWith(".temp") ||
+    // Campos do dump-json que o builder do frontend consome (ver
+    // Providers.buildMediaInfoFromProbe). Todo o resto (thumbnails,
+    // heatmap, chapters, headers por formato...) é peso morto no IPC.
+    private val PROBE_TOP_KEEP = setOf(
+        "id", "title", "uploader", "channel", "duration", "duration_string",
+        "resolution", "vcodec", "extractor", "extractor_type", "upload_date",
+        "view_count", "thumbnail", "description", "subtitles",
+        "automatic_captions", "formats"
+    )
+    private val PROBE_FMT_KEEP = setOf(
+        "format_id", "ext", "resolution", "format_note", "vcodec", "acodec",
+        "filesize", "filesize_approx", "fps", "tbr"
+    )
+
+    // Enxuta o dump-json antes do IPC (~600KB→~10KB medido): remove chaves
+    // fora do allowlist, reduz legendas às chaves (idiomas) e formatos aos
+    // 10 campos usados. O parse org.json + o IPC + o parse no WebView eram
+    // o gargalo do "analisar" em aparelho fraco. Retorna o mesmo objeto.
+    fun slimProbe(obj: JSONObject): JSONObject {
+        val top = obj.keys().asSequence().toList()
+        for (k in top) if (k !in PROBE_TOP_KEEP) obj.remove(k)
+        for (langDict in listOf("subtitles", "automatic_captions")) {
+            val o = obj.optJSONObject(langDict) ?: continue
+            val slim = JSONObject()
+            for (l in o.keys()) slim.put(l, true)
+            obj.put(langDict, slim)
+        }
+        val fmts = obj.optJSONArray("formats") ?: return obj
+        val out = JSONArray()
+        for (i in 0 until fmts.length()) {
+            val f = fmts.optJSONObject(i) ?: continue
+            val s = JSONObject()
+            for (k in PROBE_FMT_KEEP) if (f.has(k)) s.put(k, f.get(k))
+            out.put(s)
+        }
+        obj.put("formats", out)
+        return obj
+    }
+
+    fun isTempArtifact(name: String): Boolean {        return name.contains(".part") || name.endsWith(".ytdl") || name.endsWith(".temp") ||
             name.endsWith(".tmp") || name.endsWith(".new") || name.contains(".cuttmp.") ||
             name.endsWith(".cuttmp") || name.contains("-Frag")
     }

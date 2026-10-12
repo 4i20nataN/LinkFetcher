@@ -195,8 +195,9 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                 }
                 try {
                     val obj = JSObject(response.out)
-                    // Remove a lista de thumbnails detalhadas para otimizar tráfego IPC; apenas thumbnail (string) é necessária.
-                    obj.remove("thumbnails")
+                    // Enxuta antes do IPC (ver slimProbe): o dump cheio
+                    // trava o parse em aparelho fraco.
+                    YtDlpParsing.slimProbe(obj)
                     invoke.resolve(obj)
                 } catch (e: Exception) {
                     invoke.reject("probe: JSON inválido: ${e.message}")
