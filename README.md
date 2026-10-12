@@ -12,6 +12,8 @@
 
 ## Screenshots
 
+![Visão geral](screenshots/00-filmstrip.webp)
+
 ![Analyzer — real video, options expanded](screenshots/01-analisar.webp)
 
 ![PRO checkout — 5 plans](screenshots/03-pro.webp)
