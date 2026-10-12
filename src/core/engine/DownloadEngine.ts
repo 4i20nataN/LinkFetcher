@@ -645,17 +645,7 @@ class DownloadEngineClass {
         if (data.type === 'progress') {
           this.applyProgressEvent(item.id, data);
         } else if (data.type === 'processing') {
-          const live = this.items.find(i => i.id === item.id);
-          if (live && live.status === 'downloading') {
-            live.processing = true;
-            live.speed = 0;
-            live.eta = 0;
-            // Rótulo da fase silenciosa (merge/recode/extract): sem ele a
-            // barra congela no último % com velocidade fantasma.
-            live.activity = this.settings.language === 'en' ? 'Merging…' : 'Mesclando…';
-            this.touch(live.id);
-            this.notify();
-          }
+          this.markProcessing(item.id);
         } else if (data.type === 'activity') {
           const live = this.items.find(i => i.id === item.id);
           if (live && live.status === 'downloading') {
@@ -857,6 +847,20 @@ class DownloadEngineClass {
     return true;
   }
 
+  // Marca a fase silenciosa do ffmpeg (merge/recode/extract): sem o
+  // rótulo a barra congela no último % com velocidade fantasma. Vale
+  // para push (`processing`) e poll (`jobProgress.processing`, Android).
+  private markProcessing(id: string) {
+    const live = this.items.find(i => i.id === id);
+    if (!live || live.status !== 'downloading' || live.processing) return;
+    live.processing = true;
+    live.speed = 0;
+    live.eta = 0;
+    live.activity = this.settings.language === 'en' ? 'Merging…' : 'Mesclando…';
+    this.touch(live.id);
+    this.notify();
+  }
+
   // Aplica um evento de progresso (push ou poll): corpo único p/ não
   // divergir. Throttle de notify continua valendo (500ms Android).
   private applyProgressEvent(id: string, data: any) {
@@ -911,6 +915,8 @@ class DownloadEngineClass {
       return;
     }
     if (typeof snap.percent !== 'number') return;
+    // Pós-processamento visto pelo plugin mas com push morto: marca aqui.
+    if (snap.processing === true) this.markProcessing(id);
     // Reaproveita o caminho do push: dedupe + throttle + touch valem igual.
     this.applyProgressEvent(id, {
       id, type: 'progress',

@@ -872,6 +872,12 @@ pub async fn ytdlp_download(
                 "yt-dlp-progress",
                 &serde_json::json!({ "id": download_id, "type": "processing" }),
             );
+        } else if let Some((cur, tot)) = parse_fragment(trimmed) {
+            // Fragmentos sem % (HLS/DASH): prova de vida com contagem.
+            let _ = app.emit(
+                "yt-dlp-progress",
+                &serde_json::json!({ "id": download_id, "type": "activity", "kind": "fragment", "current": cur, "total": tot }),
+            );
         } else if parse_retry_signal(trimmed) {
             // Retry de rede: sinaliza `retry` (cauda sem progresso).
             let _ = app.emit(
@@ -1598,6 +1604,15 @@ pub fn parse_merge(line: &str) -> Option<String> {
     None
 }
 
+/// Fragmento HLS/DASH (`Downloading fragment 12 of 120`): download sem %
+/// nenhum — sem este sinal a UI congela em 0% até o merge. Função pura.
+fn parse_fragment(line: &str) -> Option<(u64, u64)> {
+    let p = "[download] Downloading fragment ";
+    let rest = line.trim().strip_prefix(p)?;
+    let (cur, tot) = rest.split_once(" of ")?;
+    Some((cur.trim().parse().ok()?, tot.trim().parse().ok()?))
+}
+
 /// Retry de fragmento/rede do yt-dlp; sem ele o card congela no fim. Função pura p/ teste.
 pub fn parse_retry_signal(line: &str) -> bool {
     line.contains("Retrying fragment ")
@@ -1769,6 +1784,18 @@ mod tests {
         assert!(!parse_retry_signal("[Merger] Merging formats into \"a.mp4\""));
         assert!(!parse_retry_signal("[download] Destination: /dl/a.mp4"));
         assert!(!parse_retry_signal(""));
+    }
+
+    #[test]
+    fn fragment_lines_yield_activity_counts() {
+        assert_eq!(
+            parse_fragment("[download] Downloading fragment 12 of 120"),
+            Some((12, 120))
+        );
+        assert_eq!(parse_fragment("[download] Downloading fragment 1 of 1"), Some((1, 1)));
+        assert_eq!(parse_fragment("download:LF_PROG:86.7%|29.7MiB|NA|10000000|11500000"), None);
+        assert_eq!(parse_fragment("[Merger] Merging formats into \"a.mp4\""), None);
+        assert_eq!(parse_fragment(""), None);
     }
 
     #[test]

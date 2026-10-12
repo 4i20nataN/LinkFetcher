@@ -56,6 +56,10 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
     // falhou das duas formas neste aparelho — poll via invoke é
     // request/response e não depende de listener, timing nem foreground.
     private val lastProgress = ConcurrentHashMap<String, YtDlpParsing.MobileProgress>()
+    // Jobs que entraram em pós-processamento (ffmpeg: extração/merge):
+    // o poll `jobProgress` expõe p/ o engine marcar `processing` mesmo
+    // com o push morto. Limpo junto com lastProgress (retry/fim).
+    private val processingJobs = ConcurrentHashMap<String, Boolean>()
     private data class FinishedJob(val ok: Boolean, val filePath: String?, val size: Long, val error: String?, val at: Long)
     private val finishedJobs = ConcurrentHashMap<String, FinishedJob>()
     private fun rememberFinished(id: String, job: FinishedJob) {
@@ -333,6 +337,28 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
             var lastEmitMs = 0L
             // Sinais de atividade (fragmentos, retries, avisos) durante operações sem percentual direto.
             var lastActivityMs = 0L
+            // Caminho único de ingestão (snapshot p/ poll + emit throttled):
+            // linha parseada e % da lib convergem aqui, sem divergir.
+            fun ingestProgress(p: YtDlpParsing.MobileProgress) {
+                // Snapshot p/ `jobProgress` (poll do engine): guarda TODA
+                // atualização, sem o teto de 500ms do emit.
+                lastProgress[args.processId] = p
+                val nowMs = System.currentTimeMillis()
+                if (p.percent.toInt() != lastPercent && (lastPercent == -1 || nowMs - lastEmitMs >= 500)) {
+                    lastPercent = p.percent.toInt()
+                    lastEmitMs = nowMs
+                    emitOnUi("yt-dlp-progress") {
+                        put("id", args.processId)
+                        put("type", "progress")
+                        put("percent", p.percent)
+                        put("speed", p.speed)
+                        put("eta", p.eta)
+                        put("downloaded", p.downloaded)
+                        put("total", p.total)
+                    }
+                    notifications.showDlProgress(args.processId, args.title, p.percent.toInt())
+                }
+            }
             fun emitActivity(kind: String, a: Int = -1, b: Int = -1, text: String? = null) {
                 val now = System.currentTimeMillis()
                 if (now - lastActivityMs < 3_000) return
@@ -352,9 +378,19 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                 // um `finished` velho nunca reconciliar a nova execução.
                 finishedJobs.remove(args.processId)
                 lastProgress.remove(args.processId)
+                processingJobs.remove(args.processId)
                 val request = YoutubeDLRequest(emptyList<String>())
                 request.addCommands(args.argv)
-                val response = YoutubeDL.getInstance().execute(request, args.processId) { _, _, line ->
+                val response = YoutubeDL.getInstance().execute(request, args.processId) { libProgress, _, line ->
+                    // A lib calcula % sozinha (fragmentos HLS, total
+                    // desconhecido): cobre linhas que o parse não entende.
+                    // Fora de 0..100 (NaN cai aqui) = indeterminado, ignora.
+                    if (libProgress >= 0f && libProgress <= 100f) {
+                        val prev = lastProgress[args.processId]
+                        ingestProgress(YtDlpParsing.MobileProgress(
+                            libProgress.toDouble(), prev?.speed ?: 0.0, prev?.eta ?: 0.0,
+                            prev?.downloaded ?: 0L, prev?.total ?: 0L))
+                    }
                     YtDlpParsing.parseDestination(line)?.let {
                         captured = it
                         seen.add(it)
@@ -365,6 +401,7 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                     // 100% sem explicação (o DownloadEngine já trata `processing`).
                     if (!processingSent && YtDlpParsing.isPostProcessorLine(line)) {
                         processingSent = true
+                        processingJobs[args.processId] = true
                         emitOnUi("yt-dlp-progress") {
                             put("id", args.processId)
                             put("type", "processing")
@@ -372,24 +409,7 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                         notifications.showDlProcessing(args.processId, args.title)
                     }
                     YtDlpParsing.parseProgress(line)?.let { p ->
-                        // Snapshot p/ `jobProgress` (poll do engine): guarda
-                        // TODA linha parseada, sem o teto de 500ms do emit.
-                        lastProgress[args.processId] = p
-                        val nowMs = System.currentTimeMillis()
-                        if (p.percent.toInt() != lastPercent && (lastPercent == -1 || nowMs - lastEmitMs >= 500)) {
-                            lastPercent = p.percent.toInt()
-                            lastEmitMs = nowMs
-                            emitOnUi("yt-dlp-progress") {
-                                put("id", args.processId)
-                                put("type", "progress")
-                                put("percent", p.percent)
-                                put("speed", p.speed)
-                                put("eta", p.eta)
-                                put("downloaded", p.downloaded)
-                                put("total", p.total)
-                            }
-                            notifications.showDlProgress(args.processId, args.title, p.percent.toInt())
-                        }
+                        ingestProgress(p)
                     } ?: YtDlpParsing.parseActivity(line)?.let { a ->
                         // Linha sem % mas com informação (fragmento/retry/aviso).
                         when (a) {
@@ -478,6 +498,7 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
             } finally {
                 activeJobs.remove(args.processId)
                 lastProgress.remove(args.processId)
+                processingJobs.remove(args.processId)
             }
         }
     }
@@ -552,6 +573,7 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                 res.put("eta", p.eta)
                 res.put("downloaded", p.downloaded)
                 res.put("total", p.total)
+                if (processingJobs[id] == true) res.put("processing", true)
             }
             invoke.resolve(res)
         } catch (e: Exception) {
@@ -630,6 +652,15 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
             .take(64).trim().trim('.')
         if (args.url.isBlank() || !fileName.endsWith(".apk") || ".." in fileName) {
             invoke.reject("URL ou nome de APK inválidos")
+            return
+        }
+        // Allowlist: update só via HTTPS do GitHub (pós-XSS não desvia p/ APK alheio).
+        val updateUri = android.net.Uri.parse(args.url)
+        val updateHost = (updateUri.host ?: "").lowercase()
+        val updateHostOk = updateHost == "github.com" || updateHost.endsWith(".github.com") ||
+            updateHost == "objects.githubusercontent.com" || updateHost == "release-assets.githubusercontent.com"
+        if (updateUri.scheme?.lowercase() != "https" || !updateHostOk) {
+            invoke.reject("URL de atualização não confiável")
             return
         }
         try {
