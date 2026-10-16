@@ -7,7 +7,7 @@ import { useApp } from '../../context/AppContext';
 import { verifyLicenseKey, isLicenseActive, keyBelongsToContact } from './license';
 import { getLicense, saveLicense, clearLicense, useLicense } from './licenseStore';
 import { PLANS, planById, formatBRL, validEmail } from './purchase';
-import { createAutoCheckout, fetchAutoKey, recoverKey, saveLastCheckout, loadLastCheckout, clearLastCheckout, type AutoCheckout } from './autoBuy';
+import { createAutoCheckout, fetchAutoKey, recoverKey, deviceId, saveLastCheckout, loadLastCheckout, clearLastCheckout, type AutoCheckout } from './autoBuy';
 import QRCode from 'qrcode';
 import { KeyRound, X, Lock, Trash2, Copy, Check } from 'lucide-react';
 
@@ -72,6 +72,9 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
   const [checkout, setCheckout] = useState<AutoCheckout | null>(null);
   const [qr, setQr] = useState<string | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
+  const [limitHit, setLimitHit] = useState(false);
+  const [releaseBusy, setReleaseBusy] = useState(false);
+  const [pollNonce, setPollNonce] = useState(0);
   const [pixCopied, setPixCopied] = useState(false);
   const [doneKey, setDoneKey] = useState<string | null>(null);
   const [doneExp, setDoneExp] = useState<number | null>(null);
@@ -101,6 +104,7 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
     setCheckout(null);
     setQr(null);
     setPayError(null);
+    setLimitHit(false);
     setDoneKey(null);
     setDoneExp(null);
     clearLastCheckout();
@@ -120,6 +124,7 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
     }
     setBuying(true);
     setPayError(null);
+    setLimitHit(false);
     setDoneKey(null);
     setDoneExp(null);
     try {
@@ -169,7 +174,7 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
           if (alive) setPayError(t('Pix expirado. Cancele e gere outro.', 'Pix expired. Cancel and generate another.'));
           return true;
         }
-        const r = await fetchAutoKey(checkout.checkoutId, buyer);
+        const r = await fetchAutoKey(checkout.checkoutId, buyer, deviceId());
         if (!alive) return true;
         if (r.status === 'paid' && r.key) {
           const chk = await verifyLicenseKey(r.key);
@@ -193,7 +198,22 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
           if (alive) setPayError(msg);
           return true;
         }
-      } catch { /* próximo tick tenta */ }
+      } catch (e) {
+        // Cota de aparelhos: o servidor recusa o 3º (403 device-limit) —
+        // para o poll e oferece liberar (reinstalação/troca de aparelho).
+        const err = (e as { body?: { error?: string } })?.body?.error;
+        if (e instanceof Error && e.message === 'server-403' && err === 'device-limit') {
+          if (alive) {
+            setLimitHit(true);
+            setPayError(t(
+              'Esta chave já está em 2 aparelhos. Trocou de aparelho ou reinstalou? Libere abaixo.',
+              'This key is already on 2 devices. New device or reinstall? Release below.',
+            ));
+          }
+          return true;
+        }
+        /* próximo tick tenta */
+      }
       return false;
     };
     void check().then(done => {
@@ -204,9 +224,34 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
       const cleanup = () => clearInterval(timer);
       timers.push(cleanup);
     });
+    // Declarado ANTES do uso assíncrono: se desmontar antes do 1º check
+    // resolver, o cleanup encontra o array (vazio) e o guard `alive` impede
+    // a criação do intervalo — sem isso o poll de rede vazava p/ sempre.
     const timers: Array<() => void> = [];
     return () => { alive = false; timers.forEach(fn => fn()); };
-  }, [view, checkout, doneKey, email, isEn]);
+  }, [view, checkout, doneKey, email, isEn, pollNonce]);
+
+  // Libera os aparelhos da chave (reinstalação/troca) e retoma o poll:
+  // o servidor limpa os slots e reenvia a chave para o próprio e-mail.
+  async function sendRelease(): Promise<void> {
+    const buyer = email.trim().toLowerCase();
+    if (!validEmail(buyer) || releaseBusy) return;
+    setReleaseBusy(true);
+    try {
+      const r = await recoverKey(buyer, { release: true });
+      if (r.status === 'sent') {
+        setLimitHit(false);
+        setPayError(null);
+        setPollNonce((n) => n + 1);
+      } else {
+        setPayError(t('Não liberou. Tente de novo.', 'Could not release. Try again.'));
+      }
+    } catch {
+      setPayError(t('Não liberou. Tente de novo.', 'Could not release. Try again.'));
+    } finally {
+      setReleaseBusy(false);
+    }
+  }
 
   async function copyPix(): Promise<void> {
     if (!checkout?.qrText) return;
@@ -503,6 +548,15 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
                   </>
                 )}
                 <FieldError message={payError} />
+                {limitHit && (
+                  <button
+                    onClick={() => void sendRelease()}
+                    disabled={releaseBusy}
+                    className={PRIMARY_BTN}
+                  >
+                    {releaseBusy ? '…' : t('Liberar aparelhos e tentar de novo', 'Release devices and retry')}
+                  </button>
+                )}
                 <button onClick={resetPurchase} className={LINK_BTN}>
                   {t('Cancelar e gerar outro', 'Cancel and generate another')}
                 </button>

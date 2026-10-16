@@ -701,6 +701,30 @@ export default {
         }
         if (c.status !== 'paid') return json({ status: c.status });
         if (!same) return json({ error: 'contact-mismatch' }, 403);
+        // Cota de aparelhos (2 por chave, sem punição): registra quem recebe
+        // via servidor; o 3º distinto não recebe (ativação manual offline segue
+        // valendo — é limite de entrega, não revogação). App antigo não manda
+        // device → liberado (compatibilidade).
+        const device = String(url.searchParams.get('device') || '').trim().slice(0, 64);
+        if (device) {
+          const nowSec = Math.floor(Date.now() / 1000);
+          await env.DB.prepare('DELETE FROM device_slots WHERE expires_at < ?').bind(nowSec).run();
+          const slots = await env.DB.prepare(
+            'SELECT device_id FROM device_slots WHERE license_key = ?',
+          ).bind(c.license_key).all();
+          const known = (slots.results || []).map((r) => r.device_id);
+          if (!known.includes(device)) {
+            if (known.length >= 2) {
+              console.error('device-limit:', c.checkout_id);
+              return json({ error: 'device-limit', devices: 2 }, 403);
+            }
+            const paidAt = Date.parse(c.paid_at || c.created_at || '') / 1000 || nowSec;
+            const expires = Math.floor(paidAt) + Math.max(1, Number(c.days || 30)) * 86400;
+            await env.DB.prepare(
+              'INSERT OR IGNORE INTO device_slots (license_key, device_id, contact, expires_at, first_seen) VALUES (?, ?, ?, ?, ?)',
+            ).bind(c.license_key, device, who, expires, new Date().toISOString()).run();
+          }
+        }
         return json({ status: 'paid', key: c.license_key, emailSent: !!c.email_sent });
       }
 
@@ -719,7 +743,13 @@ export default {
         ).bind(who, who).first();
         // Resposta única (exista ou não): sem oráculo de quem pagou.
         if (!c || !/@/.test(c.email || '')) return json({ status: 'sent' });
-        const r = await sendKeyEmail(env, { to: c.email, key: c.license_key, days: daysOf(env, c) });
+        // `release=1`: limpa os slots de aparelhos da chave (reinstalação,
+        // troca de aparelho). O e-mail abaixo avisa o comprador — ele fica
+        // sabendo se alguém mexeu.
+        if (url.searchParams.get('release') === '1' && c.license_key) {
+          await env.DB.prepare('DELETE FROM device_slots WHERE license_key = ?').bind(c.license_key).run();
+        }
+        const r = await sendKeyEmail(env, { to: c.email, key: c.license_key, days: daysOf(env, c), plan: planLabelOf(env, c) });
         c.email_sent = r.sent ? 1 : 0;
         c.updated_at = new Date().toISOString();
         await saveCheckout(env, c);

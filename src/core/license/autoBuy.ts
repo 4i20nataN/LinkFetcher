@@ -37,12 +37,33 @@ export function createAutoCheckout(email: string, contact: string, plan = 'mensa
   return api('/api/checkout', { method: 'POST', body: JSON.stringify({ email, contact, plan }) });
 }
 
-export function fetchAutoKey(checkoutId: string, contact: string): Promise<{ status: string; key?: string; emailSent?: boolean }> {
-  return api(`/api/key/${encodeURIComponent(checkoutId)}?contact=${encodeURIComponent(contact)}`);
+export function fetchAutoKey(checkoutId: string, contact: string, device = ''): Promise<{ status: string; key?: string; emailSent?: boolean }> {
+  const q = `/api/key/${encodeURIComponent(checkoutId)}?contact=${encodeURIComponent(contact)}` +
+    (device ? `&device=${encodeURIComponent(device)}` : '');
+  return api(q);
 }
 
-export function recoverKey(contact: string): Promise<{ status: string; days?: number; emailSent?: boolean }> {
-  return api(`/api/recover?contact=${encodeURIComponent(contact)}`);
+export function recoverKey(contact: string, opts?: { release?: boolean }): Promise<{ status: string; days?: number; emailSent?: boolean }> {
+  const q = `/api/recover?contact=${encodeURIComponent(contact)}` + (opts?.release ? '&release=1' : '');
+  return api(q);
+}
+
+/** ID estável do aparelho (1 valor por instalação): base da cota de 2. */
+const DEVICE_KEY = 'lf-device-id';
+
+export function deviceId(): string {
+  try {
+    let id = localStorage.getItem(DEVICE_KEY);
+    if (!id) {
+      id = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+        ? crypto.randomUUID()
+        : `dev-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+      localStorage.setItem(DEVICE_KEY, id);
+    }
+    return id;
+  } catch {
+    return '';
+  }
 }
 
 const LAST_CHECKOUT_KEY = 'lf-last-checkout';

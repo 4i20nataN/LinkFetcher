@@ -33,3 +33,16 @@ CREATE TABLE IF NOT EXISTS broadcast_sends (
   sent_at TEXT NOT NULL,
   PRIMARY KEY (tag, email)
 );
+
+-- Cota de aparelhos (2 por chave, sem punição): o poll registra o
+-- aparelho que recebeu a chave; o 3º distinto não recebe via servidor
+-- (ativação manual offline continua valendo — é limite de entrega, não
+-- revogação). `release=1` no recover limpa os slots (reinstalação).
+CREATE TABLE IF NOT EXISTS device_slots (
+  license_key TEXT NOT NULL,
+  device_id TEXT NOT NULL,
+  contact TEXT NOT NULL DEFAULT '',
+  expires_at INTEGER NOT NULL DEFAULT 0,
+  first_seen TEXT NOT NULL,
+  PRIMARY KEY (license_key, device_id)
+);
