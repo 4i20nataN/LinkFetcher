@@ -1,12 +1,12 @@
 // Modal PRO: comprar (e-mail → Pix → chave na tela + e-mail) ou ativar com
 // chave existente (chave + e-mail do comprador). Reenvio da chave por e-mail.
 // Quando ativo: status + remover. Sem backdoors.
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext';
 import { verifyLicenseKey, isLicenseActive, keyBelongsToContact } from './license';
 import { getLicense, saveLicense, clearLicense, useLicense } from './licenseStore';
-import { PLANS, planById, formatBRL, validEmail } from './purchase';
+import { PLANS, planById, formatBRL, validEmail, TURNSTILE_SITE_KEY } from './purchase';
 import { createAutoCheckout, fetchAutoKey, recoverKey, deviceId, saveLastCheckout, loadLastCheckout, clearLastCheckout, type AutoCheckout } from './autoBuy';
 import QRCode from 'qrcode';
 import { KeyRound, X, Lock, Trash2, Copy, Check } from 'lucide-react';
@@ -75,6 +75,10 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
   const [limitHit, setLimitHit] = useState(false);
   const [releaseBusy, setReleaseBusy] = useState(false);
   const [pollNonce, setPollNonce] = useState(0);
+  // Anti-robô (Turnstile): '' = desligado (sem sitekey não renderiza).
+  const [captchaToken, setCaptchaToken] = useState('');
+  const captchaBox = useRef<HTMLDivElement | null>(null);
+  const captchaWidget = useRef<string | null>(null);
   const [pixCopied, setPixCopied] = useState(false);
   const [doneKey, setDoneKey] = useState<string | null>(null);
   const [doneExp, setDoneExp] = useState<number | null>(null);
@@ -94,6 +98,53 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
   const plan = planById(planId);
   const price = formatBRL(plan.price);
   const t = (pt: string, en: string) => (isEn ? en : pt);
+
+  // Monta o widget quando a compra está na etapa de e-mail.
+  useEffect(() => {
+    if (!TURNSTILE_SITE_KEY || view !== 'buy' || checkout || doneKey) return;
+    let alive = true;
+    const boot = () => {
+      if (!alive) return;
+      const w = window as unknown as { turnstile?: {
+        render: (el: HTMLElement, opts: Record<string, unknown>) => string;
+        remove: (id: string) => void;
+        reset: (id: string) => void;
+      } };
+      if (!w.turnstile || !captchaBox.current) {
+        setTimeout(boot, 500);
+        return;
+      }
+      try {
+        if (captchaWidget.current) w.turnstile.remove(captchaWidget.current);
+        captchaWidget.current = w.turnstile.render(captchaBox.current, {
+          sitekey: TURNSTILE_SITE_KEY,
+          theme: 'dark',
+          callback: (token: string) => { if (alive) setCaptchaToken(token); },
+          'expired-callback': () => { if (alive) setCaptchaToken(''); },
+          'error-callback': () => { if (alive) setCaptchaToken(''); },
+        });
+      } catch { /* rede bloqueada: compra segue se o servidor não exigir */ }
+    };
+    if (!document.querySelector('script[data-turnstile]')) {
+      const s = document.createElement('script');
+      s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+      s.async = true;
+      s.setAttribute('data-turnstile', '1');
+      s.onload = boot;
+      s.onerror = () => { /* sem widget: servidor decide */ };
+      document.head.appendChild(s);
+    } else {
+      boot();
+    }
+    return () => {
+      alive = false;
+      try {
+        const w = (window as unknown as { turnstile?: { remove: (id: string) => void } }).turnstile;
+        if (w && captchaWidget.current) w.remove(captchaWidget.current);
+      } catch { /* nada */ }
+      captchaWidget.current = null;
+    };
+  }, [view, checkout, doneKey]);
 
   function flash(setter: (v: boolean) => void): void {
     setter(true);
@@ -122,24 +173,33 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
       ));
       return;
     }
+    if (TURNSTILE_SITE_KEY && !captchaToken) {
+      setPayError(t('Confirme que você não é um robô.', 'Confirm you are not a robot.'));
+      return;
+    }
     setBuying(true);
     setPayError(null);
     setLimitHit(false);
     setDoneKey(null);
     setDoneExp(null);
     try {
-      const co = await createAutoCheckout(buyer, buyer, plan.id);
+      const co = await createAutoCheckout(buyer, buyer, plan.id, captchaToken);
+      setCaptchaToken('');
+      setCheckout(co);
       setCheckout(co);
       saveLastCheckout(buyer, co);
       setResumed(null);
       setQr(await qrFromCheckout(co));
     } catch (e) {
-      const body = (e as { body?: { validUntil?: string } })?.body;
+      const body = (e as { body?: { validUntil?: string; error?: string } })?.body;
       if (e instanceof Error && e.message === 'server-409') {
         const until = body?.validUntil ? new Date(body.validUntil).toLocaleDateString(isEn ? 'en' : 'pt-BR') : null;
         setPayError(until
           ? t(`Este e-mail já tem PRO ativo até ${until} — enviamos a chave pro seu e-mail.`, `This email already has PRO active until ${until} — we sent the key to your email.`)
           : t('Este e-mail já tem PRO ativo — enviamos a chave pro seu e-mail.', 'This email already has PRO active — we sent the key to your email.'));
+      } else if (e instanceof Error && e.message === 'server-403' && (body?.error === 'captcha-required' || body?.error === 'captcha-failed')) {
+        setCaptchaToken('');
+        setPayError(t('Verificação anti-robô falhou. Confirme de novo e tente.', 'Bot check failed. Confirm again and retry.'));
       } else {
         setPayError(t('Não gerou o Pix. Tente de novo.', 'Could not generate Pix. Try again.'));
       }
@@ -516,11 +576,12 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
                 </div>
                 <button
                   onClick={() => void startBuy()}
-                  disabled={!emailOk || buying}
+                  disabled={!emailOk || buying || (!!TURNSTILE_SITE_KEY && !captchaToken)}
                   className={PRIMARY_BTN}
                 >
                   {buying ? '…' : t(`Comprar — ${price}`, `Buy — ${price}`)}
                 </button>
+                {TURNSTILE_SITE_KEY ? <div ref={captchaBox} className="flex justify-center min-h-16" /> : null}
                 <FieldError message={payError} />
               </>
             ) : (

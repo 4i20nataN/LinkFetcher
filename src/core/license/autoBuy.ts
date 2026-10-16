@@ -33,8 +33,8 @@ async function api(path: string, init?: RequestInit) {
   return res.json();
 }
 
-export function createAutoCheckout(email: string, contact: string, plan = 'mensal'): Promise<AutoCheckout> {
-  return api('/api/checkout', { method: 'POST', body: JSON.stringify({ email, contact, plan }) });
+export function createAutoCheckout(email: string, contact: string, plan = 'mensal', turnstile = ''): Promise<AutoCheckout> {
+  return api('/api/checkout', { method: 'POST', body: JSON.stringify({ email, contact, plan, turnstile }) });
 }
 
 export function fetchAutoKey(checkoutId: string, contact: string, device = ''): Promise<{ status: string; key?: string; emailSent?: boolean }> {

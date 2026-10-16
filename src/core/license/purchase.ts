@@ -37,6 +37,9 @@ export function formatBRL(v: number): string {
   return `R$ ${v.toFixed(2).replace('.', ',')}`;
 }
 
+/** Sitekey pública do Turnstile (anti-robô). '' = desligado. */
+export const TURNSTILE_SITE_KEY = '';
+
 /** E-mail válido (único contato aceito na compra). */
 export function validEmail(s: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s.trim());

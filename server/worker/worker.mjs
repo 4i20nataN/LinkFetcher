@@ -53,6 +53,31 @@ function normContact(s) {
   return String(s || '').trim().normalize('NFKC').toLowerCase();
 }
 
+// Turnstile (anti-robô no checkout): sem TURNSTILE_SECRET, desligado
+// (comportamento atual). Com secret, exige token válido — falha fechada.
+async function verifyTurnstile(env, token, ip) {
+  if (!env.TURNSTILE_SECRET) return { ok: true, skipped: true };
+  if (!token || typeof token !== 'string' || token.length > 2048) {
+    return { ok: false, reason: 'captcha-required' };
+  }
+  try {
+    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        secret: env.TURNSTILE_SECRET,
+        response: token,
+        remoteip: ip || '',
+      }),
+    });
+    const data = await res.json().catch(() => null);
+    if (data && data.success === true) return { ok: true };
+    return { ok: false, reason: 'captcha-failed' };
+  } catch {
+    return { ok: false, reason: 'captcha-failed' };
+  }
+}
+
 const CORS = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, POST, OPTIONS',
@@ -592,6 +617,12 @@ export default {
         // que nunca ativa manualmente. Recusa antes de gerar Pix.
         if (enc.encode(contact).length > 24) {
           return json({ error: 'contact-too-long' }, 400);
+        }
+        // Anti-robô: com TURNSTILE_SECRET configurado, exige token válido
+        // (sem secret, desligado — comportamento atual).
+        const captcha = await verifyTurnstile(env, body.turnstile, ip);
+        if (!captcha.ok) {
+          return json({ error: captcha.reason || 'captcha-failed' }, 403);
         }
         // Plano escolhido (default = mensal, p/ app antigo). Validado aqui,
         // antes de qualquer chamada ao MP — plano inválido nunca gera Pix.

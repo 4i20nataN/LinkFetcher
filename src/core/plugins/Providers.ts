@@ -326,23 +326,11 @@ export class ProviderRegistry {
     return this.fallback;
   }
 
+  /** Metadados de exibição (nome/ícone/cor): fonte única é o PLATFORM_REGISTRY. */
   static getPlatformConfig(id: PlatformId) {
-    const configs: Record<PlatformId, { name: string; icon: string; color: string; domains: string[] }> = {
-      youtube: { name: 'YouTube', icon: 'Youtube', color: 'bg-red-600 text-white', domains: ['youtube.com', 'youtu.be'] },
-      tiktok: { name: 'TikTok', icon: 'Tv', color: 'bg-neutral-900 text-white border border-neutral-700', domains: ['tiktok.com'] },
-      instagram: { name: 'Instagram', icon: 'Instagram', color: 'bg-gradient-to-tr from-yellow-500 via-pink-500 to-purple-600 text-white', domains: ['instagram.com'] },
-      facebook: { name: 'Facebook', icon: 'Facebook', color: 'bg-blue-600 text-white', domains: ['facebook.com'] },
-      x: { name: 'X / Twitter', icon: 'Twitter', color: 'bg-black text-white border border-neutral-800', domains: ['x.com', 'twitter.com'] },
-      reddit: { name: 'Reddit', icon: 'MessageSquare', color: 'bg-orange-600 text-white', domains: ['reddit.com'] },
-      soundcloud: { name: 'SoundCloud', icon: 'Music', color: 'bg-orange-500 text-white', domains: ['soundcloud.com'] },
-      spotify: { name: 'Spotify', icon: 'Disc', color: 'bg-emerald-500 text-black', domains: ['spotify.com'] },
-      twitch: { name: 'Twitch', icon: 'Twitch', color: 'bg-purple-600 text-white', domains: ['twitch.tv'] },
-      pinterest: { name: 'Pinterest', icon: 'Image', color: 'bg-red-700 text-white', domains: ['pinterest.com'] },
-      threads: { name: 'Threads', icon: 'Hash', color: 'bg-zinc-900 text-white', domains: ['threads.net'] },
-      vimeo: { name: 'Vimeo', icon: 'Video', color: 'bg-sky-500 text-white', domains: ['vimeo.com'] },
-      generic: { name: 'Web Link / File', icon: 'Globe', color: 'bg-zinc-600 text-white', domains: [] }
-    };
-    return configs[id] || configs.generic;
+    const found = PLATFORM_REGISTRY.find((p) => p.id === id)
+      ?? PLATFORM_REGISTRY.find((p) => p.id === 'generic')!;
+    return { name: found.name, icon: found.icon, color: found.color, domains: [...found.domains] };
   }
 }
 

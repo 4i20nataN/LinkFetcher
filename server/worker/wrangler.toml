@@ -14,9 +14,10 @@ BASE_URL = "https://linkfetcher-licenses.linkfetcher.workers.dev"
 # (O Worker lê env.SMTP_FROM igual; [vars] aqui exporia o endereço no git.)
 
 # D1 — crie antes: wrangler d1 create linkfetcher-licenses
-# e cole o database_id abaixo. Aplique o schema 1x:
-# wrangler d1 execute linkfetcher-licenses --file=./schema.sql
+# e cole o database_id abaixo. Migrações versionadas em ./migrations:
+# wrangler d1 migrations apply linkfetcher-licenses --remote
 [[d1_databases]]
 binding = "DB"
 database_name = "linkfetcher-licenses"
 database_id = "c37c4b47-eb82-4a8e-84b4-1abcd0032e94"
+migrations_dir = "migrations"

@@ -39,6 +39,11 @@ em `*.workers.dev`.
    wrangler secret put SMTP_FROM
    wrangler secret put ADMIN_PASSWORD
    ```
+   Anti-robô (opcional, recomendado): Cloudflare dash → Turnstile → Add
+   site (managed) → `wrangler secret put TURNSTILE_SECRET` + cole a
+   **sitekey** em `TURNSTILE_SITE_KEY` (`src/core/license/purchase.ts`) e
+   rebuild. Sem secret, o checkout segue sem captcha (fail-open).
+
    Em `wrangler.toml`, `[vars]` leva só `PRICE`, `PLAN_DAYS` e `BASE_URL`
    (nada de e-mail/senha no git).
 6. **Deploy:**
@@ -98,6 +103,8 @@ Brevo grátis). O CI da release chama sozinho quando o secret
 
 ## Banco (D1)
 
-Aplicar o schema 1x (e reaplicar a cada mudança — tudo `IF NOT EXISTS`):
-`wrangler d1 execute linkfetcher-licenses --file=./schema.sql`
-Tabelas: `checkouts` (+ coluna `plan`), `broadcasts`, `broadcast_sends`.
+Migrações versionadas em `./migrations` (nunca edite uma já aplicada —
+crie `0002_*.sql`):
+`wrangler d1 migrations apply linkfetcher-licenses --remote`
+Tabelas: `checkouts` (+ coluna `plan`), `broadcasts`, `broadcast_sends`,
+`device_slots`. `schema.sql` é só espelho de referência.
