@@ -6,6 +6,7 @@
 import React, { useEffect, useState, useCallback, useMemo, Suspense } from 'react';
 import { AppProvider, useApp, SettingsSync } from './context/AppContext';
 import { ThemeWrapper } from './components/ThemeWrapper';
+import { notifyAppReady } from './bootSplash';
 import { LazyMotionProvider } from './animation/LazyMotionProvider';
 import { CSSPageTransition } from './animation/CSSPageTransition';
 import { isAndroid } from './core/ytdlp/YtDlpAdapter';
@@ -139,6 +140,11 @@ function DashboardContent() {
 }
 
 export default function App() {
+  // Primeiro paint confirmado: libera o splash (que segura até o wallpaper
+  // decodificar). Sem isso a janela transparente mostrava o desktop no boot.
+  useEffect(() => {
+    notifyAppReady();
+  }, []);
   return (
     <LazyMotionProvider>
       <AppProvider>

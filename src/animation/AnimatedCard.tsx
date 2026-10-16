@@ -3,6 +3,7 @@
 import React from 'react';
 import { m, type Variants } from 'motion/react';
 import { slideUp, transitions } from './variants';
+import { RENDER_PROFILE } from '../core/perf/renderProfile';
 
 interface AnimatedCardProps extends React.ComponentPropsWithoutRef<'div'> {
   children: React.ReactNode;
@@ -26,6 +27,15 @@ export function AnimatedCard({
   animateKey,
   ...rest
 }: AnimatedCardProps) {
+  // Efficient (WebKitGTK/Android): sem springs JS por item — N springs via rAF
+  // derrubam o scroll a cada mount/filtro. CSS transform/opacity (compositor).
+  if (RENDER_PROFILE === 'efficient') {
+    return (
+      <div key={animateKey} className={`${className ?? ''} lf-css-enter`} style={style} {...rest}>
+        {children}
+      </div>
+    );
+  }
   return (
     <m.div
       key={animateKey}

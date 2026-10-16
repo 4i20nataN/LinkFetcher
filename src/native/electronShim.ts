@@ -92,6 +92,16 @@ export function setupElectronShim() {
     off: (channel: string, listener: (...args: unknown[]) => void) => {
       const set = eventListeners.get(channel);
       set?.delete(listener);
+      // Espelha o disposable de `on()`: sem listeners, solta o `listen`
+      // Tauri — senão cada `off()` vazava 1 subscription permanente.
+      if (set && set.size === 0) {
+        eventListeners.delete(channel);
+        const un = tauriUnlistens.get(channel);
+        if (un) {
+          un();
+          tauriUnlistens.delete(channel);
+        }
+      }
     },
 
     checkForUpdate: async () => ({ updateAvailable: false }),

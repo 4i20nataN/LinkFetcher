@@ -6,4 +6,5 @@ export type { FavoriteItem, DownloadLaterItem } from './types/collections';
 export type { PlaylistItem, PlaylistInfo } from './types/playlist';
 export type { SearchOptions, SearchResult } from './types/search';
 export type { AppSettings } from './types/settings';
+export { DEFAULT_SETTINGS, sanitizeSettings } from './types/settings';
 export type { ProbeOptions } from './types/probe';

@@ -133,6 +133,12 @@ export function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, acc
   const [inputEnd, setInputEnd] = useState(endSeconds > 0 ? formatTime(endSeconds) : '');
   const [inputFocused, setInputFocused] = useState<'start' | 'end' | null>(null);
   const [dragging, setDragging] = useState<'start' | 'end' | null>(null);
+  // Rect do track cacheado no início do drag + coalescing via rAF: mousemove
+  // por pixel virava getBoundingClientRect + setState por evento (jank).
+  const trackRef = React.useRef<HTMLDivElement | null>(null);
+  const trackRectRef = React.useRef<DOMRect | null>(null);
+  const rafRef = React.useRef<number | null>(null);
+  const pendingXRef = React.useRef<{ which: 'start' | 'end'; x: number } | null>(null);
 
   useEffect(() => {
     if (inputFocused !== 'start') setInputStart(formatTime(startSeconds));
@@ -157,9 +163,11 @@ export function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, acc
   };
 
   const updateFromClientX = useCallback((which: 'start' | 'end', clientX: number) => {
-    const track = document.querySelector('[data-time-range-track]') as HTMLElement;
+    const track = trackRef.current;
     if (!track) return;
-    const rect = track.getBoundingClientRect();
+    // Rect cacheado no mousedown (getBoundingClientRect por pixel = layout
+    // thrashing; aqui é 1 leitura por frame via rAF).
+    const rect = trackRectRef.current ?? track.getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     const val = Math.round(pct * maxVal);
     if (which === 'start') {
@@ -173,9 +181,20 @@ export function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, acc
 
   useEffect(() => {
     if (!dragging) return;
-    const mouseMove = (e: MouseEvent) => { e.preventDefault(); updateFromClientX(dragging, e.clientX); };
+    trackRectRef.current = trackRef.current?.getBoundingClientRect() ?? null;
+    const flush = () => {
+      rafRef.current = null;
+      const p = pendingXRef.current;
+      pendingXRef.current = null;
+      if (p) updateFromClientX(p.which, p.x);
+    };
+    const schedule = (which: 'start' | 'end', clientX: number) => {
+      pendingXRef.current = { which, x: clientX };
+      if (rafRef.current === null) rafRef.current = requestAnimationFrame(flush);
+    };
+    const mouseMove = (e: MouseEvent) => { e.preventDefault(); schedule(dragging, e.clientX); };
     const mouseUp = () => setDragging(null);
-    const touchMove = (e: TouchEvent) => { e.preventDefault(); updateFromClientX(dragging, e.touches[0].clientX); };
+    const touchMove = (e: TouchEvent) => { e.preventDefault(); schedule(dragging, e.touches[0].clientX); };
     const touchEnd = () => setDragging(null);
     window.addEventListener('mousemove', mouseMove);
     window.addEventListener('mouseup', mouseUp);
@@ -186,6 +205,10 @@ export function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, acc
       window.removeEventListener('mouseup', mouseUp);
       window.removeEventListener('touchmove', touchMove);
       window.removeEventListener('touchend', touchEnd);
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      pendingXRef.current = null;
+      trackRectRef.current = null;
     };
   }, [dragging, updateFromClientX]);
 
@@ -193,7 +216,7 @@ export function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, acc
 
   return (
     <div className="space-y-3">
-      <div className="relative h-6 flex items-center select-none" data-time-range-track>
+      <div className="relative h-6 flex items-center select-none" data-time-range-track ref={trackRef}>
         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 rounded-full lf-surface-raised" />
         <div
           className={`absolute top-1/2 -translate-y-1/2 h-1 rounded-full ${accentBg}`}
@@ -350,10 +373,10 @@ export const Btn: React.FC<{ active: boolean; onClick: () => void; children: Rea
 };
 Btn.displayName = 'Btn';
 
-export const ToggleRow: React.FC<{ value: boolean; onChange: () => void; label: string; desc?: string; icon?: React.ReactNode }> = ({ value, onChange, label, desc, icon }) => {
+export const ToggleRow: React.FC<{ value: boolean; onChange: () => void; label: string; desc?: string; icon?: React.ReactNode; disabled?: boolean }> = ({ value, onChange, label, desc, icon, disabled = false }) => {
   const { settings } = useApp();
   return (
-    <div className="flex items-center justify-between p-3 rounded-xl lf-surface-40 lf-border">
+    <div className="flex items-center justify-between p-3 rounded-xl lf-surface-40 lf-border" aria-disabled={disabled || undefined}>
       <div className="flex items-center gap-2">
         {icon && <span className="lf-text-secondary">{icon}</span>}
         <div>
@@ -361,18 +384,18 @@ export const ToggleRow: React.FC<{ value: boolean; onChange: () => void; label: 
           {desc && <p className="fs-sm lf-text-muted mt-0.5">{desc}</p>}
         </div>
       </div>
-      <Toggle value={value} onChange={onChange} settings={settings} />
+      <Toggle value={value} onChange={onChange} settings={settings} disabled={disabled} label={label} />
     </div>
   );
 };
 ToggleRow.displayName = 'ToggleRow';
 
-export const SmallToggle: React.FC<{ value: boolean; onChange: () => void; label: string }> = ({ value, onChange, label }) => {
+export const SmallToggle: React.FC<{ value: boolean; onChange: () => void; label: string; disabled?: boolean }> = ({ value, onChange, label, disabled = false }) => {
   const { settings } = useApp();
   return (
-    <div className="flex items-center justify-between p-2.5 rounded-lg lf-surface-30 lf-border">
+    <div className="flex items-center justify-between p-2.5 rounded-lg lf-surface-30 lf-border" aria-disabled={disabled || undefined}>
       <label className="fs-sm lf-text-secondary">{label}</label>
-      <Toggle value={value} onChange={onChange} settings={settings} />
+      <Toggle value={value} onChange={onChange} settings={settings} disabled={disabled} label={label} />
     </div>
   );
 };

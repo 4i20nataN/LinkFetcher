@@ -17,11 +17,16 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [settings, setSettings] = useState<AppSettings>(StorageService.getSettings());
 
+  // Update funcional: dois toggles no mesmo tick nunca perdem um update
+  // (sem stale closure). O save é idempotente — StrictMode pode salvá-lo
+  // 2x em dev com conteúdo idêntico, sem efeito.
   const updateSettings = useCallback((newSettings: Partial<AppSettings>) => {
-    const updated = { ...settings, ...newSettings };
-    setSettings(updated);
-    StorageService.saveSettings(updated);
-  }, [settings]);
+    setSettings(prev => {
+      const updated = { ...prev, ...newSettings };
+      StorageService.saveSettings(updated);
+      return updated;
+    });
+  }, []);
 
   const value = useMemo(() => ({
     settings,

@@ -1,5 +1,5 @@
 // Entrada do link + faixa de plataformas.
-import { useRef, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useTranslation } from '../../core/i18n';
 import {
@@ -25,49 +25,22 @@ export interface AnalyzeFormProps {
 export function AnalyzeForm({ url, setUrl, loading, onPaste, onSubmit, onClear, description }: AnalyzeFormProps) {
   const { settings } = useApp();
   const { t } = useTranslation(settings);
-  const animationFrameRef = useRef<number | null>(null);
-  const smoothSetPlaybackRate = (element: HTMLElement | null, targetRate: number) => {
-    if (!element) return;
-    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
 
-    const animations = element.getAnimations();
-    if (animations.length === 0) return;
-
-    const startRate = animations[0].playbackRate;
-    const duration = 400; // ms
-    let startTime: number | null = null;
-
-    const animate = (currentTime: number) => {
-      if (!startTime) startTime = currentTime;
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-
-      const ease = 1 - Math.pow(1 - progress, 3); // cubic ease-out
-      const currentRate = startRate + (targetRate - startRate) * ease;
-
-      animations.forEach(a => a.playbackRate = currentRate);
-
-      if (progress < 1) {
-        animationFrameRef.current = requestAnimationFrame(animate);
-      }
+  // Standby de verdade: com a janela minimizada/oculta o marquee infinito
+  // acordaria o compositor à toa. Pausa via classe global (CSS puro).
+  useEffect(() => {
+    const sync = () => document.documentElement.classList.toggle('lf-hidden-paused', document.hidden);
+    sync();
+    document.addEventListener('visibilitychange', sync);
+    return () => {
+      document.removeEventListener('visibilitychange', sync);
+      document.documentElement.classList.remove('lf-hidden-paused');
     };
-
-    animationFrameRef.current = requestAnimationFrame(animate);
-  };
+  }, []);
 
   return (
     <>
-      <div
-        className="slider-container"
-        onMouseEnter={(e) => {
-          const row = e.currentTarget.querySelector('.scroll-row');
-          if (row) smoothSetPlaybackRate(row as HTMLElement, 0.35);
-        }}
-        onMouseLeave={(e) => {
-          const row = e.currentTarget.querySelector('.scroll-row');
-          if (row) smoothSetPlaybackRate(row as HTMLElement, 1);
-        }}
-      >
+      <div className="slider-container">
         <div className="scroll-row" id="scrollRow">
           <div className="tag youtube"><Play size={18} />YouTube</div>
           <div className="tag tiktok"><Music size={18} />TikTok</div>

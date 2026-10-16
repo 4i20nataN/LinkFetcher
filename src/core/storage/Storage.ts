@@ -1,4 +1,4 @@
-import { FavoriteItem, DownloadLaterItem, AppSettings } from '../../types';
+import { FavoriteItem, DownloadLaterItem, AppSettings, DEFAULT_SETTINGS, sanitizeSettings } from '../../types';
 
 export class StorageService {
   static getFavorites(): FavoriteItem[] {
@@ -85,27 +85,21 @@ export class StorageService {
   static getSettings(): AppSettings {
     try {
       const data = localStorage.getItem('universal_downloader_settings');
-      if (data) return JSON.parse(data);
+      // Sanitiza campo a campo: `null`, parcial ou tipo errado nunca quebra
+      // nem mente estado — cai no default seguro.
+      if (data) return sanitizeSettings(JSON.parse(data));
     } catch (_) {
     }
-    return {
-      themeMode: 'dark',
-      accentColor: 'indigo',
-      iconStyle: 'lucide-mono',
-      language: 'pt',
-      defaultDir: '',
-      mobilePublicSubdir: 'LinkFetcher',
-      bandLimit: 0,
-      maxConcurrent: 3,
-      autoDownload: true,
-      notifications: true,
-      updates: true,
-      clipboardEnabled: true,
-    };
+    return { ...DEFAULT_SETTINGS };
   }
 
   static saveSettings(settings: AppSettings) {
-    localStorage.setItem('universal_downloader_settings', JSON.stringify(settings));
+    try {
+      localStorage.setItem('universal_downloader_settings', JSON.stringify(settings));
+    } catch (e) {
+      // Quota esgotada/modo privado: loga em vez de estourar no handler do clique.
+      console.error('[Storage] saveSettings falhou:', e);
+    }
   }
 
   static clearCache() {

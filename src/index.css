@@ -129,9 +129,9 @@
 .text-\[15px\] { font-size: 18px; }
 
 /* Ícones Lucide acompanham a escala +20%: a prop size={N} gera width/height
-   em px fora do font-size, então escala via zoom (suportado no Chromium e
-   WebKit). Seletor mira só SVGs do lucide-react (classe .lucide). */
-svg.lucide { zoom: 1.2; }
+   em px fora do font-size, então escala via transform (só compositor, sem
+   recalc de layout como o `zoom` não-padrão faria a cada ícone). */
+svg.lucide { transform: scale(1.2); transform-origin: center; }
 
 /* Custom scrollbars matching Nothing OS / minimalist design */
 ::-webkit-scrollbar {
@@ -991,6 +991,8 @@ input[type="checkbox"] {
   gap: 10px;
   width: max-content;
   animation: scrollLeft 300s linear infinite;
+  will-change: transform;
+  transform: translateZ(0);
 
   /* Respiro interno para o hover não ser cortado pelo overflow:hidden */
   padding-top: 12px;
@@ -1023,6 +1025,24 @@ input[type="checkbox"] {
   animation: scrollLeft 300s linear infinite;
 }
 
+/* Marquee: pausa fora da tela / hover via CSS (sem rAF JS por frame) e
+   respeita reduced-motion — zera trabalho do compositor quando invisível. */
+.slider-container {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 64px;
+}
+.slider-container:hover .scroll-row {
+  animation-play-state: paused;
+}
+/* Janela minimizada/oculta: `AnalyzeForm` alterna a classe via
+   `visibilitychange` — compositor dorme em standby (zero wake/s). */
+.lf-hidden-paused .scroll-row {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scroll-row { animation: none; }
+}
+
 /* No Linux WebKitGTK software rasterizer, backdrop-filter forces full-surface
    CPU repaints on every hover/scroll/cursor frame. Replace with solid/semi-opaque
    surfaces to keep 60fps responsiveness with zero CPU lag. */
@@ -1040,10 +1060,25 @@ input[type="checkbox"] {
 }
 
 /* Sem backdrop-blur no full: no WebKitGTK por software cada scroll repinta
-   tudo atrás do vidro. Painéis usam opacidade alta em vez de desfoque. */
-.full-noblur [class*="backdrop-blur"] {
+   tudo atrás do vidro. Painéis usam opacidade alta em vez de desfoque.
+   Inclui glass-*/lf-surface-* (backdrop-filter próprio, não pego pelo
+   [class*="backdrop-blur"]) — o visual vira sólido, sem custo de blend. */
+.full-noblur [class*="backdrop-blur"],
+.full-noblur .glass-card,
+.full-noblur .glass-card-hover,
+.full-noblur .glass-sidebar,
+.full-noblur .glass-input,
+.full-noblur .glass-pill,
+.full-noblur .glass-result,
+.full-noblur .lf-surface-50,
+.full-noblur .lf-surface-40,
+.full-noblur .lf-surface-30 {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+}
+.full-noblur .glass-card,
+.full-noblur .glass-sidebar {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
 }
 
 /* Sombras achatadas no efficient: sombras grandes (32-40px + inset) forçam
@@ -1125,8 +1160,6 @@ input[type="checkbox"] {
 
 .tag:hover {
   border-color: var(--c);
-  transform: translateY(-4px);
-  z-index: 10;
 }
 
 .tag:hover i {

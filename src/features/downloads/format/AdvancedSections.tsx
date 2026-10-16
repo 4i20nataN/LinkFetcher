@@ -218,8 +218,8 @@ export function MetadataSection({ ctx }: Ctx) {
           <ToggleRow value={!!options.writeThumbnail} onChange={() => update({ writeThumbnail: !options.writeThumbnail })} label={t('fmtThumb')} desc={t('fmtThumbDesc')} icon={<BlockIcon blockId="thumbnail" />} />
           {options.writeThumbnail && (
             <div className="mt-2 space-y-1.5">
-              <div className={canEmbedThumbnail(options) ? '' : 'opacity-30 pointer-events-none'}>
-                <SmallToggle value={!!options.embedThumbnail} onChange={() => update({ embedThumbnail: !options.embedThumbnail })} label={t('fmtThumbEmbed')} />
+              <div className={canEmbedThumbnail(options) ? '' : 'opacity-30'}>
+                <SmallToggle value={!!options.embedThumbnail} onChange={() => update({ embedThumbnail: !options.embedThumbnail })} label={t('fmtThumbEmbed')} disabled={!canEmbedThumbnail(options)} />
               </div>
               {!canEmbedThumbnail(options) && (
                 <p className="fs-sm lf-text-faint">{t('fmtThumbAudio', { fmt: options.audioOnly ? 'wav' : 'webm/flv' })}</p>
@@ -268,8 +268,8 @@ export function BehaviorSection({ ctx }: Ctx) {
               <span className="fs-sm text-amber-500/70 font-medium">{t('fmtAdvancedOpts')}</span>
             </div>
             <SmallToggle value={!!options.noOverwrites} onChange={() => update({ noOverwrites: !options.noOverwrites })} label={t('fmtNoOverwrite')} />
-            <div className={options.audioOnly ? '' : 'opacity-30 pointer-events-none'}>
-              <SmallToggle value={!!options.keepVideo} onChange={() => update({ keepVideo: !options.keepVideo })} label={t('fmtKeepVideo')} />
+            <div className={options.audioOnly ? '' : 'opacity-30'}>
+              <SmallToggle value={!!options.keepVideo} onChange={() => update({ keepVideo: !options.keepVideo })} label={t('fmtKeepVideo')} disabled={!options.audioOnly} />
             </div>
           </div>
         </div>

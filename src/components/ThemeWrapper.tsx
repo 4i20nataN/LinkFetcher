@@ -90,6 +90,19 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
   const themeClass = THEME_CLASSES[settings.themeMode] ?? THEME_CLASSES.dark;
 
   const backgroundImage = THEME_BACKGROUNDS[settings.themeMode] ?? THEME_BACKGROUNDS.dark;
+  // Troca de tema sem flash: o wallpaper antigo fica até o novo decodificar.
+  // (No boot o splash já segura a tela até o decode — ver bootSplash.ts.)
+  const [bgUrl, setBgUrl] = useState(backgroundImage);
+  useEffect(() => {
+    if (bgUrl === backgroundImage) return;
+    let alive = true;
+    const im = new Image();
+    im.onload = () => { if (alive) setBgUrl(backgroundImage); };
+    im.onerror = () => { if (alive) setBgUrl(backgroundImage); };
+    im.src = backgroundImage;
+    if (im.decode) im.decode().then(() => { if (alive) setBgUrl(backgroundImage); }).catch(() => {});
+    return () => { alive = false; };
+  }, [backgroundImage, bgUrl]);
 
   const accentVars = ACCENT_MAP[settings.accentColor] ?? DEFAULT_ACCENT;
 
@@ -101,19 +114,22 @@ export const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children
   } as React.CSSProperties), [accentVars.primary, accentVars.rgb, accentVars.hover, accentVars.glow]);
 
   const isFramelessRounded = !isAndroid() && !isMaximized;
+  const isEfficient = RENDER_PROFILE === 'efficient';
 
   return (
     <div
-      className={`h-screen transition-colors duration-300 select-none ${themeClass} ${RENDER_PROFILE === 'efficient' ? 'efficient' : 'full-noblur'} relative overflow-hidden border-0 outline-none ${
+      className={`h-screen transition-colors duration-300 select-none ${themeClass} ${isEfficient ? 'efficient' : 'full-noblur'} relative overflow-hidden border-0 outline-none ${
         isFramelessRounded ? 'rounded-3xl shadow-2xl' : ''
       }`}
       style={style}
     >
       <div
-        className="absolute inset-0 z-[0] pointer-events-none bg-cover bg-center bg-no-repeat transition-all duration-500"
+        className="absolute inset-0 z-[0] pointer-events-none bg-cover bg-center bg-no-repeat"
         style={{
           backgroundColor: EFFICIENT_FLAT_BG[settings.themeMode] ?? EFFICIENT_FLAT_BG.dark,
-          backgroundImage: `url("${backgroundImage}")`,
+          // Wallpaper sempre visível (identidade do app): é camada estática —
+          // o custo do scroll estava no blur por card e nos springs JS, não aqui.
+          backgroundImage: `url("${bgUrl}")`,
         }}
       />
 

@@ -266,6 +266,9 @@ export function SubtitlesSection({ ctx }: Ctx) {
   const { options, update, mediaInfo, openSections, toggleSection, accentBg, showSubs, setShowSubs, showSubsPicker, setShowSubsPicker } = ctx;
   const { settings } = useApp();
   const { t } = useTranslation(settings);
+  // Embutir legenda só faz sentido p/ vídeo em container que aceita (mp4/webm/mkv).
+  const canEmbedSubs = !options.audioOnly && options.subLangs !== 'all'
+    && (!options.videoFormat || ['mp4', 'webm', 'mkv'].includes(options.videoFormat));
   return (
     <AccordionSection id="subtitles" title={t('fmtSubs')} blockId="subtitles" isOpen={openSections.has('subtitles')} onToggle={() => toggleSection('subtitles')} accentBg={accentBg}>
       <div className="px-3 pb-3 pt-2 space-y-3">
@@ -372,8 +375,8 @@ export function SubtitlesSection({ ctx }: Ctx) {
                 ))}
               </div>
             </div>
-            <div className={(!options.audioOnly && options.subLangs !== 'all' && (!options.videoFormat || ['mp4', 'webm', 'mkv'].includes(options.videoFormat))) ? '' : 'opacity-30 pointer-events-none'}>
-              <SmallToggle value={options.embedSubs} onChange={() => update({ embedSubs: !options.embedSubs })} label={t('fmtEmbedSubs')} />
+            <div className={canEmbedSubs ? '' : 'opacity-30'}>
+              <SmallToggle value={options.embedSubs} onChange={() => update({ embedSubs: !options.embedSubs })} label={t('fmtEmbedSubs')} disabled={!canEmbedSubs} />
             </div>
             {(!!options.audioOnly || (!!options.videoFormat && !['mp4', 'webm', 'mkv'].includes(options.videoFormat))) && (
               <p className="fs-sm lf-text-faint">{t('fmtEmbedSubsNote')}</p>
@@ -446,12 +449,13 @@ export function FilenameSection({ ctx }: Ctx) {
               }
             }}
             settings={settings}
+            label={t('fmtNoSpaces')}
           />
           <span className="fs-sm lf-text-faint">{t('fmtNoSpaces')}</span>
         </div>
         <div className="flex items-center gap-1 ml-1 pl-2 border-l lf-border">
           <label className="fs-sm lf-text-secondary">{t('fmtCleanName')}</label>
-          <Toggle value={!!options.restrictFilenames} onChange={() => update({ restrictFilenames: !options.restrictFilenames })} settings={settings} />
+          <Toggle value={!!options.restrictFilenames} onChange={() => update({ restrictFilenames: !options.restrictFilenames })} settings={settings} label={t('fmtCleanName')} />
         </div>
       </div>
     </div>

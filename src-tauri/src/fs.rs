@@ -517,7 +517,7 @@ async fn ffmpeg_cut_local(
         .await
         .map_err(|e| format!("spawn ffmpeg p/ corte: {e}"))?;
     if !out.status.success() {
-        let _ = std::fs::remove_file(&tmp_path);
+        let _ = tokio::fs::remove_file(&tmp_path).await;
         let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
         let msg = clean_error_message(&stderr);
         return Err(if msg.is_empty() {
@@ -527,8 +527,9 @@ async fn ffmpeg_cut_local(
         });
     }
     // Remove o cheio antes (Windows) e renomeia o trecho p/ o final.
-    std::fs::remove_file(full_path).map_err(|e| format!("limpar arquivo cheio: {e}"))?;
-    std::fs::rename(&tmp_path, full_path).map_err(|e| format!("finalizar corte: {e}"))?;
+    // tokio::fs: não ocupa worker do runtime com I/O bloqueante.
+    tokio::fs::remove_file(full_path).await.map_err(|e| format!("limpar arquivo cheio: {e}"))?;
+    tokio::fs::rename(&tmp_path, full_path).await.map_err(|e| format!("finalizar corte: {e}"))?;
     Ok(())
 }
 
@@ -794,10 +795,13 @@ pub async fn ytdlp_download(
     let download_id = params.id.clone();
     let mut captured_filepath: Option<String> = None;
     let mut subtitle_written = false;
-    // Portão por tempo (250ms); sem olhar conteúdo p/ não engolir eventos.
+    // Portão por tempo (250ms) + conteúdo (Δ% >= 0.2 ou 100%): sem o filtro de
+    // conteúdo, 10 downloads concorrentes emitiam ~40 IPC/s e cada emit vira
+    // JSON + deserialize na main thread do WebView (jank no scroll).
     let mut last_emit = std::time::Instant::now()
         .checked_sub(std::time::Duration::from_secs(1))
         .unwrap_or_else(std::time::Instant::now);
+    let mut last_pct = f64::NAN;
 
     // Espera concorrente com a drenagem; `complete` deriva do disco.
     let mut wait_task = tokio::spawn(async move {
@@ -831,8 +835,12 @@ pub async fn ytdlp_download(
         };
         let trimmed = line.trim();
         if let Some(prog) = parse_progress(trimmed) {
-            if progress_emit_due(Some(last_emit), std::time::Instant::now()) {
+            let moved = last_pct.is_nan()
+                || (prog.percent - last_pct).abs() >= 0.2
+                || prog.percent >= 100.0;
+            if moved && progress_emit_due(Some(last_emit), std::time::Instant::now()) {
                 last_emit = std::time::Instant::now();
+                last_pct = prog.percent;
                 let progress_event = serde_json::json!({
                     "id": download_id,
                     "type": "progress",
@@ -920,9 +928,17 @@ pub async fn ytdlp_download(
         Ok(status) if status.success() => {
             eprintln!("[ytdlp_download] Process exited successfully with status 0");
 
-            let final_path = captured_filepath
-                .filter(|p| Path::new(p).exists())
-                .or_else(|| latest_downloaded_file(&output_dir));
+            let final_path = if let Some(p) = captured_filepath.filter(|p| Path::new(p).exists()) {
+                Some(p)
+            } else {
+                // Varredura de diretório é I/O bloqueante: fora dos workers async
+                // (com 10 downloads concorrentes, travaria o pool do Tokio).
+                let dir = output_dir.clone();
+                tokio::task::spawn_blocking(move || latest_downloaded_file(&dir))
+                    .await
+                    .ok()
+                    .flatten()
+            };
 
             // Recorte: corta o cheio local via ffmpeg e entrega só o trecho.
             if wants_cut {
@@ -965,9 +981,11 @@ pub async fn ytdlp_download(
                 }
             }
 
-            let size = final_path.as_ref().map(|p| {
-                std::fs::metadata(p).ok().map(|m| m.len()).unwrap_or(0)
-            }).unwrap_or(0);
+            let size = if let Some(ref p) = final_path {
+                tokio::fs::metadata(p).await.ok().map(|m| m.len()).unwrap_or(0)
+            } else {
+                0
+            };
 
             // Aviso de legendas (não é erro): retry sem elas ou recorte com sidecar.
             let sub_warning: Option<String> =

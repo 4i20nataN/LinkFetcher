@@ -28,7 +28,7 @@ export function CapturePanel({ settings, updateSettings, t }: CapturePanelProps)
             {settings.language === 'en' ? 'Enable "paste link" button to read from clipboard automatically' : 'Ativar botão "colar link" para ler automaticamente da área de transferência'}
           </p>
         </div>
-        <Toggle value={settings.clipboardEnabled} onChange={() => updateSettings({ clipboardEnabled: !settings.clipboardEnabled })} settings={settings} />
+        <Toggle value={settings.clipboardEnabled} onChange={() => updateSettings({ clipboardEnabled: !settings.clipboardEnabled })} settings={settings} label={settings.language === 'en' ? 'Allow Clipboard Access' : 'Permitir Acesso à Área de Transferência'} />
       </div>
     </div>
   );

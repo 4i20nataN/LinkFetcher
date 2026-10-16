@@ -118,6 +118,8 @@ export const translations = {
     notifDesc: 'Exibir balões de aviso ao concluir downloads.',
     updatesLabel: 'Buscar atualizações automaticamente',
     updatesDesc: 'Verifica novas versões do app no GitHub ao iniciar.',
+    autostartLabel: 'Iniciar com o sistema',
+    autostartDesc: 'Abre o app automaticamente ao ligar o computador (inicia minimizado).',
     
     selectFormat: 'Selecionar Formato',
     presetBest: 'Melhor Qualidade',
@@ -469,6 +471,8 @@ export const translations = {
     notifDesc: 'Display notification banners when downloads finish.',
     updatesLabel: 'Check for updates automatically',
     updatesDesc: 'Checks GitHub for new app releases on startup.',
+    autostartLabel: 'Launch at system startup',
+    autostartDesc: 'Opens the app automatically when the computer starts (starts minimized).',
 
     selectFormat: 'Select Format',
     presetBest: 'Best Quality',

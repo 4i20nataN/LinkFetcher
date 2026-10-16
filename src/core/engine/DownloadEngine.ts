@@ -1,4 +1,4 @@
-import { DownloadItem, MediaInfo, MediaFormat, AppSettings, PlatformId } from '../../types';
+import { DownloadItem, MediaInfo, MediaFormat, AppSettings, PlatformId, DEFAULT_SETTINGS } from '../../types';
 import type { FormatOptions } from '../../features/downloads/FormatOptions';
 import {
   formatActivityMessage,
@@ -56,20 +56,9 @@ class DownloadEngineClass {
     }
   }
 
-  private settings: AppSettings = {
-    themeMode: 'dark',
-    accentColor: 'emerald',
-    iconStyle: 'lucide-mono',
-    language: 'pt',
-    defaultDir: '',
-    mobilePublicSubdir: 'LinkFetcher',
-    bandLimit: 0,
-    maxConcurrent: 3,
-    autoDownload: true,
-    notifications: true,
-    updates: true,
-    clipboardEnabled: true,
-  };
+  // Fonte única de defaults (tipos/settings.ts): engine nasce idêntica ao
+  // Storage e o SettingsSync hidrata em seguida — sem divergência silenciosa.
+  private settings: AppSettings = { ...DEFAULT_SETTINGS };
 
   constructor() {
     this.loadState();

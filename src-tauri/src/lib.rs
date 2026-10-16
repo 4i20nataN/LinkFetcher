@@ -23,6 +23,20 @@ pub fn run() {
         eprintln!("[hw-accel] removido veto de software: {var}=* (GPU liberada)");
       }
     }
+    // Hints p/ composição acelerada no WebKitGTK (só quando o usuário não
+    // definiu): sem eles o fallback é raster por CPU mesmo com GPU presente.
+    // `set_var` aqui não sobrescreve escolha explícita do usuário.
+    for (k, v) in [
+      ("GSK_RENDERER", "gl"),
+      ("WEBKIT_DMABUF_RENDERER", "1"),
+    ] {
+      if std::env::var_os(k).is_none() {
+        std::env::set_var(k, v);
+      }
+    }
+    if let Ok(n) = std::thread::available_parallelism() {
+      eprintln!("[hw-accel] CPUs disponíveis: {}", n.get());
+    }
   }
 
   #[allow(unused_mut)]
@@ -31,6 +45,12 @@ pub fn run() {
   #[cfg(desktop)]
   {
     builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    // Autostart honesto (Linux .desktop / Windows Run / macOS LaunchAgent).
+    // `--minimized`: boot pelo sistema abre minimizado, sem roubar o foco.
+    builder = builder.plugin(tauri_plugin_autostart::init(
+      tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+      Some(vec!["--minimized"]),
+    ));
   }
 
   #[cfg(target_os = "android")]
@@ -44,6 +64,19 @@ pub fn run() {
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_notification::init())
     .plugin(tauri_plugin_clipboard_manager::init())
+    .setup(|app| {
+      // Boot via autostart (`--minimized`): janela nasce minimizada.
+      #[cfg(desktop)]
+      {
+        if std::env::args().any(|a| a == "--minimized") {
+          use tauri::Manager;
+          if let Some(w) = app.get_webview_window("main") {
+            let _ = w.minimize();
+          }
+        }
+      }
+      Ok(())
+    })
     .invoke_handler(tauri::generate_handler![
       ytdlp::probe::ytdlp_probe,
       ytdlp::probe::ytdlp_probe_playlist,

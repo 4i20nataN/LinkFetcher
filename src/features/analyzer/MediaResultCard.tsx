@@ -70,7 +70,7 @@ export function MediaResultCard({
               decoding="async"
             />
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white">
+              <div className="p-3 rounded-full bg-white/15 border border-white/20 text-white">
                 <Play size={20} fill="currentColor" />
               </div>
             </div>

@@ -219,7 +219,7 @@ export function AndroidUpdater() {
         </p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        <Toggle value={settings.updates} onChange={() => updateSettings({ updates: !settings.updates })} settings={settings} />
+        <Toggle value={settings.updates} onChange={() => updateSettings({ updates: !settings.updates })} settings={settings} label={en ? 'App updates' : 'Atualizações do app'} />
         {stage === 'available' ? (
           <button
             onClick={download}

@@ -1,8 +1,6 @@
 /** Sonda o renderer p/ escolher os efeitos: `full` ou `efficient`. */
 // Sem GPU (WebKitGTK/Android), canvas+blur fullscreen travam o scroll.
 
-const isTauri =
-  typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window);
 // `window.chrome` só existe em motores Chromium.
 const isChromium =
   typeof window !== 'undefined' && !!(window as unknown as { chrome?: unknown }).chrome;
@@ -10,10 +8,11 @@ const isChromium =
 const isAndroid =
   typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
 
-// Perfil de render: desktop mostra o wallpaper (bitmap estático + glow
-// estático, sem blur animado); Android força 'efficient' (GPU móvel + bateria).
+// Perfil de render: só Chromium (WebView2/Chrome) aguenta blur+spring a 60fps.
+// WebKitGTK (Tauri Linux, sem window.chrome) e Android caem em 'efficient':
+// sem blur por card, sem springs JS por item — usa CSS transform/opacity.
 // Override manual p/ teste A/B (devtools): localStorage 'lf-render-profile'.
-export const RENDER_PROFILE: 'full' | 'efficient' = forcedProfile() ?? (isAndroid ? 'efficient' : 'full');
+export const RENDER_PROFILE: 'full' | 'efficient' = forcedProfile() ?? (!isChromium || isAndroid ? 'efficient' : 'full');
 
 // Override manual p/ teste A/B (devtools): 'full' mostra o wallpaper,
 // 'efficient' força o modo leve. Ausente = automático.

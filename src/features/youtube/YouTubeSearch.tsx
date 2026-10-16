@@ -58,11 +58,11 @@ const SearchResultCard = React.memo<{
           decoding="async"
         />
         <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white">
+          <div className="p-3 rounded-full bg-white/15 border border-white/20 text-white">
             <Play size={16} fill="currentColor" />
           </div>
         </div>
-        <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/80 backdrop-blur-md text-[10px] font-mono lf-text-secondary">
+        <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/85 text-[10px] font-mono lf-text-secondary">
           {video.duration_string}
         </span>
       </div>

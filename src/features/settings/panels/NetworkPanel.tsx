@@ -44,7 +44,7 @@ export function NetworkPanel({ settings, updateSettings, t }: NetworkPanelProps)
               {settings.language === 'en' ? 'Starts downloading right after analyzer finishes.' : 'Inicia o download logo após a análise, sem aguardar na fila.'}
             </p>
           </div>
-          <Toggle value={settings.autoDownload} onChange={() => updateSettings({ autoDownload: !settings.autoDownload })} settings={settings} />
+          <Toggle value={settings.autoDownload} onChange={() => updateSettings({ autoDownload: !settings.autoDownload })} settings={settings} label={settings.language === 'en' ? 'Start Downloads Automatically' : 'Iniciar Downloads Automaticamente'} />
         </div>
       </div>
     </div>

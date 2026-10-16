@@ -68,7 +68,7 @@ export const DownloadCard = React.memo(function DownloadCard({
                       loading="lazy"
                       decoding="async"
                     />
-                    <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-md text-[8px] font-mono lf-text-secondary">
+                    <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/85 text-[8px] font-mono lf-text-secondary">
                       {item.format.quality}
                     </span>
                   </div>

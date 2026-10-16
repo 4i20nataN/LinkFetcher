@@ -6,6 +6,14 @@ import { getThemeBackground } from './components/ThemeWrapper';
 const MIN_SPLASH_MS = 1000;
 const MAX_SPLASH_MS = 2600;
 
+// Sinal de primeiro paint do React (App chama notifyAppReady num useEffect).
+// Sem isso o splash saía por tempo/decode e a janela transparente mostrava
+// o desktop antes do wallpaper pintar.
+let appPainted = false;
+export function notifyAppReady(): void {
+  appPainted = true;
+}
+
 /** Tira o splash de dentro do #root antes do React renderizar (senão some na hora). */
 export function relocateSplash(): void {
   try {
@@ -60,8 +68,27 @@ export function dismissSplash(): void {
   const minWait = new Promise<void>((r) =>
     setTimeout(r, Math.max(0, MIN_SPLASH_MS - (performance.now() - t0))),
   );
+  // Primeiro paint do React: polling curto com teto — se o React travar, o
+  // splash nunca prende o app (failsafe resolve de qualquer jeito).
+  const appReady = new Promise<void>((resolve) => {
+    if (appPainted) {
+      resolve();
+      return;
+    }
+    const kill = setTimeout(() => {
+      clearInterval(tick);
+      resolve();
+    }, MAX_SPLASH_MS);
+    const tick = setInterval(() => {
+      if (appPainted) {
+        clearInterval(tick);
+        clearTimeout(kill);
+        resolve();
+      }
+    }, 50);
+  });
 
-  void Promise.all([imgReady, minWait]).then(() => {
+  void Promise.all([imgReady, minWait, appReady]).then(() => {
     el.classList.add('lf-splash-hide');
     setTimeout(() => el.remove(), 500);
   });
