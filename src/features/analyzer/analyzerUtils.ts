@@ -2,6 +2,7 @@
 // do download gratuito, datas, URLs).
 import type { MediaFormat, MediaInfo, PlaylistInfo, PlaylistItem } from '../../types';
 import type { FormatOptions } from '../downloads/FormatOptions';
+import { parseFormatHeight } from '../downloads/format/formatUtils';
 
 export function formatUploadDate(d: string): string {
   return /^\d{8}$/.test(d) ? `${d.slice(6, 8)}/${d.slice(4, 6)}/${d.slice(0, 4)}` : d;
@@ -20,13 +21,24 @@ export const sanitizeUrl = (rawUrl: string): string => {
 };
 
 // Referência do gratuito (total inicial do card): áudio = 1ª faixa;
-// vídeo = maior faixa. null = sem formatos (o handler mostra erro).
+// vídeo = maior faixa DENTRO do teto do gratuito (≤1080p60). Sem o teto o
+// card mostra a faixa 4K e o tamanho dela, embora o arquivo baixe em 1080p.
+// null = sem formatos (o handler mostra erro).
 export function pickQuickRefFormat(mediaInfo: MediaInfo, kind: 'audio' | 'video'): MediaFormat | null {
   if (!mediaInfo || mediaInfo.formats.length === 0) return null;
   if (kind === 'audio') {
     return mediaInfo.formats.find(f => f.type === 'audio') ?? mediaInfo.formats[0];
   }
-  return mediaInfo.formats.filter(f => f.type === 'video').sort((a, b) => b.sizeBytes - a.sizeBytes)[0]
+  const bySize = (a: MediaFormat, b: MediaFormat) => b.sizeBytes - a.sizeBytes;
+  const videos = mediaInfo.formats.filter(f => f.type === 'video');
+  // Espelha o teto do buildQuickOptions (≤1080p, ≤60fps). Altura/ fps
+  // desconhecidos passam (não dá p/ provar que estouram o teto).
+  const withinCap = videos.filter(f => {
+    const h = parseFormatHeight(f.quality);
+    return (h === 0 || h <= 1080) && (f.fps === undefined || f.fps <= 60);
+  });
+  return withinCap.sort(bySize)[0]
+    ?? videos.sort(bySize)[0]
     ?? mediaInfo.formats[0];
 }
 

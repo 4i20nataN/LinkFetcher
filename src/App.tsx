@@ -110,12 +110,10 @@ function DashboardContent() {
         {/* Painel principal */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain relative p-4 md:p-8 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
 
-        {/* Banner de update (só desktop) */}
-          {!isAndroid() && (
-            <Suspense fallback={null}>
-              <UpdateBanner />
-            </Suspense>
-          )}
+        {/* Banner de update (desktop: updater Tauri; Android: GitHub API + sideload) */}
+          <Suspense fallback={null}>
+            <UpdateBanner />
+          </Suspense>
 
           {/* Transição entre abas */}
           <div className="lf-animated-view">

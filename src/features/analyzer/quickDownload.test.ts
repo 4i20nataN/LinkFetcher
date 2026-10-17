@@ -44,13 +44,30 @@ describe('pickQuickRefFormat', () => {
     expect(pickQuickRefFormat(m, 'audio')?.id).toBe('a');
   });
 
-  it('vídeo: maior faixa de vídeo', () => {
+  it('vídeo: maior faixa dentro do teto do gratuito', () => {
     const m = media([
       fmt({ id: 'small', sizeBytes: 10 }),
       fmt({ id: 'big', sizeBytes: 999 }),
       fmt({ id: 'a', type: 'audio', sizeBytes: 5000 }),
     ]);
     expect(pickQuickRefFormat(m, 'video')?.id).toBe('big');
+  });
+
+  it('vídeo: nunca mostra 4K (teto 1080p60), mesmo sendo a maior faixa', () => {
+    const m = media([
+      fmt({ id: 'hd', quality: '1920x1080', fps: 60, sizeBytes: 100 }),
+      fmt({ id: 'uhd', quality: '3840x2160', fps: 60, sizeBytes: 999 }),
+      fmt({ id: 'qhd', quality: '2560x1440', sizeBytes: 800 }),
+    ]);
+    expect(pickQuickRefFormat(m, 'video')?.id).toBe('hd');
+  });
+
+  it('vídeo: ignora faixa acima de 60fps', () => {
+    const m = media([
+      fmt({ id: 'hd60', quality: '1920x1080', fps: 60, sizeBytes: 100 }),
+      fmt({ id: 'hd120', quality: '1920x1080', fps: 120, sizeBytes: 999 }),
+    ]);
+    expect(pickQuickRefFormat(m, 'video')?.id).toBe('hd60');
   });
 
   it('sem formatos: null (handler mostra erro)', () => {

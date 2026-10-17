@@ -507,11 +507,7 @@ async fn ffmpeg_cut_local(
     cmd.args(&args)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::piped());
-    #[cfg(target_os = "windows")]
-    {
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
+    crate::proc::hide_console(&mut cmd);
     let out = cmd
         .output()
         .await
@@ -722,11 +718,7 @@ pub async fn ytdlp_download(
        .stdout(std::process::Stdio::piped())
        .stderr(std::process::Stdio::piped());
 
-    #[cfg(target_os = "windows")]
-    {
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
+    crate::proc::hide_console(&mut cmd);
 
     let mut proc = cmd.spawn().map_err(|e| {
         eprintln!("[ytdlp_download] ERROR spawn: {}", e);

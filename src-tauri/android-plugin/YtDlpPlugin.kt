@@ -15,6 +15,7 @@ import app.tauri.plugin.Plugin
 import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
+import com.yausername.youtubedl_android.YoutubeDLResponse
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -72,6 +73,10 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
     // Ajustado via comando `setUpdatesEnabled` no boot e ao trocar.
     @Volatile
     private var updatesEnabled = true
+    // Auto-cura sob demanda: no máximo 1 tentativa de update por processo,
+    // só quando um probe falha com assinatura de extrator desatualizado.
+    @Volatile
+    private var ytdlpRefreshTried = false
     // Downloads de APK em andamento (id do DownloadManager → nome do arquivo).
     private val pendingUpdates = ConcurrentHashMap<Long, String>()
 
@@ -129,6 +134,26 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
+    // Auto-cura do extrator: quando um probe falha com assinatura de versão
+    // antiga (ex.: Instagram "login required/rate-limit" em yt-dlp velho),
+    // tenta UMA atualização oficial (mesma do boot). Retorna true só quando
+    // baixou uma versão nova — se já era a última, o erro é real (privado/
+    // login) e repetir não ajuda. Respeita o toggle e roda 1x por processo.
+    private fun refreshYtDlpOnce(): Boolean {
+        if (!updatesEnabled || ytdlpRefreshTried) return false
+        ytdlpRefreshTried = true
+        return try {
+            ensureInitialized()
+            val status = YoutubeDL.getInstance()
+                .updateYoutubeDL(activity.applicationContext, YoutubeDL.UpdateChannel.STABLE)
+            Log.i(TAG, "yt-dlp self-update sob demanda: $status")
+            status == YoutubeDL.UpdateStatus.DONE
+        } catch (e: Throwable) {
+            Log.w(TAG, "yt-dlp self-update sob demanda falhou: ${e.message}")
+            false
+        }
+    }
+
     // Android 13+: sem POST_NOTIFICATIONS em runtime o SO descarta os avisos
     // em silêncio. Fire-and-forget (sem callback): o SO mostra o diálogo uma
     // vez; negar só cala as notificações, nunca o download.
@@ -175,19 +200,30 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
             ensureInitialized()
             val t0 = System.currentTimeMillis()
             try {
-                val request = YoutubeDLRequest(args.url)
-                request.addOption("--dump-json")
-                request.addOption("--no-download")
-                request.addOption("--no-playlist")
-                request.addOption("--no-warnings")
-                // Fail-fast em rede móvel instável: sem isso o probe usa os
-                // retries padrão (10 + backoff) e trava a UI por minutos.
-                request.addOption("--socket-timeout", "15")
-                request.addOption("--retries", "2")
-                args.proxy?.takeIf { it.isNotBlank() }?.let {
-                    request.addOption("--proxy", it)
+                fun runProbe(): YoutubeDLResponse {
+                    val request = YoutubeDLRequest(args.url)
+                    request.addOption("--dump-json")
+                    request.addOption("--no-download")
+                    request.addOption("--no-playlist")
+                    request.addOption("--no-warnings")
+                    // Fail-fast em rede móvel instável: sem isso o probe usa os
+                    // retries padrão (10 + backoff) e trava a UI por minutos.
+                    request.addOption("--socket-timeout", "15")
+                    request.addOption("--retries", "2")
+                    args.proxy?.takeIf { it.isNotBlank() }?.let {
+                        request.addOption("--proxy", it)
+                    }
+                    return YoutubeDL.getInstance().execute(request, "probe-${System.nanoTime()}")
                 }
-                val response = YoutubeDL.getInstance().execute(request, "probe-${System.nanoTime()}")
+                var response = runProbe()
+                // Extrator velho (ex.: Instagram): atualiza 1x e repete.
+                if (response.exitCode != 0 &&
+                    YtDlpParsing.looksStaleExtractor(response.err.ifBlank { response.out }) &&
+                    refreshYtDlpOnce()
+                ) {
+                    Log.i(TAG, "probe: repetindo após self-update do yt-dlp")
+                    response = runProbe()
+                }
                 Log.i(TAG, "probe em ${System.currentTimeMillis() - t0}ms exit=${response.exitCode}")
                 if (response.exitCode != 0) {
                     invoke.reject(YtDlpParsing.cleanError(response.err.ifBlank { response.out }))
@@ -221,18 +257,29 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
         executor.execute cmd@{
             ensureInitialized()
             try {
-                val request = YoutubeDLRequest(args.url)
-                request.addOption("--flat-playlist")
-                request.addOption("--dump-json")
-                request.addOption("--no-download")
-                request.addOption("--ignore-errors")
-                request.addOption("--no-warnings")
-                request.addOption("--socket-timeout", "15")
-                request.addOption("--retries", "2")
-                args.proxy?.takeIf { it.isNotBlank() }?.let {
-                    request.addOption("--proxy", it)
+                fun runPlaylist(): YoutubeDLResponse {
+                    val request = YoutubeDLRequest(args.url)
+                    request.addOption("--flat-playlist")
+                    request.addOption("--dump-json")
+                    request.addOption("--no-download")
+                    request.addOption("--ignore-errors")
+                    request.addOption("--no-warnings")
+                    request.addOption("--socket-timeout", "15")
+                    request.addOption("--retries", "2")
+                    args.proxy?.takeIf { it.isNotBlank() }?.let {
+                        request.addOption("--proxy", it)
+                    }
+                    return YoutubeDL.getInstance().execute(request, "playlist-${System.nanoTime()}")
                 }
-                val response = YoutubeDL.getInstance().execute(request, "playlist-${System.nanoTime()}")
+                var response = runPlaylist()
+                // Extrator velho: atualiza 1x e repete (mesma auto-cura do probe).
+                if (response.exitCode != 0 && response.out.isBlank() &&
+                    YtDlpParsing.looksStaleExtractor(response.err.ifBlank { response.out }) &&
+                    refreshYtDlpOnce()
+                ) {
+                    Log.i(TAG, "probePlaylist: repetindo após self-update do yt-dlp")
+                    response = runPlaylist()
+                }
                 if (response.exitCode != 0 && response.out.isBlank()) {
                     invoke.reject(YtDlpParsing.cleanError(response.err.ifBlank { response.out }))
                     return@cmd

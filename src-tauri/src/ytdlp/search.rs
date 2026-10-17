@@ -114,6 +114,7 @@ pub async fn ytdlp_search(
     cmd.args(&args);
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
+    crate::proc::hide_console(&mut cmd);
     let mut spawned = cmd.spawn().map_err(|e| e.to_string())?;
     // Tira os pipes antes de registrar: o waiter nunca segura o lock do
     // filho (poll com try_wait), então o kill do `ytdlp_cancel` entra na

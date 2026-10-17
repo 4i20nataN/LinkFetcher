@@ -1,6 +1,7 @@
 // Painel "Sistema": notificações e atualização.
 import { useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
 import type { AppSettings } from '../../../types';
 import { useTranslation } from '../../../core/i18n';
 import { getAccentTextClass } from '../../../components/ThemeWrapper';
@@ -53,8 +54,20 @@ export function SystemPanel({ settings, updateSettings, t, isAndroid }: SystemPa
     setAutoError(null);
     try {
       const { enable, disable } = await import('@tauri-apps/plugin-autostart');
-      if (autostart) await disable();
-      else await enable();
+      if (autostart) {
+        await disable();
+      } else {
+        // Pasta de autostart de outro dono (ex.: root): pede a senha e
+        // corrige antes de gravar — sem exigir configuração manual.
+        try {
+          await invoke('autostart_repair');
+        } catch (repairErr) {
+          const detail = typeof repairErr === 'string'
+            ? repairErr : (repairErr as Error)?.message ?? String(repairErr);
+          throw new Error(detail || 'Permissão necessária para ativar a inicialização automática.');
+        }
+        await enable();
+      }
       setAutostart(!autostart);
     } catch (e) {
       // Falha (ex.: pasta autostart sem permissão de escrita): relê o estado

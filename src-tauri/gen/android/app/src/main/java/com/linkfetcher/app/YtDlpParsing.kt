@@ -256,6 +256,22 @@ internal object YtDlpParsing {
         return if (msg.length > 500) msg.take(497) + "..." else msg
     }
 
+    // Assinatura de yt-dlp DESATUALIZADO: o extractor quebra e o yt-dlp pede
+    // cookies/atualização (ex.: Instagram devolve "login required/rate-limit"
+    // quando a versão é antiga). Um update oficial costuma resolver — o plugin
+    // usa isto para repetir o comando 1x com o yt-dlp embarcado mais novo.
+    fun looksStaleExtractor(stderr: String): Boolean {
+        val e = stderr.lowercase()
+        return e.contains("confirm you are on the latest version") ||
+            e.contains("please report this issue") ||
+            e.contains("use --cookies-from-browser") ||
+            e.contains("login required") ||
+            e.contains("rate-limit reached") ||
+            e.contains("unable to extract") ||
+            e.contains("no video formats found") ||
+            e.contains("unsupported url")
+    }
+
     fun buildSearchQuery(platform: String, query: String, max: Int): String {
         fun enc(s: String): String {
             val sb = StringBuilder()

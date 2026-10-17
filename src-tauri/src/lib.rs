@@ -9,8 +9,92 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 mod ytdlp;
 mod fs;
+mod proc;
 #[cfg(target_os = "android")]
 mod mobile_ytdlp;
+
+/// Pasta XDG de autostart do usuário (`$XDG_CONFIG_HOME/autostart`, senão
+/// `$HOME/.config/autostart`).
+#[cfg(target_os = "linux")]
+fn autostart_dir() -> Option<std::path::PathBuf> {
+  let base = std::env::var_os("XDG_CONFIG_HOME")
+    .map(std::path::PathBuf::from)
+    .filter(|p| p.is_absolute())
+    .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")))?;
+  Some(base.join("autostart"))
+}
+
+#[cfg(target_os = "linux")]
+fn autostart_writable(dir: &std::path::Path) -> bool {
+  let probe = dir.join(".lf-write-probe");
+  match std::fs::File::create(&probe) {
+    Ok(_) => {
+      let _ = std::fs::remove_file(&probe);
+      true
+    }
+    Err(_) => false,
+  }
+}
+
+#[cfg(target_os = "linux")]
+fn id_field(flag: &str) -> Result<String, String> {
+  let out = std::process::Command::new("id")
+    .arg(flag)
+    .output()
+    .map_err(|e| format!("id {}: {}", flag, e))?;
+  let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+  if s.is_empty() {
+    Err(format!("id {} vazio", flag))
+  } else {
+    Ok(s)
+  }
+}
+
+/// Garante que a pasta de autostart seja gravável pelo usuário atual.
+///
+/// Sistema saudável: no-op. Se a pasta estiver sob posse de outro dono
+/// (ex.: `root`, criada por um comando elevado), pede a senha via `pkexec`
+/// e corrige o dono — o toggle "iniciar com o sistema" nunca exige
+/// configuração manual, no máximo uma senha. Somente Linux.
+#[tauri::command]
+async fn autostart_repair() -> Result<(), String> {
+  #[cfg(target_os = "linux")]
+  {
+    let dir = autostart_dir()
+      .ok_or_else(|| "não foi possível localizar a pasta de autostart".to_string())?;
+    if !dir.exists() {
+      std::fs::create_dir_all(&dir).map_err(|e| format!("criar {}: {}", dir.display(), e))?;
+      return Ok(());
+    }
+    if autostart_writable(&dir) {
+      return Ok(());
+    }
+    let owner = format!("{}:{}", id_field("-u")?, id_field("-g")?);
+    let out = std::process::Command::new("pkexec")
+      .arg("chown")
+      .arg("-R")
+      .arg(&owner)
+      .arg(&dir)
+      .output()
+      .map_err(|e| format!("pkexec indisponível: {}", e))?;
+    if !out.status.success() {
+      let err = String::from_utf8_lossy(&out.stderr);
+      return Err(format!(
+        "permissão necessária para ajustar {} ({})",
+        dir.display(),
+        err.trim()
+      ));
+    }
+    if autostart_writable(&dir) {
+      return Ok(());
+    }
+    Err(format!("{} ainda sem permissão de escrita", dir.display()))
+  }
+  #[cfg(not(target_os = "linux"))]
+  {
+    Ok(())
+  }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -96,6 +180,7 @@ pub fn run() {
       fs::fs_save_description,
       fs::fs_fetch_cover,
       fs::fs_elect_finished,
+      autostart_repair,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

@@ -203,9 +203,10 @@ pub async fn ytdlp_status(app: AppHandle) -> Result<BinStatus, String> {
     }
     // Versão p/ diagnóstico (best-effort: binário ausente/quebrado → None).
     let version = if ytdlp.is_file() {
-        tokio::process::Command::new(&ytdlp)
-            .arg("--version")
-            .output()
+        let mut cmd = tokio::process::Command::new(&ytdlp);
+        cmd.arg("--version");
+        crate::proc::hide_console(&mut cmd);
+        cmd.output()
             .await
             .ok()
             .filter(|o| o.status.success())
@@ -413,8 +414,10 @@ async fn smoke(bin: &Path, file: &str) -> Result<(), String> {
     } else {
         "--version"
     };
-    let out = tokio::process::Command::new(bin)
-        .arg(flag)
+    let mut cmd = tokio::process::Command::new(bin);
+    cmd.arg(flag);
+    crate::proc::hide_console(&mut cmd);
+    let out = cmd
         .output()
         .await
         .map_err(|e| format!("smoke {file}: {e}"))?;

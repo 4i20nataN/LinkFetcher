@@ -21,8 +21,10 @@ pub async fn ytdlp_probe(
 }
 
 async fn run_capture(bin: &Path, args: &[String]) -> Result<Vec<u8>, String> {
-    let out = tokio::process::Command::new(bin)
-        .args(args)
+    let mut cmd = tokio::process::Command::new(bin);
+    cmd.args(args);
+    crate::proc::hide_console(&mut cmd);
+    let out = cmd
         .output()
         .await
         .map_err(|e| e.to_string())?;
