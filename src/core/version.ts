@@ -1,7 +1,7 @@
 // Versão do app (injetada no build via __APP_VERSION__ — ver vite.config).
 // O fallback só aparece fora do build (testes/web puro): mantido pelo
 // `npm run bump` junto com package.json/tauri.conf/Cargo.
-export const APP_VERSION_FALLBACK = '1.5.2';
+export const APP_VERSION_FALLBACK = '1.5.3';
 
 export function appVersion(): string {
   try {
