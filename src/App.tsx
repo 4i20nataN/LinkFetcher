@@ -7,6 +7,7 @@ import React, { useEffect, useState, useCallback, useMemo, Suspense } from 'reac
 import { AppProvider, useApp, SettingsSync } from './context/AppContext';
 import { ThemeWrapper } from './components/ThemeWrapper';
 import { notifyAppReady } from './bootSplash';
+import { setupKeyboardScroll } from './core/a11y/keyboardScroll';
 import { LazyMotionProvider } from './animation/LazyMotionProvider';
 import { CSSPageTransition } from './animation/CSSPageTransition';
 import { isAndroid } from './core/ytdlp/YtDlpAdapter';
@@ -145,6 +146,14 @@ export default function App() {
   useEffect(() => {
     notifyAppReady();
   }, []);
+
+  // Desktop: rolagem por setas coalescida por rAF (o scroll nativo do
+  // WebKitGTK trava ao segurar a tecla). No Android não há teclado físico útil.
+  useEffect(() => {
+    if (isAndroid()) return;
+    return setupKeyboardScroll();
+  }, []);
+
   return (
     <LazyMotionProvider>
       <AppProvider>
