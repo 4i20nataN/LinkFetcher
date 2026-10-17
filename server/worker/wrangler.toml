@@ -21,3 +21,20 @@ binding = "DB"
 database_name = "linkfetcher-licenses"
 database_id = "c37c4b47-eb82-4a8e-84b4-1abcd0032e94"
 migrations_dir = "migrations"
+
+# Rate limit durável (Cloudflare Workers) — funciona no workers.dev, sem
+# precisar de domínio/zona. Cobra por IP e por local do Cloudflare.
+# period só aceita 10 ou 60; namespace_id precisa ser único na conta.
+[[ratelimits]]
+name = "CHECKOUT_LIMITER"        # POST /api/checkout (criar Pix)
+namespace_id = "1001"
+  [ratelimits.simple]
+  limit = 10
+  period = 60
+
+[[ratelimits]]
+name = "RECOVER_LIMITER"         # /api/recover (reenvio de e-mail)
+namespace_id = "1002"
+  [ratelimits.simple]
+  limit = 5
+  period = 60

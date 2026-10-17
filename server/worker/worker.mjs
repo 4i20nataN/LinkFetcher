@@ -138,6 +138,20 @@ function rateOk(ip) {
   return arr.length <= 20;
 }
 
+// --- rate limit durável (binding do Cloudflare): sobrevive a isolates e
+// é cobrado por IP + local do Cloudflare. Falha ABERTA: sem binding ou erro,
+// deixa passar (o limitador em memória continua como 2ª camada). ---
+async function rateLimited(env, binding, key) {
+  const limiter = env && env[binding];
+  if (!limiter || typeof limiter.limit !== 'function') return false;
+  try {
+    const res = await limiter.limit({ key: String(key || 'unknown') });
+    return !res.success;
+  } catch {
+    return false;
+  }
+}
+
 // --- webhook: extração do payment id (igual ao server/webhook.mjs) ---
 export function extractPaymentId(jsonBody, searchParams) {
   if (jsonBody && jsonBody.type === 'payment' && jsonBody?.data?.id) {
@@ -598,6 +612,7 @@ export default {
 
       // Checkout: cria o Pix no MP.
       if (request.method === 'POST' && url.pathname === '/api/checkout') {
+        if (await rateLimited(env, 'CHECKOUT_LIMITER', ip)) return json({ error: 'rate-limited' }, 429);
         if (!rateOk(ip)) return json({ error: 'rate-limited' }, 429);
         if (Number(request.headers.get('content-length') || 0) > 64 * 1024) {
           return json({ error: 'body-too-large' }, 413);
@@ -764,6 +779,7 @@ export default {
       // no corpo da resposta (e-mail não é segredo; a chave, sim).
       const recMatch = url.pathname === '/api/recover';
       if (request.method === 'GET' && recMatch) {
+        if (await rateLimited(env, 'RECOVER_LIMITER', ip)) return json({ error: 'rate-limited' }, 429);
         if (!rateOk(ip)) return json({ error: 'rate-limited' }, 429);
         const who = normContact(url.searchParams.get('contact'));
         if (!who) return json({ error: 'bad-contact' }, 400);

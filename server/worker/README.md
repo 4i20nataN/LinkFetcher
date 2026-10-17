@@ -108,3 +108,16 @@ crie `0002_*.sql`):
 `wrangler d1 migrations apply linkfetcher-licenses --remote`
 Tabelas: `checkouts` (+ coluna `plan`), `broadcasts`, `broadcast_sends`,
 `device_slots`. `schema.sql` é só espelho de referência.
+
+## Rate limit (anti-abuso)
+
+Dois bindings do Cloudflare em `wrangler.toml` (`[[ratelimits]]`), por IP e
+por local — funcionam no `workers.dev`, sem domínio/zona:
+
+- `CHECKOUT_LIMITER` — `POST /api/checkout` (10/60s)
+- `RECOVER_LIMITER` — `GET /api/recover` (5/60s)
+
+Semântica oficial: **permissivo e eventualmente consistente** (conta por
+isolate, converge rápido). É barreira p/ bot em massa, não contador exato.
+O limitador em memória (`rateOk`) segue como 2ª camada. Se o binding faltar
+ou der erro, o código **falha aberto** (nunca bloqueia compra legítima).
