@@ -1,16 +1,19 @@
-// Aba Sobre: licença PRO (chave + contato da compra), privacidade,
-// suporte e informações do app. Mesmo padrão visual da PrivacyPolicy
-// (ramo isLight + tokens lf-*) para os 4 temas.
+// Aba Sobre: licença PRO (chave + contato da compra), planos (gratuito × PRO),
+// privacidade, suporte e informações do app. Mesmo padrão visual da
+// PrivacyPolicy (ramo isLight + tokens lf-*) para os 4 temas.
+// Os planos vêm de `PLANS` (purchase.ts): preço/duração nunca são digitados
+// aqui, para a página não divergir do checkout.
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useLicense, getLicense, clearLicense } from '../../core/license/licenseStore';
 import { appVersion } from '../../core/version';
 import { isLicenseActive } from '../../core/license/license';
+import { PLANS, formatBRL } from '../../core/license/purchase';
 import { LicenseModal } from '../../core/license/LicenseModal';
 import { PrivacyPolicy } from '../privacy/PrivacyPolicy';
 import {
   Info, KeyRound, ShieldCheck, Copy, Check, Eye, EyeOff,
-  Trash2, ChevronRight, Cpu,
+  Trash2, ChevronRight, Cpu, Sparkles, Layers,
 } from 'lucide-react';
 
 /** Mostra prefixo + 1º grupo; o resto vira •••• (evita shoulder surfing). */
@@ -54,6 +57,66 @@ export function AboutView() {
   const body = `text-[13px] leading-relaxed ${isLight ? 'text-zinc-600' : 'lf-text-secondary'}`;
   const rowLabel = `text-[11px] uppercase tracking-wider font-semibold ${isLight ? 'text-zinc-500' : 'lf-text-muted'}`;
   const rowValue = `text-sm font-medium ${isLight ? 'text-zinc-800' : 'text-white'}`;
+  const planRow = `flex items-baseline gap-3 py-2 border-b last:border-0 ${isLight ? 'border-zinc-200/60' : 'border-white/[0.05]'}`;
+
+  // Gratuito = rota rápida (analyzerUtils.buildQuickOptions): vídeo até
+  // 1080p60 com merge mp4, ou áudio MP3 na qualidade máxima.
+  const freeList = isEn
+    ? [
+        'Link analysis, download queue, favorites and "download later"',
+        'Video up to 1080p60 (merged into MP4)',
+        'Audio as MP3 at maximum quality',
+        'Bulk download of a whole playlist with the quick presets',
+        'No sign-up and no key to activate',
+      ]
+    : [
+        'Análise de link, fila de download, favoritos e "baixar depois"',
+        'Vídeo até 1080p60 (merge em MP4)',
+        'Áudio em MP3 na qualidade máxima',
+        'Lote de playlist inteira com os ajustes rápidos',
+        'Sem cadastro e sem chave para ativar',
+      ];
+  // PRO = painel Download Personalizado (FormatSelector/LinkAnalyzer), que sem
+  // licença fica travado para leitura.
+  const proList = isEn
+    ? [
+        'Resolution up to 4K, plus FPS cap and codec choice',
+        'Section cuts — download only a range of the video',
+        'Subtitles (manual and auto): language, format, embed',
+        'SponsorBlock segment removal',
+        'Cover art: save, embed; metadata inside the file',
+        'Custom filename, audio normalize and video sharpen (desktop)',
+        'Bandwidth limit and parallel fragment downloads',
+        'All of the above applied to a playlist in bulk',
+      ]
+    : [
+        'Resolução até 4K, além de teto de FPS e escolha de codec',
+        'Cortes por seção — baixar só um trecho do vídeo',
+        'Legendas (manuais e automáticas): idioma, formato, embutir',
+        'Remoção de segmentos com SponsorBlock',
+        'Capa: salvar e incrustar; metadados dentro do arquivo',
+        'Nome do arquivo, normalização de áudio e nitidez de vídeo (desktop)',
+        'Limite de banda e fragmentos baixados em paralelo',
+        'Tudo isso aplicado em lote a uma playlist inteira',
+      ];
+
+  const howItWorks = isEn
+    ? [
+        'Paid with Pix; the key arrives by e-mail and inside the app itself.',
+        'Validity starts at payment confirmation — not at activation.',
+        'Activation needs the key plus the buyer e-mail, so a new device or a format never loses the license.',
+        'Up to 2 devices per key; changed device or reinstalled? Use "Release devices" in the license modal.',
+        'No auto-renewal: when it expires, the next purchase is a new key.',
+        'The key is signed (ECDSA P-256) and verified offline by the app — privileged actions re-check the signature.',
+      ]
+    : [
+        'Pagamento por Pix; a chave chega por e-mail e no próprio app.',
+        'A validade começa na confirmação do pagamento, não na ativação.',
+        'Ativar pede a chave + o e-mail do comprador: aparelho novo ou formatação não perde a licença.',
+        'Até 2 aparelhos por chave; trocou de aparelho ou reinstalou? Use "Liberar aparelhos" no modal de licença.',
+        'Sem renovação automática: quando expira, a compra seguinte gera uma nova chave.',
+        'A chave é assinada (ECDSA P-256) e verificada offline pelo app — ações privilegiadas revalidam a assinatura.',
+      ];
 
   return (
     <div className="min-h-screen flex flex-col items-center py-10 px-4 md:px-8 relative">
@@ -200,6 +263,114 @@ export function AboutView() {
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Planos: o que é gratuito e o que o PRO libera */}
+          <div className={card}>
+            <h3 className={cardTitle}>
+              <Layers size={18} className="text-blue-500 shrink-0" />
+              {isEn ? 'Free and PRO' : 'Gratuito e PRO'}
+            </h3>
+            <p className={`${body} mb-4`}>
+              {isEn
+                ? 'The free plan is not a trial: the app keeps working without a key, with video up to 1080p60 and MP3 audio. PRO unlocks the Custom Download panel — without it those controls are readable but locked.'
+                : 'O plano gratuito não é avaliação: o app continua funcionando sem chave, com vídeo até 1080p60 e áudio MP3. O PRO libera o painel Download Personalizado — sem ele, esses controles aparecem à mostra mas travados.'}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+              <div>
+                <p className={`${rowLabel} mb-2`}>{isEn ? 'Included in the free plan' : 'Incluso no plano gratuito'}</p>
+                <ul className="flex flex-col gap-1.5">
+                  {freeList.map((item, i) => (
+                    <li key={i} className={`${body} flex items-start gap-2`}>
+                      <Check size={14} className={`mt-0.5 shrink-0 ${isLight ? 'text-zinc-500' : 'text-zinc-400'}`} />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className={`${rowLabel} mb-2`}>{isEn ? 'Unlocked by PRO' : 'Liberado pelo PRO'}</p>
+                <ul className="flex flex-col gap-1.5">
+                  {proList.map((item, i) => (
+                    <li key={i} className={`${body} flex items-start gap-2`}>
+                      <Check size={14} className="mt-0.5 shrink-0 text-emerald-400" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Durações PRO: mesmo acesso, só muda o tempo e o preço do período */}
+          <div className={card}>
+            <h3 className={cardTitle}>
+              <Sparkles size={18} className="text-blue-500 shrink-0" />
+              {isEn ? 'PRO durations' : 'Durações PRO'}
+            </h3>
+            <p className={`${body} mb-3`}>
+              {isEn
+                ? 'Every PRO key carries the same plan: the same features, the same 2-device allowance, the same offline signature. What changes is only how long the key stays active — and the price of that period. The longer the period, the cheaper per day.'
+                : 'Toda chave PRO carrega o mesmo plano: as mesmas funções, a mesma cota de 2 aparelhos, a mesma assinatura offline. O que muda é apenas o tempo de atividade da chave — e o preço desse período. Quanto mais longo, mais barato por dia.'}
+            </p>
+            <div className="mb-1">
+              {PLANS.map(p => {
+                const perDay = p.price / p.days;
+                return (
+                  <div key={p.id} className={planRow}>
+                    <div className="flex-1 min-w-0">
+                      <p className={rowValue}>
+                        {isEn ? p.labelEn : p.label}
+                        {p.tag && (
+                          <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold align-middle
+                            ${isLight
+                              ? 'bg-blue-50 text-blue-600 border border-blue-100'
+                              : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                            }`}>
+                            {p.id === 'mensal' && isEn ? 'most popular' : p.tag}
+                          </span>
+                        )}
+                      </p>
+                      <p className={`text-[11px] ${isLight ? 'text-zinc-500' : 'lf-text-muted'}`}>
+                        {isEn
+                          ? `≈ ${formatBRL(perDay)} per day`
+                          : `≈ ${formatBRL(perDay)} por dia`}
+                      </p>
+                    </div>
+                    <p className={`${rowValue} shrink-0`}>{formatBRL(p.price)}</p>
+                  </div>
+                );
+              })}
+            </div>
+            <p className={`${body} mt-3`}>
+              {isEn
+                ? 'Prices and durations mirror the license server catalog.'
+                : 'Preços e durações espelham o catálogo do servidor de licenças.'}
+            </p>
+            {!active && (
+              <button
+                onClick={() => setShowLicense(true)}
+                className="mt-4 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all"
+              >
+                {isEn ? 'Activate PRO' : 'Ativar PRO'}
+              </button>
+            )}
+          </div>
+
+          {/* Como a licença funciona na prática */}
+          <div className={card}>
+            <h3 className={cardTitle}>
+              <KeyRound size={18} className="text-blue-500 shrink-0" />
+              {isEn ? 'How activation works' : 'Como a ativação funciona'}
+            </h3>
+            <ul className="flex flex-col gap-1.5">
+              {howItWorks.map((item, i) => (
+                <li key={i} className={`${body} pl-5 relative`}>
+                  <span className="absolute left-0 top-0 text-blue-500 font-light">▹</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
           </div>
 
           {/* Privacidade */}
