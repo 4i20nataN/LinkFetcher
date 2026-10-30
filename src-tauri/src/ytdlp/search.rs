@@ -103,15 +103,19 @@ pub async fn ytdlp_search(
         "--no-download".into(),
         // Zero resíduo fora dos downloads (paridade com probe/download).
         "--no-cache-dir".into(),
+        "--socket-timeout".into(),
+        "30".into(),
     ];
     if let Some(p) = &options.proxy {
         args.push("--proxy".into());
         args.push(p.clone());
     }
     args.extend(super::binary::js_runtime_args());
+    args.push("--".into());
     args.push(build_query(&options.platform, &options.query, max));
     let mut cmd = tokio::process::Command::new(&bin);
     cmd.args(&args);
+    cmd.kill_on_drop(true);
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
     crate::proc::hide_console(&mut cmd);

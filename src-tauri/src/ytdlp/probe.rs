@@ -23,10 +23,13 @@ pub async fn ytdlp_probe(
 async fn run_capture(bin: &Path, args: &[String]) -> Result<Vec<u8>, String> {
     let mut cmd = tokio::process::Command::new(bin);
     cmd.args(args);
+    cmd.kill_on_drop(true);
     crate::proc::hide_console(&mut cmd);
-    let out = cmd
-        .output()
+    // Deadline: sem ele, um probe travado em rede segura o comando para sempre
+    // e não está no mapa de cancelamento (nada o liberta).
+    let out = tokio::time::timeout(std::time::Duration::from_secs(180), cmd.output())
         .await
+        .map_err(|_| "probe: tempo esgotado (180s) — verifique a conexão".to_string())?
         .map_err(|e| e.to_string())?;
     if !out.status.success() {
         return Err(String::from_utf8_lossy(&out.stderr).into_owned());
@@ -41,6 +44,41 @@ fn common_auth(args: &mut Vec<String>, proxy: &Option<String>) {
     }
 }
 
+/// Args do probe simples; a URL vem sempre depois do `--` para que um campo
+/// XSS'd (`--load-info-json=…`) não seja lido como opção do yt-dlp.
+pub fn probe_args(url: &str, proxy: &Option<String>, js_args: &[String]) -> Vec<String> {
+    let mut args = vec![
+        "--dump-json".into(),
+        "--no-download".into(),
+        "--no-playlist".into(),
+        // Rede parada ≠ espera infinita (paridade com o Android).
+        "--socket-timeout".into(),
+        "30".into(),
+    ];
+    common_auth(&mut args, proxy);
+    args.extend(js_args.iter().cloned());
+    args.push("--".into());
+    args.push(url.to_owned());
+    args
+}
+
+/// Args do probe de playlist; mesma regra do `--` antes da URL.
+pub fn playlist_probe_args(url: &str, proxy: &Option<String>, js_args: &[String]) -> Vec<String> {
+    let mut args = vec![
+        "--flat-playlist".into(),
+        "--dump-json".into(),
+        "--no-download".into(),
+        "--ignore-errors".into(),
+        "--socket-timeout".into(),
+        "30".into(),
+    ];
+    common_auth(&mut args, proxy);
+    args.extend(js_args.iter().cloned());
+    args.push("--".into());
+    args.push(url.to_owned());
+    args
+}
+
 /// Retorna o JSON bruto; `--no-playlist` mantém paridade com o Android.
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
@@ -49,10 +87,7 @@ pub async fn ytdlp_probe(
     options: ProbeOptions,
 ) -> Result<serde_json::Value, String> {
     let bin = super::binary::ytdlp_path(&app)?;
-    let mut args = vec!["--dump-json".into(), "--no-download".into(), "--no-playlist".into()];
-    common_auth(&mut args, &options.proxy);
-    args.extend(super::binary::js_runtime_args());
-    args.push(options.url);
+    let args = probe_args(&options.url, &options.proxy, &super::binary::js_runtime_args());
     let stdout = run_capture(&bin, &args).await?;
     serde_json::from_slice(&stdout).map_err(|e| format!("probe: JSON inválido: {e}"))
 }
@@ -134,15 +169,7 @@ pub async fn ytdlp_probe_playlist(
     options: ProbeOptions,
 ) -> Result<PlaylistResult, String> {
     let bin = super::binary::ytdlp_path(&app)?;
-    let mut args = vec![
-        "--flat-playlist".into(),
-        "--dump-json".into(),
-        "--no-download".into(),
-        "--ignore-errors".into(),
-    ];
-    common_auth(&mut args, &options.proxy);
-    args.extend(super::binary::js_runtime_args());
-    args.push(options.url);
+    let args = playlist_probe_args(&options.url, &options.proxy, &super::binary::js_runtime_args());
     let stdout = run_capture(&bin, &args).await?;
     Ok(parse_playlist_ndjson(&String::from_utf8_lossy(&stdout)))
 }
@@ -204,5 +231,27 @@ mod playlist_parse_tests {
         assert_eq!(r.entries.len(), 2);
         assert_eq!(r.playlist_count, Some(2));
         assert_eq!(r.title.as_deref(), Some("Minha Playlist"));
+    }
+}
+
+#[cfg(test)]
+mod args_security_tests {
+    use super::{playlist_probe_args, probe_args};
+
+    #[test]
+    fn url_maliciosa_apos_separador_nao_vira_opcao() {
+        // Regressão de segurança: URL/flag injetada deve ser posição, não opção.
+        let evil = "--load-info-json=/etc/passwd";
+        let a = probe_args(evil, &None, &[]);
+        let sep = a.iter().position(|x| x == "--").expect("faltou o separador --");
+        assert_eq!(a.last().map(String::as_str), Some(evil));
+        assert_eq!(sep, a.len() - 2);
+
+        let p = playlist_probe_args(evil, &Some("http://127.0.0.1:8080".into()), &["--js-run".into()]);
+        let sep = p.iter().position(|x| x == "--").expect("faltou o separador --");
+        assert_eq!(p.last().map(String::as_str), Some(evil));
+        // Opções legítimas (proxy, js) vêm antes do separador; nada depois além da URL.
+        assert!(p[..sep].contains(&"--proxy".to_string()));
+        assert!(p[..sep].contains(&"--js-run".to_string()));
     }
 }

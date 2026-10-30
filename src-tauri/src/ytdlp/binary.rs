@@ -205,13 +205,15 @@ pub async fn ytdlp_status(app: AppHandle) -> Result<BinStatus, String> {
     let version = if ytdlp.is_file() {
         let mut cmd = tokio::process::Command::new(&ytdlp);
         cmd.arg("--version");
+        cmd.kill_on_drop(true);
         crate::proc::hide_console(&mut cmd);
-        cmd.output()
-            .await
-            .ok()
-            .filter(|o| o.status.success())
-            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
-            .filter(|v| !v.is_empty())
+        match tokio::time::timeout(std::time::Duration::from_secs(15), cmd.output()).await {
+            Ok(Ok(o)) if o.status.success() => {
+                Some(String::from_utf8_lossy(&o.stdout).trim().to_owned())
+                    .filter(|v| !v.is_empty())
+            }
+            _ => None,
+        }
     } else {
         None
     };
@@ -226,6 +228,10 @@ pub async fn ytdlp_status(app: AppHandle) -> Result<BinStatus, String> {
 fn build_client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
         .user_agent("LinkFetcher-setup")
+        // Só o de conexão: este client também baixa os binários (~190 MB) e
+        // um timeout total mataria linhas lentas. Os pedidos curtos (sums)
+        // levam `.timeout()` próprio no RequestBuilder.
+        .connect_timeout(std::time::Duration::from_secs(15))
         .redirect(reqwest::redirect::Policy::custom(|attempt| {
             let host_ok = attempt.url().host_str().is_some_and(|h| {
                 ALLOWED_HOSTS
@@ -416,10 +422,13 @@ async fn smoke(bin: &Path, file: &str) -> Result<(), String> {
     };
     let mut cmd = tokio::process::Command::new(bin);
     cmd.arg(flag);
+    cmd.kill_on_drop(true);
     crate::proc::hide_console(&mut cmd);
-    let out = cmd
-        .output()
+    // Binário quebrado/pentente pode nunca responder: sem deadline o setup
+    // fica preso e `ENSURE_RUNNING` nunca libera.
+    let out = tokio::time::timeout(std::time::Duration::from_secs(30), cmd.output())
         .await
+        .map_err(|_| format!("smoke {file}: tempo esgotado (30s)"))?
         .map_err(|e| format!("smoke {file}: {e}"))?;
     if out.status.success() {
         Ok(())
@@ -464,6 +473,7 @@ async fn ensure_ytdlp(client: &reqwest::Client, app: &AppHandle) -> Result<PathB
     );
     let sums = client
         .get(&sums_url)
+        .timeout(std::time::Duration::from_secs(60))
         .send()
         .await
         .map_err(|e| fail(format!("yt-dlp sums: {e}")))?
@@ -664,7 +674,8 @@ async fn ensure_ffmpeg(client: &reqwest::Client, app: &AppHandle) -> Result<Path
     let sums_url = format!(
         "https://github.com/BtbN/FFmpeg-Builds/releases/download/{FFMPEG_TAG}/checksums.sha256"
     );
-    let expected_sha: String = match client.get(&sums_url).send().await {
+    let expected_sha: String =
+        match client.get(&sums_url).timeout(std::time::Duration::from_secs(60)).send().await {
         Ok(resp) => match resp.text().await {
             Ok(text) => parse_sums(&text, FFMPEG_ASSET)
                 .unwrap_or_else(|| pinned_ffmpeg_sha().to_owned()),
@@ -723,14 +734,37 @@ pub async fn ytdlp_ensure_binaries(_app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Libera `ENSURE_RUNNING` em qualquer saída do task (erro, pânico ou early
+/// return). Com o `store` manual no fim, um pânico no meio do setup deixava a
+/// trava acesa para sempre: `ytdlp_ensure_binaries` virava no-op silencioso e
+/// o overlay de setup girava ao infinito.
+struct EnsureGuard;
+
+impl EnsureGuard {
+    fn acquire() -> Option<Self> {
+        if ENSURE_RUNNING.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            None
+        } else {
+            Some(Self)
+        }
+    }
+}
+
+impl Drop for EnsureGuard {
+    fn drop(&mut self) {
+        ENSURE_RUNNING.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub async fn ytdlp_ensure_binaries(app: AppHandle) -> Result<(), String> {
     let handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        if ENSURE_RUNNING.swap(true, std::sync::atomic::Ordering::SeqCst) {
-            return;
-        }
+        let _guard = match EnsureGuard::acquire() {
+            Some(g) => g,
+            None => return,
+        };
         if let Err(e) = ensure_binaries(&handle).await {
             let _ = handle.emit(
                 "binary-download",
@@ -745,7 +779,6 @@ pub async fn ytdlp_ensure_binaries(app: AppHandle) -> Result<(), String> {
                 },
             );
         }
-        ENSURE_RUNNING.store(false, std::sync::atomic::Ordering::SeqCst);
     });
     Ok(())
 }
