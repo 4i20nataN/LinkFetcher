@@ -344,7 +344,8 @@ export async function probePlaylistFull(
   const provider = ProviderRegistry.getProviderForUrl(url);
   const platform = (provider as any).platform as PlatformId || 'generic';
 
-  const items: PlaylistItem[] = (result.entries || []).map((entry, idx) => ({
+  const entries: Record<string, unknown>[] = result.entries || [];
+  const items: PlaylistItem[] = entries.map((entry, idx) => ({
     id: (entry.id as string) || `pl_${idx}`,
     title: (entry.title as string) || `Item ${idx + 1}`,
     url: (entry.url as string) || (entry.webpage_url as string) || url,

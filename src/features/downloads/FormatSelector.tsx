@@ -227,7 +227,7 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
   // Ao mudar um lado, o outro volta p/ neutro se ficar incompatível
   useEffect(() => {
     if (options.audioOnly) return;
-    if (allowedCodecs && !allowedCodecs.includes(options.videoCodec)) {
+    if (allowedCodecs && (options.videoCodec === undefined || !allowedCodecs.includes(options.videoCodec))) {
       update({ videoCodec: allowedCodecs[0] });
     }
   }, [options.audioOnly, allowedCodecs, options.videoCodec, update]);
@@ -298,7 +298,7 @@ export const FormatSelector = React.memo(function FormatSelector({ mediaInfo, on
                   key={fmt.id}
                   onClick={() => {
                     setOptions(prev => ({ ...prev, format: fmt.id }));
-                    onFormatChange(fmt);
+                    onFormatChange?.(fmt);
                   }}
                   className={`
                     border rounded-lg fs-sm font-bold transition-all text-center py-2.5

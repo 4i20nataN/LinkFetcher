@@ -11,7 +11,12 @@ export class StorageService {
   }
 
   static saveFavorites(favs: FavoriteItem[]) {
-    localStorage.setItem('universal_downloader_favorites', JSON.stringify(favs));
+    try {
+      localStorage.setItem('universal_downloader_favorites', JSON.stringify(favs));
+    } catch (e) {
+      // Quota esgotada/modo privado: loga em vez de estourar no handler do clique.
+      console.error('[Storage] saveFavorites falhou:', e);
+    }
   }
 
   static toggleFavorite(fav: Omit<FavoriteItem, 'dateAdded'>): boolean {
@@ -56,7 +61,12 @@ export class StorageService {
   }
 
   static saveDownloadLater(list: DownloadLaterItem[]) {
-    localStorage.setItem('universal_downloader_later', JSON.stringify(list));
+    try {
+      localStorage.setItem('universal_downloader_later', JSON.stringify(list));
+    } catch (e) {
+      // Quota esgotada/modo privado: loga em vez de estourar no handler do clique.
+      console.error('[Storage] saveDownloadLater falhou:', e);
+    }
   }
 
   static addToDownloadLater(item: Omit<DownloadLaterItem, 'dateAdded'>): boolean {

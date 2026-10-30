@@ -140,8 +140,6 @@ export const BinarySetupOverlay: React.FC<{ onReady: () => void }> = ({ onReady 
           {t('setupDesc')}
         </p>
 
-        {st.stage === 'checking' && <p className="text-sm lf-text-muted">{t('setupChecking')}</p>}
-
         {st.stage === 'idle' && (
           <div className="flex gap-2">
             <button className="px-4 py-2 rounded-xl bg-indigo-500 text-white text-sm font-semibold" onClick={startDownload}>

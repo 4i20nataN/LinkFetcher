@@ -38,6 +38,8 @@ const asBool = (v: unknown, fallback: boolean) => (typeof v === 'boolean' ? v : 
 const asNum = (v: unknown, fallback: number) =>
   typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : fallback;
 const asStr = (v: unknown, fallback: string) => (typeof v === 'string' ? v : fallback);
+const asOptStr = (v: unknown, fallback: string | undefined): string | undefined =>
+  typeof v === 'string' ? v : fallback;
 
 /**
  * Sanitiza settings vindos de localStorage/backup: JSON válido com forma ou
@@ -59,7 +61,7 @@ export function sanitizeSettings(raw: unknown): AppSettings {
     iconStyle,
     language,
     defaultDir: asStr(s.defaultDir, d.defaultDir),
-    mobilePublicSubdir: asStr(s.mobilePublicSubdir, d.mobilePublicSubdir),
+    mobilePublicSubdir: asOptStr(s.mobilePublicSubdir, d.mobilePublicSubdir),
     bandLimit: asNum(s.bandLimit, d.bandLimit),
     maxConcurrent: Math.min(10, Math.max(1, Math.round(asNum(s.maxConcurrent, d.maxConcurrent)))),
     autoDownload: asBool(s.autoDownload, d.autoDownload),

@@ -54,6 +54,7 @@ export const DownloadLaterView: React.FC = () => {
 
               return (
                 <AnimatedCard
+                  key={item.id}
                   animateKey={item.id}
                   variant={slideUpLight}
                   className="p-3.5 rounded-2xl glass-card flex flex-col sm:flex-row gap-4 justify-between sm:items-center group hover:bg-white/10 transition-colors [content-visibility:auto] [contain-intrinsic-size:auto_120px]"

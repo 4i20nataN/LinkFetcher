@@ -319,6 +319,7 @@ export function TimeRangeSlider({ durationSeconds, startSeconds, endSeconds, acc
 }
 
 export interface AccordionSectionProps {
+  id?: string;
   title: string;
   blockId: BlockId;
   isOpen: boolean;

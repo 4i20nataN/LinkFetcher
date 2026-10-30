@@ -9,8 +9,9 @@ function isDesktop(): boolean {
 }
 
 async function callDesktop<T>(channel: string, payload?: unknown): Promise<T> {
-  if (isDesktop()) {
-    return window.electron.invoke(channel, payload) as Promise<T>;
+  const electron = window.electron;
+  if (isDesktop() && electron) {
+    return electron.invoke(channel, payload) as Promise<T>;
   }
   throw new Error('Desktop bridge unavailable');
 }

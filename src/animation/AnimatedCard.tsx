@@ -5,7 +5,16 @@ import { m, type Variants } from 'motion/react';
 import { slideUp, transitions } from './variants';
 import { RENDER_PROFILE } from '../core/perf/renderProfile';
 
-interface AnimatedCardProps extends React.ComponentPropsWithoutRef<'div'> {
+interface AnimatedCardProps extends Omit<
+  React.ComponentPropsWithoutRef<'div'>,
+  | 'onDrag'
+  | 'onDragStart'
+  | 'onDragEnd'
+  | 'onAnimationStart'
+  | 'onAnimationEnd'
+  | 'onAnimationIteration'
+  | 'onTransitionEnd'
+> {
   children: React.ReactNode;
   variant?: Variants;
   transition?: React.ComponentProps<typeof m.div>['transition'];

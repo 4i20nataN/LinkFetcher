@@ -102,6 +102,7 @@ export const FavoritesView: React.FC = () => {
 
               return (
                 <AnimatedCard
+                  key={fav.id}
                   animateKey={fav.id}
                   variant={scaleIn}
                   className="rounded-2xl glass-card flex flex-col group hover:bg-white/10 transition-colors overflow-hidden [content-visibility:auto] [contain-intrinsic-size:auto_320px]"

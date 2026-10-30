@@ -108,7 +108,7 @@ export function VideoFormatSection({ ctx }: Ctx) {
                   </Btn>
                 );
                 return ok ? btn : (
-                  <TooltipWrapper key={fmt} tip={t('fmtTipIncompatCodec', { name: VIDEO_CODECS.find(c => c.id === options.videoCodec)?.label ?? options.videoCodec })}>
+                  <TooltipWrapper key={fmt} tip={t('fmtTipIncompatCodec', { name: VIDEO_CODECS.find(c => c.id === options.videoCodec)?.label ?? options.videoCodec ?? '' })}>
                     {btn}
                   </TooltipWrapper>
                 );

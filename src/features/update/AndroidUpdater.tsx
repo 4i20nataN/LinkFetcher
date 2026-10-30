@@ -82,12 +82,14 @@ export interface AndroidUpdateAvailable {
   body: string;
 }
 
-export interface AndroidCheckResult {
-  available: boolean;
-  /** tag remota (mesmo quando já está em dia) */
-  tag: string;
-  info?: AndroidUpdateAvailable;
-}
+export type AndroidCheckResult =
+  | {
+      available: true;
+      /** tag remota (mesmo quando já está em dia) */
+      tag: string;
+      info: AndroidUpdateAvailable;
+    }
+  | { available: false; tag: string };
 
 /** Checagem pura reusável (banner automático + linha manual): resolve com
  *  o APK da ABI do aparelho quando há release maior que a instalada.
@@ -238,7 +240,7 @@ export function AndroidUpdater() {
           </button>
         ) : (
           <span className="px-3 py-2 text-xs lf-text-muted flex items-center gap-1.5">
-            {stage === 'available' || stage === 'downloading' ? <CheckCircle2 size={12} className="text-emerald-400" /> : <RefreshCw size={12} className="animate-spin" />}
+            {stage === 'downloading' ? <CheckCircle2 size={12} className="text-emerald-400" /> : <RefreshCw size={12} className="animate-spin" />}
             {stage === 'downloading' ? (en ? 'Downloading…' : 'Baixando…') : ''}
           </span>
         )}
