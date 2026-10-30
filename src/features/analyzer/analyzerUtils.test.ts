@@ -1,7 +1,7 @@
 // Lote de playlist: MediaInfo da entry flat + opções globais.
 import { describe, it, expect } from 'vitest';
 import {
-  fmtDuration, playlistItemToMedia, buildBulkOptions, removePlaylistItem,
+  fmtDuration, playlistItemToMedia, buildBulkOptions, removePlaylistItem, canBulkPlaylist,
 } from './analyzerUtils';
 import type { FormatOptions } from '../downloads/FormatOptions';
 import type { PlaylistInfo } from '../../types';
@@ -89,5 +89,25 @@ describe('playlist bulk', () => {
     const a = buildBulkOptions(base, 'audio');
     expect(a.audioOnly).toBe(true);
     expect(a.format).toBe('bestaudio/best');
+  });
+});
+
+// Lote de playlist é PRO nos três ajustes; análise e item avulso não são.
+describe('canBulkPlaylist', () => {
+  const inOneHourSec = Math.floor(Date.now() / 1000) + 3600;
+
+  it('sem licença: lote bloqueado', () => {
+    expect(canBulkPlaylist(null)).toBe(false);
+    expect(canBulkPlaylist(undefined)).toBe(false);
+  });
+
+  it('licença ativa ou vitalícia: lote liberado', () => {
+    expect(canBulkPlaylist({ expiresAt: inOneHourSec })).toBe(true);
+    expect(canBulkPlaylist({ expiresAt: 0 })).toBe(true);
+  });
+
+  it('licença expirada: lote bloqueado', () => {
+    expect(canBulkPlaylist({ expiresAt: Math.floor(Date.now() / 1000) - 1 })).toBe(false);
+    expect(canBulkPlaylist({ expiresAt: 1 })).toBe(false);
   });
 });

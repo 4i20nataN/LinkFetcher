@@ -3,6 +3,14 @@
 import type { MediaFormat, MediaInfo, PlaylistInfo, PlaylistItem } from '../../types';
 import type { FormatOptions } from '../downloads/FormatOptions';
 import { parseFormatHeight } from '../downloads/format/formatUtils';
+import { isLicenseActive } from '../../core/license/license';
+
+/** Lote de playlist (vídeo, áudio ou personalizado) é PRO: a análise e o item
+ *  avulso continuam gratuitos. Pura p/ teste — a UI usa para o portão visual e
+ *  o handler revalida a assinatura antes de enfileirar. */
+export function canBulkPlaylist(license: { expiresAt: number } | null | undefined): boolean {
+  return isLicenseActive(license);
+}
 
 export function formatUploadDate(d: string): string {
   return /^\d{8}$/.test(d) ? `${d.slice(6, 8)}/${d.slice(4, 6)}/${d.slice(0, 4)}` : d;

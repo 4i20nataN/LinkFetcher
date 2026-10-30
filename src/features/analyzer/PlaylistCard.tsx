@@ -316,25 +316,48 @@ export function PlaylistCard({
               </button>
             )}
 
-            {/* Gratuito primeiro (mesma ordem do vídeo unitário). */}
+            {/* Lote (rápido ou personalizado) é PRO: o gratuito vê os botões,
+                o cadeado avisa e o clique cai no portão do handler (pop-up). */}
             <div className="border-t lf-border pt-4 space-y-2">
               <p className="font-bold text-white text-center text-base">
-                {isEn ? '📥 Free Download' : '📥 Download Gratuito'}
+                {isEn
+                  ? (proActive ? '📥 Quick Download' : '📥 Quick Download — PRO')
+                  : (proActive ? '📥 Download Rápido' : '📥 Download Rápido — PRO')}
               </p>
               <div className="grid grid-cols-2 gap-5">
                 <button
                   onClick={() => onDownloadAll('video')}
-                  className="flex items-center justify-center gap-2 py-2.5 px-2 rounded-xl bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:brightness-110 text-white font-bold fs-sm whitespace-nowrap transition-all shadow-lg shadow-blue-500/25 hover:scale-[1.01] active:scale-[0.99]"
+                  title={proActive ? undefined : (isEn ? 'Bulk playlist download is PRO' : 'Lote de playlist é PRO')}
+                  className={`flex items-center justify-center gap-2 py-2.5 px-2 rounded-xl font-bold fs-sm whitespace-nowrap transition-all shadow-lg ${
+                    proActive
+                      ? 'bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:brightness-110 text-white shadow-blue-500/25 hover:scale-[1.01] active:scale-[0.99]'
+                      : 'bg-zinc-600 cursor-pointer opacity-80 hover:opacity-100 text-white'
+                  }`}
                 >
-                  <Clapperboard size={15} className="text-white shrink-0" />
+                  {proActive
+                    ? <Clapperboard size={15} className="text-white shrink-0" />
+                    : <Lock size={15} className="text-white shrink-0" />}
                   {isEn ? 'Default Video' : 'Vídeo Padrão'}
+                  {!proActive && (
+                    <span className="px-1 rounded text-[7px] font-bold leading-tight bg-amber-500 text-black border border-amber-600">PRO</span>
+                  )}
                 </button>
                 <button
                   onClick={() => onDownloadAll('audio')}
-                  className="flex items-center justify-center gap-2 py-2.5 px-2 rounded-xl bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:brightness-110 text-white font-bold fs-sm whitespace-nowrap transition-all shadow-lg shadow-blue-500/25 hover:scale-[1.01] active:scale-[0.99]"
+                  title={proActive ? undefined : (isEn ? 'Bulk playlist download is PRO' : 'Lote de playlist é PRO')}
+                  className={`flex items-center justify-center gap-2 py-2.5 px-2 rounded-xl font-bold fs-sm whitespace-nowrap transition-all shadow-lg ${
+                    proActive
+                      ? 'bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:brightness-110 text-white shadow-blue-500/25 hover:scale-[1.01] active:scale-[0.99]'
+                      : 'bg-zinc-600 cursor-pointer opacity-80 hover:opacity-100 text-white'
+                  }`}
                 >
-                  <Music size={15} className="text-white shrink-0" />
+                  {proActive
+                    ? <Music size={15} className="text-white shrink-0" />
+                    : <Lock size={15} className="text-white shrink-0" />}
                   {isEn ? 'MP3 Audio' : 'Áudio MP3'}
+                  {!proActive && (
+                    <span className="px-1 rounded text-[7px] font-bold leading-tight bg-amber-500 text-black border border-amber-600">PRO</span>
+                  )}
                 </button>
               </div>
             </div>

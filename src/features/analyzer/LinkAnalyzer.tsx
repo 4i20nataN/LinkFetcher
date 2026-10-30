@@ -17,10 +17,11 @@ import { isLicenseActive, isLicenseGenuine } from '../../core/license/license';
 import type { FormatOptions } from '../downloads/FormatOptions';
 import { isPlaylistUrl } from '../../core/ytdlp/playlistUtils';
 import { adapterErrorMessage } from '../../core/ytdlp/YtDlpAdapter';
-import { sanitizeUrl, formatUploadDate as fmtDate, pickQuickRefFormat, buildQuickOptions, buildBulkOptions, playlistItemToMedia, removePlaylistItem } from './analyzerUtils';
+import { sanitizeUrl, formatUploadDate as fmtDate, pickQuickRefFormat, buildQuickOptions, buildBulkOptions, playlistItemToMedia, removePlaylistItem, canBulkPlaylist } from './analyzerUtils';
 import { LicenseModal } from '../../core/license/LicenseModal';
 import { AnalyzeForm } from './AnalyzeForm';
 import { PlaylistCard } from './PlaylistCard';
+import { ProBulkModal } from './ProBulkModal';
 import { MediaResultCard } from './MediaResultCard';
 
 
@@ -57,6 +58,9 @@ export const LinkAnalyzer: React.FC = () => {
   const [playlistExpanded, setPlaylistExpanded] = useState(false);
   // Modal PRO (desbloqueio a partir do card de playlist).
   const [showLicense, setShowLicense] = useState(false);
+  // Aviso "lote de playlist é PRO": 1x por análise bem-sucedida e quando o
+  // gratuito tenta o lote. Não persiste (reanalisar pode mostrar de novo).
+  const [showBulkPro, setShowBulkPro] = useState(false);
   // Mídia de referência p/ o painel global (1 probe no 1º item).
   const [refMedia, setRefMedia] = useState<MediaInfo | null>(null);
   const [refLoading, setRefLoading] = useState(false);
@@ -170,6 +174,7 @@ export const LinkAnalyzer: React.FC = () => {
     setSuccessMsg(null);
     setProbeError(null);
     setPlaylistInfo(null);
+    setShowBulkPro(false);
     setShowCoverFormats(false);
 
     if (isPlaylistUrl(targetUrl)) {
@@ -188,6 +193,9 @@ export const LinkAnalyzer: React.FC = () => {
         }
         setPlaylistInfo(playlist);
         setLoading(false);
+        // Análise continua gratuita; o que virou PRO é o lote. Avisa 1x por
+        // análise bem-sucedida (esta função roda por submissão, não por render).
+        if (!canBulkPlaylist(getLicense())) setShowBulkPro(true);
         fireReferenceProbe(playlist);
         return;
       } catch (err: any) {
@@ -350,11 +358,13 @@ export const LinkAnalyzer: React.FC = () => {
   };
 
   // Lote com config única: sem probe por item (o MediaInfo vem da entry
-  // flat). custom = PRO, igual ao personalizado unitário.
+  // flat). Playlist em lote é PRO nos três ajustes (rápido ou personalizado):
+  // presença p/ a UI + assinatura revalidada p/ ação privilegiada. Negado →
+  // só o pop-up, nada entra na fila.
   const handleDownloadAllPlaylist = async (kind: 'custom' | 'audio' | 'video') => {
     if (!playlistInfo || playlistInfo.items.length === 0) return;
-    if (kind === 'custom' && (!isLicenseActive(getLicense()) || !(await isLicenseGenuine()))) {
-      setError(settings.language === 'en' ? 'Bulk custom download is PRO — use a free preset or activate your key.' : 'Download em lote personalizado é PRO — use um preset gratuito ou ative sua chave.');
+    if (!canBulkPlaylist(getLicense()) || !(await isLicenseGenuine())) {
+      setShowBulkPro(true);
       return;
     }
     const opts = buildBulkOptions(formatOptions, kind);
@@ -687,6 +697,13 @@ export const LinkAnalyzer: React.FC = () => {
       />
 
       {showLicense && <LicenseModal onClose={() => setShowLicense(false)} />}
+
+      {showBulkPro && (
+        <ProBulkModal
+          onClose={() => setShowBulkPro(false)}
+          onActivate={() => { setShowBulkPro(false); setShowLicense(true); }}
+        />
+      )}
 
       {mediaInfo && !loading && (
         <MediaResultCard

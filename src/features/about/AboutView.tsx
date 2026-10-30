@@ -66,14 +66,12 @@ export function AboutView() {
         'Link analysis, download queue, favorites and "download later"',
         'Video up to 1080p60 (merged into MP4)',
         'Audio as MP3 at maximum quality',
-        'Bulk download of a whole playlist with the quick presets',
         'No sign-up and no key to activate',
       ]
     : [
         'Análise de link, fila de download, favoritos e "baixar depois"',
         'Vídeo até 1080p60 (merge em MP4)',
         'Áudio em MP3 na qualidade máxima',
-        'Lote de playlist inteira com os ajustes rápidos',
         'Sem cadastro e sem chave para ativar',
       ];
   // PRO = painel Download Personalizado (FormatSelector/LinkAnalyzer), que sem
@@ -87,7 +85,7 @@ export function AboutView() {
         'Cover art: save, embed; metadata inside the file',
         'Custom filename, audio normalize and video sharpen (desktop)',
         'Bandwidth limit and parallel fragment downloads',
-        'All of the above applied to a playlist in bulk',
+        'Whole playlist in bulk, with any preset — quick or custom',
       ]
     : [
         'Resolução até 4K, além de teto de FPS e escolha de codec',
@@ -97,7 +95,7 @@ export function AboutView() {
         'Capa: salvar e incrustar; metadados dentro do arquivo',
         'Nome do arquivo, normalização de áudio e nitidez de vídeo (desktop)',
         'Limite de banda e fragmentos baixados em paralelo',
-        'Tudo isso aplicado em lote a uma playlist inteira',
+        'Playlist inteira em lote, em qualquer ajuste — rápido ou personalizado',
       ];
 
   const howItWorks = isEn
@@ -273,8 +271,8 @@ export function AboutView() {
             </h3>
             <p className={`${body} mb-4`}>
               {isEn
-                ? 'The free plan is not a trial: the app keeps working without a key, with video up to 1080p60 and MP3 audio. PRO unlocks the Custom Download panel — without it those controls are readable but locked.'
-                : 'O plano gratuito não é avaliação: o app continua funcionando sem chave, com vídeo até 1080p60 e áudio MP3. O PRO libera o painel Download Personalizado — sem ele, esses controles aparecem à mostra mas travados.'}
+                ? 'The free plan is not a trial: the app keeps working without a key, with video up to 1080p60 and MP3 audio. A playlist you can still analyze and browse item by item for free — downloading the whole list at once is PRO. PRO unlocks the Custom Download panel — without it those controls are readable but locked.'
+                : 'O plano gratuito não é avaliação: o app continua funcionando sem chave, com vídeo até 1080p60 e áudio MP3. Playlist ele continua analisando e mostrando todos os itens de graça — o lote da lista inteira é PRO. O PRO libera o painel Download Personalizado — sem ele, esses controles aparecem à mostra mas travados.'}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
               <div>

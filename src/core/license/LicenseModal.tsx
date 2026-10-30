@@ -497,8 +497,8 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
             )}
             <div className="grid grid-cols-2 gap-1.5">
               {(isEn
-                ? ['Up to 4K', 'Every codec', 'Trims and subtitles', 'SponsorBlock']
-                : ['Até 4K', 'Codecs e formatos', 'Cortes e legendas', 'SponsorBlock']
+                ? ['Up to 4K', 'Every codec', 'Trims and subtitles', 'SponsorBlock', 'Bulk playlists']
+                : ['Até 4K', 'Codecs e formatos', 'Cortes e legendas', 'SponsorBlock', 'Playlist em lote']
               ).map(b => (
                 <div key={b} className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15 fs-sm lf-text-secondary">
                   <Check size={12} className="text-emerald-400 shrink-0" />
