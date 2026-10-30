@@ -8,8 +8,9 @@ import { verifyLicenseKey, isLicenseActive, keyBelongsToContact } from './licens
 import { getLicense, saveLicense, clearLicense, useLicense } from './licenseStore';
 import { PLANS, planById, formatBRL, validEmail, TURNSTILE_SITE_KEY } from './purchase';
 import { createAutoCheckout, fetchAutoKey, recoverKey, deviceId, saveLastCheckout, loadLastCheckout, clearLastCheckout, type AutoCheckout } from './autoBuy';
+import { ResendKeySection } from './ResendKeySection';
 import QRCode from 'qrcode';
-import { KeyRound, X, Lock, Trash2, Copy, Check } from 'lucide-react';
+import { KeyRound, X, Lock, Trash2, Copy, Check, Mail } from 'lucide-react';
 
 const ERR_PT: Record<string, string> = {
   format: 'Formato inválido. Confira a chave recebida (começa com LF1-).',
@@ -90,8 +91,9 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
   const [buyerEmail, setBuyerEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [recoverBusy, setRecoverBusy] = useState(false);
-  const [recoverMsg, setRecoverMsg] = useState<string | null>(null);
+  // Painel "licença ativa": o reenvio mora aqui (era só uma view escondida
+  // dentro de "Já tenho uma chave").
+  const [showResend, setShowResend] = useState(false);
 
   const emailOk = validEmail(email);
   const [planId, setPlanId] = useState('mensal');
@@ -397,27 +399,6 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
     }
   }
 
-  async function sendRecovery(): Promise<void> {
-    const contact = buyerEmail.trim().toLowerCase();
-    if (!validEmail(contact) || recoverBusy) return;
-    setRecoverBusy(true);
-    setRecoverMsg(null);
-    try {
-      const r = await recoverKey(contact);
-      if (r.status === 'sent') {
-        setRecoverMsg(t('Chave enviada pro seu e-mail.', 'Key sent to your email.'));
-      } else if (r.status === 'send-failed') {
-        setRecoverMsg(t('Compra encontrada, mas o e-mail falhou — use "Perdi minha chave" para tentar de novo.', 'Purchase found, but email failed — use "Lost my key" to retry.'));
-      } else {
-        setRecoverMsg(t('Nenhuma compra paga para este e-mail.', 'No paid purchase for this email.'));
-      }
-    } catch {
-      setRecoverMsg(t('Não enviou. Tente de novo.', 'Could not send. Try again.'));
-    } finally {
-      setRecoverBusy(false);
-    }
-  }
-
   const steps = [
     { label: 'E-mail', done: emailOk, on: !emailOk },
     { label: 'Pix', done: !!doneKey, on: emailOk && !doneKey },
@@ -452,6 +433,19 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
                 </span>
               )}
             </div>
+            <button
+              onClick={() => setShowResend(v => !v)}
+              aria-expanded={showResend}
+              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl lf-surface-40 lf-border lf-text-secondary hover:text-white fs-sm font-semibold transition-colors"
+            >
+              <Mail size={14} />
+              {showResend ? t('Fechar', 'Close') : t('Reenviar chave por e-mail', 'Resend key by email')}
+            </button>
+            {showResend && (
+              <div className="pt-1">
+                <ResendKeySection initialEmail={lic.contact || ''} withRelease />
+              </div>
+            )}
             <button
               onClick={() => { clearLicense(); onClose(); }}
               className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl lf-surface-40 lf-border lf-text-secondary hover:text-red-400 fs-sm font-semibold transition-colors"
@@ -629,6 +623,12 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
             >
               {t('Já tenho uma chave', 'I already have a key')}
             </button>
+            <button
+              onClick={() => setView('recover')}
+              className={LINK_BTN}
+            >
+              {t('Já comprei, mas perdi a chave — reenviar por e-mail', 'I already bought but lost the key — resend by email')}
+            </button>
           </div>
         ) : view === 'activate' ? (
           <div className="space-y-3">
@@ -675,44 +675,21 @@ export function LicenseModal({ onClose }: { onClose: () => void }) {
               {busy ? '…' : t('Ativar', 'Activate')}
             </button>
             <button
-              onClick={() => { setView('recover'); setRecoverMsg(null); }}
+              onClick={() => setView('recover')}
               className={LINK_BTN}
             >
-              {t('Perdi minha chave', 'Lost my key')}
+              {t('Perdi minha chave — reenviar por e-mail', 'Lost my key — resend by email')}
             </button>
           </div>
         ) : view === 'recover' ? (
           <div className="space-y-3">
             <button
-              onClick={() => { setView('activate'); setRecoverMsg(null); }}
+              onClick={() => setView(lic ? 'activate' : 'buy')}
               className="fs-sm lf-text-muted hover:text-zinc-200 transition-colors"
             >
-              ← {t('Voltar à ativação', 'Back to activation')}
+              ← {t('Voltar', 'Back')}
             </button>
-            <p className="fs-sm lf-text-secondary">
-              {t(
-                'Digite o e-mail da compra: se ele já comprou, reenviamos a chave (válida até a expiração).',
-                'Enter the purchase email: if it already bought, we resend the key (valid until expiration).',
-              )}
-            </p>
-            <input
-              value={buyerEmail}
-              onChange={e => setBuyerEmail(e.target.value)}
-              inputMode="email"
-              autoComplete="off"
-              placeholder="voce@email.com"
-              className={INPUT_CLS}
-            />
-            <button
-              onClick={() => void sendRecovery()}
-              disabled={!validEmail(buyerEmail) || recoverBusy}
-              className={PRIMARY_BTN}
-            >
-              {recoverBusy ? '…' : t('Enviar minha chave no e-mail', 'Send my key by email')}
-            </button>
-            {recoverMsg && (
-              <p className="fs-sm lf-text-secondary">{recoverMsg}</p>
-            )}
+            <ResendKeySection initialEmail={buyerEmail} withRelease />
           </div>
         ) : null}
       </div>

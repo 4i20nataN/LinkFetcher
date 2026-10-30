@@ -12,6 +12,9 @@ BASE_URL = "https://linkfetcher-licenses.linkfetcher.workers.dev"
 # Remetente do e-mail da chave (tem que ser o e-mail verificado no Brevo).
 # FORA DO REPO: configure como segredo — `wrangler secret put SMTP_FROM`.
 # (O Worker lê env.SMTP_FROM igual; [vars] aqui exporia o endereço no git.)
+# SUPPORT_EMAIL = caixa que LÊ as respostas dos e-mails. O Worker só escreve
+# "responda este e-mail" quando ele existe; sem ele, o replyTo fica desligado.
+# FORA DO REPO: `wrangler secret put SUPPORT_EMAIL`.
 
 # D1 — crie antes: wrangler d1 create linkfetcher-licenses
 # e cole o database_id abaixo. Migrações versionadas em ./migrations:
@@ -37,4 +40,13 @@ name = "RECOVER_LIMITER"         # /api/recover (reenvio de e-mail)
 namespace_id = "1002"
   [ratelimits.simple]
   limit = 5
+  period = 60
+
+# Idem, por E-MAIL da compra: limita o estrago de quem sabe o endereço de
+# alguém (reenvio é enviado à caixa do dono, nunca ao chamador).
+[[ratelimits]]
+name = "RECOVER_CONTACT_LIMITER"
+namespace_id = "1003"
+  [ratelimits.simple]
+  limit = 3
   period = 60

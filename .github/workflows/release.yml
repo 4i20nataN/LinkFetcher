@@ -187,7 +187,7 @@ jobs:
             f"https://github.com/{repo}/releases/tag/{tag}\n"
             f"\n"
             f"Sua chave PRO continua válida — nada muda na ativação.\n"
-            f"Perdeu a chave? No app: Download Personalizado → Ativar PRO → Perdi minha chave."
+            f"Perdeu a chave? No app, aba Sobre → Reenviar chave por e-mail."
           )
           body = json.dumps({
             "tag": tag,

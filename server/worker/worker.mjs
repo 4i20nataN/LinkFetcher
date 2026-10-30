@@ -128,6 +128,32 @@ function planLabelOf(env, row) {
   return String(row?.plan && plansOf(env)[row.plan]?.label || '') || 'PRO';
 }
 
+// --- recover: qual compra o contato pode reenviar (pura p/ teste) ---
+// Regra do produto: nunca reenviar chave vencida nem de plano antigo. Entre as
+// compras pagas do contato vale a MAIS RECENTE que ainda não expirou
+// (paid_at + days) — um anual vigente não perde para um semanal já vencido.
+// Sem linha vigente devolve null: o endpoint responde o neutro e nada é
+// enviado, então a rota continua sem oráculo de "quem já comprou".
+export function pickRecoverable(rows, nowMs = Date.now()) {
+  let best = null;
+  let bestPaidAt = 0;
+  for (const r of rows || []) {
+    if (!r || r.status !== 'paid' || !r.license_key) continue;
+    if (!/@/.test(String(r.email || ''))) continue;
+    const paidAt = Date.parse(r.paid_at || r.created_at || '');
+    if (!Number.isFinite(paidAt) || paidAt <= 0) continue;
+    const days = Number(r.days ?? 30);
+    if (!Number.isFinite(days)) continue;
+    // days >= 3650 = vitalícia (não há o que calcular).
+    const alive = days >= 3650 || paidAt + days * 86_400_000 > nowMs;
+    if (alive && paidAt > bestPaidAt) {
+      best = r;
+      bestPaidAt = paidAt;
+    }
+  }
+  return best;
+}
+
 // --- rate limit em memória (best-effort por isolate): 20 checkouts/min por IP ---
 const hits = new Map();
 function rateOk(ip) {
@@ -280,6 +306,10 @@ async function sendEmail(env, { to, subject, text, html, attachments }) {
       subject,
       textContent: text,
     };
+    // Sem replyTo, "responda este e-mail" cai no remetente verificado do Brevo
+    // (caixa morta). SUPPORT_EMAIL é o endereço de suporte real; sem ele, o
+    // texto abaixo não promete resposta.
+    if (env.SUPPORT_EMAIL) payload.replyTo = { email: env.SUPPORT_EMAIL, name: 'Suporte LinkFetcher' };
     if (html) payload.htmlContent = html;
     if (attachments && attachments.length > 0) {
       payload.attachment = attachments.map((a) => ({
@@ -311,6 +341,13 @@ function escHtml(s) {
   }[c]));
 }
 
+// Promessa de resposta só existe se houver caixa de suporte: o SMTP_FROM do
+// Brevo é um remetente verificado, não um mailbox — sem SUPPORT_EMAIL (e
+// replyTo), "responda este e-mail" seria uma mentira no rodapé.
+function canReply(env) {
+  return /@/.test(String(env.SUPPORT_EMAIL || ''));
+}
+
 function richText(s) {
   // Escapa e quebra linhas; URLs viram links (parte-se antes de escapar
   // p/ não quebrar `&` do href).
@@ -330,7 +367,7 @@ function firstUrl(s) {
 
 // E-mail de novidade (broadcast): mesmo terno do e-mail da chave, com
 // botão de download quando a mensagem traz link.
-function broadcastEmailHtml({ tag, subject, message }) {
+function broadcastEmailHtml({ tag, subject, message, support }) {
   const paras = String(message ?? '')
     .split(/\n{2,}/)
     .map((p) => p.trim())
@@ -364,7 +401,7 @@ ${cta}
 </table>
 </td></tr>
 <tr><td style="background:#f8fafc;padding:14px 28px;text-align:center;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;">
-E-mail automático de novidade — responda se precisar de ajuda.
+${support || 'E-mail automático de novidade.'}
 </td></tr>
 </table>
 </td></tr>
@@ -374,7 +411,7 @@ E-mail automático de novidade — responda se precisar de ajuda.
 
 // Molde HTML do e-mail (tabelas + inline: compatível com Gmail/Outlook).
 // `rows` = blocos de conteúdo já escapados; texto puro segue em `text`.
-function keyEmailHtml({ preheader, title, lead, key, validity, steps, foot }) {
+function keyEmailHtml({ preheader, title, lead, key, validity, steps, foot, support }) {
   const stepRows = steps.map(
     (s, i) => `<tr><td style="padding:7px 0;font-size:14px;line-height:20px;color:#334155;">
       <span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:9999px;background:#ecfdf5;color:#059669;font-size:12px;font-weight:bold;margin-right:8px;">${i + 1}</span>${s}</td></tr>`,
@@ -408,7 +445,7 @@ ${stepRows}
 </table>
 </td></tr>
 <tr><td style="background:#f8fafc;padding:14px 28px;text-align:center;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;">
-E-mail automático da sua compra — responda se precisar de ajuda.
+${support || 'E-mail automático da sua compra.'}
 </td></tr>
 </table>
 </td></tr>
@@ -418,6 +455,7 @@ E-mail automático da sua compra — responda se precisar de ajuda.
 
 async function sendKeyEmail(env, { to, key, days, plan }) {
   const label = plan || 'PRO';
+  const replyable = canReply(env);
   const text = [
     'Bem-vindo ao PRO! Obrigado por apoiar o LinkFetcher.',
     '',
@@ -429,7 +467,9 @@ async function sendKeyEmail(env, { to, key, days, plan }) {
     '1. Abra o LinkFetcher → Download Personalizado → Ativar PRO',
     '2. Já tenho uma chave (cole a chave acima)',
     '',
-    'Guarde este e-mail. Qualquer dúvida, responda por aqui.',
+    replyable
+      ? 'Guarde este e-mail. Qualquer dúvida, responda por aqui.'
+      : 'Guarde este e-mail — ele é o comprovante da sua compra.',
     'Anexo: sua chave também vai em .txt para baixar e guardar.',
   ].join('\n');
   const keyFile = [
@@ -443,14 +483,17 @@ async function sendKeyEmail(env, { to, key, days, plan }) {
   const html = keyEmailHtml({
     preheader: 'Obrigado por assinar o PRO — sua chave chegou.',
     title: 'Bem-vindo ao PRO! 🎉',
-    lead: 'Obrigado por apoiar o LinkFetcher! Sua assinatura já está ativa — copie a chave abaixo e ative no app em menos de 1 minuto. Qualquer dúvida, é só responder este e-mail.',
+    lead: `Obrigado por apoiar o LinkFetcher! Sua assinatura já está ativa — copie a chave abaixo e ative no app em menos de 1 minuto.${replyable ? ' Qualquer dúvida, é só responder este e-mail.' : ''}`,
     key: escHtml(key),
     validity: `Plano ${label} — válido por ${days} dias. Bom proveito!`,
     steps: [
       'Abra o LinkFetcher → <b>Download Personalizado</b> → <b>Ativar PRO</b>',
       'Toque em <b>Já tenho uma chave</b> e cole a chave acima',
     ],
-    foot: 'Anexamos sua chave em <b>.txt</b> — baixe e guarde. Perdeu tudo? No app: Download Personalizado → Ativar PRO → <b>Perdi minha chave</b>.',
+    foot: 'Anexamos sua chave em <b>.txt</b> — baixe e guarde. Perdeu tudo? No app, abra a aba <b>Sobre</b> → <b>Reenviar chave por e-mail</b>.',
+    support: replyable
+      ? 'E-mail automático da sua compra — responda se precisar de ajuda.'
+      : 'E-mail automático da sua compra — esta caixa não recebe respostas.',
   });
   return sendEmail(env, {
     to,
@@ -782,18 +825,32 @@ export default {
         if (await rateLimited(env, 'RECOVER_LIMITER', ip)) return json({ error: 'rate-limited' }, 429);
         if (!rateOk(ip)) return json({ error: 'rate-limited' }, 429);
         const who = normContact(url.searchParams.get('contact'));
-        if (!who) return json({ error: 'bad-contact' }, 400);
-        const c = await env.DB.prepare(
+        // Só E-MAIL pede reenvio (mesmo teste do app): sem isso, saber o
+        // "contato" (apelido de 24 bytes da compra) bastaria para disparar
+        // e-mail contra a caixa de outra pessoa.
+        if (!who || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(who)) return json({ error: 'bad-contact' }, 400);
+        // 2ª camada por contato: saber o e-mail da vítima não permite
+        // bombardear a caixa dela com e-mails de chave.
+        if (await rateLimited(env, 'RECOVER_CONTACT_LIMITER', who)) return json({ error: 'rate-limited' }, 429);
+        const rows = await env.DB.prepare(
           `SELECT * FROM checkouts
            WHERE (lower(email) = ? OR lower(contact) = ?) AND status = 'paid' AND license_key IS NOT NULL
-           ORDER BY paid_at DESC LIMIT 1`,
-        ).bind(who, who).first();
-        // Resposta única (exista ou não): sem oráculo de quem pagou.
+           ORDER BY paid_at DESC LIMIT 20`,
+        ).bind(who, who).all();
+        // Só a compra ainda vigente mais recente; expirada/plano antigo fica
+        // de fora (mandar chave morta faria o cliente achar que ainda tem PRO).
+        const c = pickRecoverable(rows.results, Date.now());
+        // Resposta única (exista compra, esteja vencida ou não): sem oráculo.
         if (!c || !/@/.test(c.email || '')) return json({ status: 'sent' });
-        // `release=1`: limpa os slots de aparelhos da chave (reinstalação,
-        // troca de aparelho). O e-mail abaixo avisa o comprador — ele fica
-        // sabendo se alguém mexeu.
-        if (url.searchParams.get('release') === '1' && c.license_key) {
+        // `release=1` limpa os slots de aparelhos da chave (reinstalação,
+        // troca de aparelho) e o e-mail abaixo avisa o comprador — ele fica
+        // sabendo se alguém mexeu. Continua autenticado só pelo e-mail da
+        // compra de propósito: a cota de 2 aparelhos é LIMITE DE ENTREGA, não
+        // revogação (a ativação manual offline funciona sem o servidor), e os
+        // slots se re-registram no próximo poll — quem perde não é o dono.
+        // Exigir a chave quebraria o único caso que usa release: o app que
+        // bateu no limite AINDA NÃO TEM a chave.
+        if (url.searchParams.get('release') === '1') {
           await env.DB.prepare('DELETE FROM device_slots WHERE license_key = ?').bind(c.license_key).run();
         }
         const r = await sendKeyEmail(env, { to: c.email, key: c.license_key, days: daysOf(env, c), plan: planLabelOf(env, c) });
@@ -895,7 +952,12 @@ export default {
             to,
             subject,
             text: message,
-            html: broadcastEmailHtml({ tag, subject, message }),
+            html: broadcastEmailHtml({
+              tag, subject, message,
+              support: canReply(env)
+                ? 'E-mail automático de novidade — responda se precisar de ajuda.'
+                : 'E-mail automático de novidade.',
+            }),
           });
           if (r.sent) {
             sent++;

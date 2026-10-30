@@ -10,10 +10,11 @@ import { appVersion } from '../../core/version';
 import { isLicenseActive } from '../../core/license/license';
 import { PLANS, formatBRL } from '../../core/license/purchase';
 import { LicenseModal } from '../../core/license/LicenseModal';
+import { ResendKeySection } from '../../core/license/ResendKeySection';
 import { PrivacyPolicy } from '../privacy/PrivacyPolicy';
 import {
   Info, KeyRound, ShieldCheck, Copy, Check, Eye, EyeOff,
-  Trash2, ChevronRight, Cpu, Sparkles, Layers,
+  Trash2, ChevronRight, Cpu, Sparkles, Layers, Mail,
 } from 'lucide-react';
 
 /** Mostra prefixo + 1º grupo; o resto vira •••• (evita shoulder surfing). */
@@ -35,6 +36,7 @@ export function AboutView() {
   const [showLicense, setShowLicense] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showResend, setShowResend] = useState(false);
   const version = appVersion();
 
   if (showPrivacy) return <PrivacyPolicy onBack={() => setShowPrivacy(false)} />;
@@ -103,7 +105,8 @@ export function AboutView() {
         'Paid with Pix; the key arrives by e-mail and inside the app itself.',
         'Validity starts at payment confirmation — not at activation.',
         'Activation needs the key plus the buyer e-mail, so a new device or a format never loses the license.',
-        'Up to 2 devices per key; changed device or reinstalled? Use "Release devices" in the license modal.',
+        'Up to 2 devices per key; changed device or reinstalled? Use "Release devices and resend" under "Resend key by email".',
+        'Lost the key? The resend goes only to the email registered at payment, and only while the subscription is still active.',
         'No auto-renewal: when it expires, the next purchase is a new key.',
         'The key is signed (ECDSA P-256) and verified offline by the app — privileged actions re-check the signature.',
       ]
@@ -111,7 +114,8 @@ export function AboutView() {
         'Pagamento por Pix; a chave chega por e-mail e no próprio app.',
         'A validade começa na confirmação do pagamento, não na ativação.',
         'Ativar pede a chave + o e-mail do comprador: aparelho novo ou formatação não perde a licença.',
-        'Até 2 aparelhos por chave; trocou de aparelho ou reinstalou? Use "Liberar aparelhos" no modal de licença.',
+        'Até 2 aparelhos por chave; trocou de aparelho ou reinstalou? Use "Liberar os aparelhos e reenviar", embaixo de "Reenviar chave por e-mail".',
+        'Perdeu a chave? O reenvio só sai para o e-mail cadastrado no pagamento e só enquanto a assinatura ainda está ativa.',
         'Sem renovação automática: quando expira, a compra seguinte gera uma nova chave.',
         'A chave é assinada (ECDSA P-256) e verificada offline pelo app — ações privilegiadas revalidam a assinatura.',
       ];
@@ -238,6 +242,14 @@ export function AboutView() {
                     {isEn ? 'Manage license' : 'Gerenciar licença'}
                   </button>
                   <button
+                    onClick={() => setShowResend(v => !v)}
+                    aria-expanded={showResend}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl lf-surface-40 lf-border lf-text-secondary hover:text-white text-xs font-semibold transition-colors"
+                  >
+                    <Mail size={14} />
+                    {isEn ? 'Resend key by email' : 'Reenviar chave por e-mail'}
+                  </button>
+                  <button
                     onClick={() => { clearLicense(); }}
                     className="flex items-center gap-2 px-4 py-2.5 rounded-xl lf-surface-40 lf-border lf-text-secondary hover:text-red-400 text-xs font-semibold transition-colors"
                   >
@@ -245,6 +257,11 @@ export function AboutView() {
                     {isEn ? 'Remove license' : 'Remover licença'}
                   </button>
                 </div>
+                {showResend && (
+                  <div className="p-3.5 rounded-xl lf-surface-40 lf-border">
+                    <ResendKeySection initialEmail={lic.contact || ''} withRelease />
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
@@ -259,6 +276,21 @@ export function AboutView() {
                 >
                   {isEn ? 'Activate PRO' : 'Ativar PRO'}
                 </button>
+                {/* Expirou ou formatou o aparelho: a porta de entrada do
+                    reenvio também aparece aqui, não só escondida no modal. */}
+                <button
+                  onClick={() => setShowResend(v => !v)}
+                  aria-expanded={showResend}
+                  className="flex items-center gap-2 fs-sm lf-text-muted hover:text-zinc-200 transition-colors"
+                >
+                  <Mail size={14} />
+                  {isEn ? 'Already bought? Resend my key by email' : 'Já comprei? Reenviar minha chave por e-mail'}
+                </button>
+                {showResend && (
+                  <div className="p-3.5 rounded-xl lf-surface-40 lf-border">
+                    <ResendKeySection withRelease />
+                  </div>
+                )}
               </div>
             )}
           </div>
