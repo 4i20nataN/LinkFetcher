@@ -360,13 +360,16 @@ export const LinkAnalyzer: React.FC = () => {
     const opts = buildBulkOptions(formatOptions, kind);
     opts.playlistName = playlistInfo.title;
     const container = opts.audioOnly ? (opts.audioFormat || 'mp3') : (opts.videoFormat || 'mp4');
-    let added = 0;
+    // Lote: um único addMany (dedupe pré-computado + 1 notify + 1 save) em
+    // vez de N addDownload com O(n) cada — jank real em playlist de 1300+.
+    const requests: { media: MediaInfo; format: MediaFormat; formatOptions: typeof opts }[] = [];
     for (const item of playlistInfo.items) {
       if (!item.url) continue;
       const media = playlistItemToMedia(playlistInfo, item, { audioOnly: !!opts.audioOnly, container });
-      DownloadEngine.addDownload(media, media.formats[0], opts);
-      added++;
+      requests.push({ media, format: media.formats[0], formatOptions: opts });
     }
+    DownloadEngine.addMany(requests);
+    const added = requests.length;
     const total = playlistInfo.items.length;
     setSuccessMsg(settings.language === 'en'
       ? (added === total ? `Added ${added} items to queue` : `Added ${added} of ${total} items to queue`)

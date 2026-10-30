@@ -28,6 +28,27 @@ const YT_DLP_PLATFORMS = new Set([
   'youtube', 'tiktok', 'instagram', 'facebook', 'x', 'reddit', 'soundcloud', 'twitch', 'vimeo'
 ]);
 
+// Chaves de persistência da fila/histórico. `.corrupt` guarda o payload ilegível
+// (com timestamp) e `.bak` é o backup rotativo pré-gravação — nenhum overwrite
+// apaga dados sem antes existir cópia recuperável.
+const ITEMS_KEY = 'universal_downloader_items';
+const ITEMS_BAK_KEY = 'universal_downloader_items.bak';
+const ITEMS_CORRUPT_KEY = 'universal_downloader_items.corrupt';
+
+// Contêiner efetivo do item — mesma regra usada no sufixo de repetidos.
+const outContainerOf = (audioOnly?: boolean, audioFormat?: string, mergeFmt?: string, ext?: string) =>
+  audioOnly ? (audioFormat || 'mp3') : (mergeFmt || ext || '');
+
+// Base do nome de família sem o sufixo (N) que o engine acrescenta a repetidos.
+const familyBaseOf = (name?: string) =>
+  ((name && name.trim()) || '%(title)s').replace(/ \(\d+\)$/, '');
+
+type DownloadRequest = {
+  media: MediaInfo;
+  format: MediaFormat;
+  formatOptions?: FormatOptions | null;
+};
+
 class DownloadEngineClass {
   private items: DownloadItem[] = [];
   private listeners: Set<EngineListener> = new Set();
@@ -59,6 +80,13 @@ class DownloadEngineClass {
   // Fonte única de defaults (tipos/settings.ts): engine nasce idêntica ao
   // Storage e o SettingsSync hidrata em seguida — sem divergência silenciosa.
   private settings: AppSettings = { ...DEFAULT_SETTINGS };
+
+  // Guarda de integridade da persistência (FIX 1/2): parse do key principal
+  // falhou no boot — a primeira escrita seguinte DEVE copiar o valor cru para
+  // `.bak` antes de sobrescrever (nunca clobber silencioso).
+  private corruptBackupPending = false;
+  // Contador para o backup rotativo pré-gravação (1x a cada N escritas).
+  private writesSinceBackup = 0;
 
   constructor() {
     this.loadState();
@@ -147,20 +175,51 @@ class DownloadEngineClass {
     this.processQueue();
   }
 
+  // Parse defensivo do payload persistido: null quando ausente/ilegível/não
+  // array — o chamador decide entre usar, restaurar do backup ou descartar.
+  private parseItemsList(raw: string | null): DownloadItem[] | null {
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return null;
+      return parsed.map(item => {
+        // `processing`/`activity` são transientes — nunca sobrevivem reload.
+        // Reset in-progress downloads to queued on reload
+        if (item.status === 'downloading') {
+          return { ...item, status: 'paused', speed: 0, eta: 0, processing: false, activity: undefined };
+        }
+        return { ...item, processing: false, activity: undefined };
+      });
+    } catch {
+      return null;
+    }
+  }
+
   private loadState() {
     try {
-      const stored = localStorage.getItem('universal_downloader_items');
-      if (stored) {
-        const parsed: DownloadItem[] = JSON.parse(stored);
-        this.items = parsed.map(item => {
-          // `processing`/`activity` são transientes — nunca sobrevivem reload.
-          // Reset in-progress downloads to queued on reload
-          if (item.status === 'downloading') {
-            return { ...item, status: 'paused', speed: 0, eta: 0, processing: false, activity: undefined };
-          }
-          return { ...item, processing: false, activity: undefined };
-        });
+      const raw = localStorage.getItem(ITEMS_KEY);
+      if (!raw) return;
+      const parsed = this.parseItemsList(raw);
+      if (parsed) {
+        this.items = parsed;
+        return;
       }
+      // Payload corrupto: NUNCA deixar a próxima gravação sobrescrevê-lo sem
+      // cópia. (1) snapshot timestampado em `.corrupt` (uma vez — o primeiro
+      // incidente vence), (2) flag que força o backup pré-gravação, (3) repair
+      // path: restaura do `.bak` periódico quando ele parseia.
+      this.corruptBackupPending = true;
+      this.writesSinceBackup = 0;
+      try {
+        if (!localStorage.getItem(ITEMS_CORRUPT_KEY)) {
+          localStorage.setItem(ITEMS_CORRUPT_KEY, JSON.stringify({
+            corruptedAt: new Date().toISOString(),
+            raw,
+          }));
+        }
+      } catch { /* quota cheia: a flag acima ainda força o `.bak` antes do overwrite */ }
+      const fromBak = this.parseItemsList(localStorage.getItem(ITEMS_BAK_KEY));
+      if (fromBak) this.items = fromBak;
     } catch (e) {
       console.error('Error loading engine state', e);
       this.items = [];
@@ -175,14 +234,34 @@ class DownloadEngineClass {
   // transições de estado forçam persistência.
   private static readonly PERSIST_THROTTLE_MS = 2000;
   private lastPersistedAt = 0;
+  // Backup pré-gravação: no máximo 1x a cada N escritas (custo amortizado,
+  // não dobra o custo de cada save).
+  private static readonly BACKUP_EVERY_N_WRITES = 10;
 
   private saveState(force = false) {
     const now = Date.now();
     if (!force && now - this.lastPersistedAt < DownloadEngineClass.PERSIST_THROTTLE_MS) return;
     this.lastPersistedAt = now;
     try {
-      const active = this.items.filter(i => ['queued', 'downloading', 'paused'].includes(i.status));
-      const finished = this.items.filter(i => !['queued', 'downloading', 'paused'].includes(i.status));
+      // Backup ANTES do overwrite: forçado quando o key atual está corrupto
+      // (repair do FIX 1) ou a cada N escritas (rotativo, um único `.bak`).
+      const backupNow = this.corruptBackupPending
+        || ++this.writesSinceBackup >= DownloadEngineClass.BACKUP_EVERY_N_WRITES;
+      if (backupNow) {
+        this.corruptBackupPending = false;
+        this.writesSinceBackup = 0;
+        try {
+          const prev = localStorage.getItem(ITEMS_KEY);
+          if (prev) localStorage.setItem(ITEMS_BAK_KEY, prev);
+        } catch { /* backup best-effort: nunca bloqueia a gravação principal */ }
+      }
+      // Uma passada só (antes: dois filters completos sobre a lista).
+      const active: DownloadItem[] = [];
+      const finished: DownloadItem[] = [];
+      for (const i of this.items) {
+        if (i.status === 'queued' || i.status === 'downloading' || i.status === 'paused') active.push(i);
+        else finished.push(i);
+      }
       const slim = (list: DownloadItem[]) => list.map(({ activity: _a, ...rest }) => rest);
       // Quota do WebView (~5MB, dividida com o resto do app): após uso forte
       // (playlist de 1300+ faixas) o payload pode estourar. Degrada o
@@ -191,7 +270,7 @@ class DownloadEngineClass {
       for (let k = 0; k < caps.length; k++) {
         try {
           const toPersist = [...active, ...finished.slice(0, caps[k])];
-          localStorage.setItem('universal_downloader_items', JSON.stringify(slim(toPersist)));
+          localStorage.setItem(ITEMS_KEY, JSON.stringify(slim(toPersist)));
           return;
         } catch (e) {
           if (k === caps.length - 1) throw e;
@@ -228,40 +307,45 @@ class DownloadEngineClass {
     if (i >= 0) this.items[i] = { ...this.items[i] };
   }
 
-  addDownload(media: MediaInfo, format: MediaFormat, formatOptions?: FormatOptions | null) {
-    // Repetidos permitidos com sufixo (1), (2)...: evita sobrescrever o
-    // arquivo no disco e dois processos brigando pelo mesmo .part.
-    const outContainerOf = (audioOnly?: boolean, audioFormat?: string, mergeFmt?: string, ext?: string) =>
-      audioOnly ? (audioFormat || 'mp3') : (mergeFmt || ext || '');
-    const familyBaseOf = (name?: string) =>
-      ((name && name.trim()) || '%(title)s').replace(/ \(\d+\)$/, '');
-    const newContainer = outContainerOf(
-      formatOptions?.audioOnly, formatOptions?.audioFormat,
-      formatOptions?.videoFormat, format.ext,
-    );
-    const newBase = familyBaseOf(formatOptions?.customFilename);
-    const sameCount = this.items.filter(item =>
-      item.url === media.originalUrl
-      && (item.playlistName || '') === (formatOptions?.playlistName || '')
-      && outContainerOf(item.audioOnly, item.audioFormat, item.mergeOutputFormat, item.format.ext) === newContainer
-      && familyBaseOf(item.customFilename) === newBase
-    ).length;
+  // Chave da "família" que ganha sufixo (N) em repetidos: url + playlist +
+  // contêiner de saída + base do nome. Idêntica ao predicado do loop antigo.
+  private familyKey(url: string, playlistName: string | undefined, container: string, base: string): string {
+    return `${url}\u0000${playlistName || ''}\u0000${container}\u0000${base}`;
+  }
+
+  // Conta os repetidos da família em UMA passada (antes: filter+length).
+  private countSameFamily(
+    media: MediaInfo, formatOptions: FormatOptions | null | undefined,
+    container: string, base: string,
+  ): number {
+    const plKey = formatOptions?.playlistName || '';
+    let count = 0;
+    for (const item of this.items) {
+      if (item.url === media.originalUrl
+        && (item.playlistName || '') === plKey
+        && outContainerOf(item.audioOnly, item.audioFormat, item.mergeOutputFormat, item.format.ext) === container
+        && familyBaseOf(item.customFilename) === base) count++;
+    }
+    return count;
+  }
+
+  private buildDownloadItem(
+    req: DownloadRequest,
+    sameCount: number,
+    newBase: string,
+    addedAt: string,
+  ): DownloadItem {
+    const { media, format, formatOptions } = req;
     let customFilename = formatOptions?.customFilename;
     if (sameCount > 0) {
       customFilename = `${newBase} (${sameCount})`;
     }
 
-    const defaultSizeByType: Record<string, number> = {
-      video: 25 * 1024 * 1024,
-      audio: 6 * 1024 * 1024,
-      image: 2 * 1024 * 1024,
-    };
-
     // Use probe size if available; real file size will be updated via OS-native
     // stat after download + FFmpeg merge completes (see complete handlers below).
     const sizeTotal = format.sizeBytes > 0 ? format.sizeBytes : 0;
 
-    const newItem: DownloadItem = {
+    return {
       id: `dl_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
       title: media.title,
       thumbnailUrl: media.thumbnailUrl,
@@ -305,11 +389,72 @@ class DownloadEngineClass {
       speed: 0,
       eta: 0,
       status: 'queued',
-      addedAt: new Date().toISOString(),
+      addedAt,
       url: media.originalUrl,
     };
+  }
+
+  addDownload(media: MediaInfo, format: MediaFormat, formatOptions?: FormatOptions | null) {
+    // Repetidos permitidos com sufixo (1), (2)...: evita sobrescrever o
+    // arquivo no disco e dois processos brigando pelo mesmo .part.
+    const newContainer = outContainerOf(
+      formatOptions?.audioOnly, formatOptions?.audioFormat,
+      formatOptions?.videoFormat, format.ext,
+    );
+    const newBase = familyBaseOf(formatOptions?.customFilename);
+    const sameCount = this.countSameFamily(media, formatOptions, newContainer, newBase);
+
+    const newItem = this.buildDownloadItem(
+      { media, format, formatOptions }, sameCount, newBase,
+      new Date().toISOString(),
+    );
 
     this.items.unshift(newItem);
+    this.notify();
+    this.processQueue();
+  }
+
+  // Enfileiramento em lote (playlist grande): o loop de addDownload custava
+  // O(n) de contagem + save completo + processQueue POR item (O(n²)). Aqui:
+  // contagem de repetidos pré-computada uma vez, append do lote, um único
+  // notify + uma única gravação. Mesma semântica de sufixo/ordem/fila do
+  // loop unitário (cada unshift invertia o lote — aqui inverte uma vez).
+  addMany(requests: DownloadRequest[]): void {
+    if (requests.length === 0) return;
+
+    // Tally das famílias já presentes: uma passada sobre o estado atual.
+    const counts = new Map<string, number>();
+    for (const item of this.items) {
+      const k = this.familyKey(
+        item.url, item.playlistName,
+        outContainerOf(item.audioOnly, item.audioFormat, item.mergeOutputFormat, item.format.ext),
+        familyBaseOf(item.customFilename),
+      );
+      counts.set(k, (counts.get(k) || 0) + 1);
+    }
+
+    const added: DownloadItem[] = [];
+    // addedAt monotônico dentro do lote: preserva a prioridade de início do
+    // loop antigo (FIFO) mesmo quando várias entradas caem no mesmo ms.
+    let lastMs = 0;
+    for (const req of requests) {
+      const { media, format, formatOptions } = req;
+      const container = outContainerOf(
+        formatOptions?.audioOnly, formatOptions?.audioFormat,
+        formatOptions?.videoFormat, format.ext,
+      );
+      const base = familyBaseOf(formatOptions?.customFilename);
+      const k = this.familyKey(media.originalUrl, formatOptions?.playlistName, container, base);
+      const sameCount = counts.get(k) || 0;
+      counts.set(k, sameCount + 1);
+      const now = Date.now();
+      const ms = now > lastMs ? now : lastMs + 1;
+      lastMs = ms;
+      added.push(this.buildDownloadItem(req, sameCount, base, new Date(ms).toISOString()));
+    }
+
+    // `[...reversed, ...items]` == N unshifts em sequência (ordem visível idêntica).
+    this.items = [...added.reverse(), ...this.items];
     this.notify();
     this.processQueue();
   }
@@ -529,20 +674,25 @@ class DownloadEngineClass {
   }
 
   private processQueue() {
-    const activeCount = this.items.filter(i => i.status === 'downloading').length;
+    // Uma única passada: conta ativos e coleta enfileirados já com a chave
+    // numérica de ordenação pré-computada (antes: filter+length, filter de
+    // novos e `new Date()` dentro do comparator a cada comparação).
     const maxConcurrent = this.settings.maxConcurrent || 3;
+    let activeCount = 0;
+    const candidates: { item: DownloadItem; addedAtMs: number }[] = [];
+    for (const i of this.items) {
+      if (i.status === 'downloading') activeCount++;
+      else if (i.status === 'queued') candidates.push({ item: i, addedAtMs: Date.parse(i.addedAt) || 0 });
+    }
 
     if (activeCount >= maxConcurrent) return;
 
-    const queued = this.items
-      .filter(i => i.status === 'queued')
-      .sort((a, b) => new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime());
+    candidates.sort((a, b) => a.addedAtMs - b.addedAtMs);
 
-    const slotsAvailable = maxConcurrent - activeCount;
-    const toStart = queued.slice(0, slotsAvailable);
+    const toStart = candidates.slice(0, maxConcurrent - activeCount);
 
-    for (const item of toStart) {
-      this.startDownload(item);
+    for (const c of toStart) {
+      this.startDownload(c.item);
     }
   }
 
@@ -886,7 +1036,7 @@ class DownloadEngineClass {
       this.stopPoll(id);
       return;
     }
-    let invokeFn: ((cmd: string, args?: unknown) => Promise<unknown>) | null = null;
+    let invokeFn: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
     try {
       ({ invoke: invokeFn } = await import('@tauri-apps/api/core'));
     } catch {
@@ -894,7 +1044,7 @@ class DownloadEngineClass {
     }
     let snap: any = null;
     try {
-      snap = await invokeFn!('ytdlp_job_progress', { id });
+      snap = await invokeFn('ytdlp_job_progress', { id });
     } catch {
       return;
     }
