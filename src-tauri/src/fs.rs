@@ -31,12 +31,41 @@ pub fn unregister_cancel(id: &str) -> Option<std::sync::Arc<tokio::sync::Mutex<C
     g.remove(id)
 }
 
+/// Cancelamento que chegou entre o `spawn` e o `register_cancel`: sem este
+/// registro o kill era perdido, o download ia até o fim e o arquivo ficava
+/// órfão (a UI já mostrava "cancelado").
+static CANCEL_REQUESTED: LazyLock<std::sync::Mutex<std::collections::HashSet<String>>> =
+    LazyLock::new(|| std::sync::Mutex::new(std::collections::HashSet::new()));
+
+fn mark_cancel_requested(id: &str) {
+    let mut g = CANCEL_REQUESTED.lock().unwrap();
+    if g.len() > 4096 {
+        g.clear();
+    }
+    g.insert(id.to_owned());
+}
+
+fn clear_cancel_requested(id: &str) {
+    CANCEL_REQUESTED.lock().unwrap().remove(id);
+}
+
+/// Consome o pedido (uma só vez).
+fn take_cancel_requested(id: &str) -> bool {
+    CANCEL_REQUESTED.lock().unwrap().remove(id)
+}
+
 /// Ids com `.part` a apagar ao terminar; `pause` preserva p/ resume.
 static CLEANUP_INTENT: LazyLock<std::sync::Mutex<std::collections::HashSet<String>>> =
     LazyLock::new(|| std::sync::Mutex::new(std::collections::HashSet::new()));
 
 fn mark_cleanup_intent(id: &str) {
-    CLEANUP_INTENT.lock().unwrap().insert(id.to_owned());
+    let mut g = CLEANUP_INTENT.lock().unwrap();
+    // Sessão longa acumula ids de downloads já concluídos; sem teto cresce
+    // para sempre (cada cancel/pause insere um).
+    if g.len() > 4096 {
+        g.clear();
+    }
+    g.insert(id.to_owned());
 }
 
 /// Consome a intenção de limpeza.
@@ -49,9 +78,27 @@ static LAST_PATHS: LazyLock<std::sync::Mutex<std::collections::HashMap<String, V
     LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
 
 fn remember_download_path(id: &str, path: &str) {
+    // Snapshot dos ids vivos ANTES de tocar LAST_PATHS: sem lock aninhado.
+    let active: std::collections::HashSet<String> = {
+        let m = CANCEL_MAP.lock().unwrap();
+        m.keys().cloned().collect()
+    };
     let mut g = LAST_PATHS.lock().unwrap();
     if g.len() > 1000 {
-        g.clear();
+        // Os ids vivos são os que ainda precisam de tracking de caminho;
+        // despejar tudo (`clear()`) matava o cleanup e o resume dos downloads
+        // em andamento.
+        let stale: Vec<String> = g
+            .keys()
+            .filter(|k| !active.contains(k.as_str()))
+            .cloned()
+            .collect();
+        for k in stale.iter().take(stale.len() / 2) {
+            g.remove(k);
+        }
+        if g.len() > 1000 {
+            g.clear();
+        }
     }
     let v = g.entry(id.to_owned()).or_default();
     if !v.contains(&path.to_owned()) {
@@ -340,6 +387,8 @@ pub async fn fs_fetch_cover(url: String) -> Result<serde_json::Value, String> {
     }
     let client = reqwest::Client::builder()
         .user_agent("LinkFetcher")
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(30))
         // Revalida cada hop: só https:// com host público (anti-SSRF via redirect).
         .redirect(reqwest::redirect::Policy::custom(|attempt| {
             if attempt.previous().len() >= 5 {
@@ -385,6 +434,20 @@ pub async fn fs_fetch_cover(url: String) -> Result<serde_json::Value, String> {
         "ext": ext,
         "size": bytes.len(),
     }))
+}
+
+/// Cauda de até `max` chars de um UTF-8 que pode começar/terminar no meio de
+/// um caractere multibyte. Fatiar por byte (como fazia o coletor antigo)
+/// panicava fora do limite de caractere.
+pub fn stderr_tail(bytes: &[u8], max: usize) -> String {
+    let text = String::from_utf8_lossy(bytes);
+    text.chars()
+        .rev()
+        .take(max)
+        .collect::<Vec<char>>()
+        .iter()
+        .rev()
+        .collect()
 }
 
 /// Filtra ruído de progresso do ffmpeg/stderr e mantém o erro real (máx. 500).
@@ -506,7 +569,8 @@ async fn ffmpeg_cut_local(
     let mut cmd = tokio::process::Command::new(ffmpeg);
     cmd.args(&args)
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped());
+        .stderr(std::process::Stdio::piped())
+        .kill_on_drop(true);
     crate::proc::hide_console(&mut cmd);
     let out = cmd
         .output()
@@ -713,10 +777,16 @@ pub async fn ytdlp_download(
     }
     eprintln!("[ytdlp_download] argv: {:?}", argv);
 
+    // Retry pode reusar o id: um pedido antigo não pode matar a tentativa nova.
+    clear_cancel_requested(&params.id);
+
     let mut cmd = tokio::process::Command::new(ytdlp_bin);
     cmd.args(&argv)
        .stdout(std::process::Stdio::piped())
-       .stderr(std::process::Stdio::piped());
+       .stderr(std::process::Stdio::piped())
+       // Fechar o app (ou descartar a task) mata o filho: sem isto, yt-dlp
+       // continuava escrevendo em ~/Downloads depois da saída.
+       .kill_on_drop(true);
 
     crate::proc::hide_console(&mut cmd);
 
@@ -738,6 +808,13 @@ pub async fn ytdlp_download(
     let child_arc = std::sync::Arc::new(tokio::sync::Mutex::new(proc));
     register_cancel(params.id.clone(), child_arc.clone());
     eprintln!("[ytdlp_download] registered in cancel map");
+    // O cancel pode ter caído na janela spawn→registro: mata agora e deixa o
+    // loop abaixo tratar como saída por sinal (mesmo caminho do kill normal).
+    if take_cancel_requested(&params.id) {
+        eprintln!("[ytdlp_download] cancel pendente; matando id={}", params.id);
+        let mut child = child_arc.lock().await;
+        let _ = child.kill().await;
+    }
 
     let (stdout_tx, mut stdout_rx) = tokio::sync::mpsc::channel::<String>(128);
 
@@ -765,23 +842,26 @@ pub async fn ytdlp_download(
         }
     });
 
-    // Coleta stderr (últimos 4000 chars p/ diagnóstico).
+    // Coleta stderr (cauda p/ diagnóstico). Bytes crus até o fim: fatiar por
+    // byte ou decodificar por chunk corrompia acent/CJK e panicava fora do
+    // limite de caractere — o panic morria no `unwrap_or_default` do join e a
+    // causa real do erro sumia.
     let stderr_collector = tokio::spawn(async move {
         let mut buf = [0u8; 1024];
-        let mut stderr_buf = String::new();
+        let mut raw: Vec<u8> = Vec::new();
         loop {
             match stderr.read(&mut buf).await {
                 Ok(0) => break,
                 Ok(n) => {
-                    stderr_buf.push_str(&String::from_utf8_lossy(&buf[..n]));
-                    if stderr_buf.len() > 4000 {
-                        stderr_buf = stderr_buf[stderr_buf.len() - 4000..].to_owned();
+                    raw.extend_from_slice(&buf[..n]);
+                    if raw.len() > 16_000 {
+                        raw.drain(..raw.len() - 16_000);
                     }
                 }
                 Err(_) => break,
             }
         }
-        stderr_buf
+        stderr_tail(&raw, 4000)
     });
 
     let download_id = params.id.clone();
@@ -796,24 +876,34 @@ pub async fn ytdlp_download(
     let mut last_pct = f64::NAN;
 
     // Espera concorrente com a drenagem; `complete` deriva do disco.
-    let mut wait_task = tokio::spawn(async move {
-        let mut child_guard = child_arc.lock().await;
-        child_guard.wait().await
+    // Poll com try_wait (padrão do search.rs): o waiter NUNCA segura o lock
+    // do filho entre awaits, senão o kill do `ytdlp_cancel` enfileira atrás
+    // da espera e o cancelamento só destrava quando o yt-dlp morre sozinho.
+    let mut poll_task = tokio::spawn(async move {
+        loop {
+            let exited = child_arc.lock().await.try_wait();
+            match exited {
+                Ok(Some(st)) => break Ok(st),
+                Ok(None) => tokio::time::sleep(std::time::Duration::from_millis(50)).await,
+                Err(e) => break Err(e),
+            }
+        }
     });
+    let join_err = |e: tokio::task::JoinError| {
+        Err(std::io::Error::other(format!("wait: {e}")))
+    };
     let mut eof = false;
     let wait_res: std::io::Result<std::process::ExitStatus> = loop {
         if eof {
             // EOF antes da saída: aguarda o término.
             eprintln!("[ytdlp_download] stdout EOF antes da saída; aguardando término");
-            break wait_task
-                .await
-                .unwrap_or_else(|e| Err(std::io::Error::new(std::io::ErrorKind::Other, format!("wait: {e}"))));
+            break poll_task.await.unwrap_or_else(join_err);
         }
         // Sem `break` nos braços (atingiria o `select!`, não este loop).
         let mut exited: Option<std::io::Result<std::process::ExitStatus>> = None;
         let line: Option<String> = tokio::select! {
-            w = &mut wait_task => {
-                exited = Some(w.unwrap_or_else(|e| Err(std::io::Error::new(std::io::ErrorKind::Other, format!("wait: {e}")))));
+            w = &mut poll_task => {
+                exited = Some(w.unwrap_or_else(join_err));
                 None
             }
             l = stdout_rx.recv() => l,
@@ -953,14 +1043,6 @@ pub async fn ytdlp_download(
                                 "message": &cut_err,
                             });
                             let _ = app.emit("yt-dlp-progress", &error_event);
-                            let _ = app.emit(
-                                "binary-download",
-                                serde_json::json!({
-                                    "stage": "error",
-                                    "file": "yt-dlp",
-                                    "message": &cut_err,
-                                }),
-                            );
                             return Err(cut_err);
                         }
                     }
@@ -971,6 +1053,21 @@ pub async fn ytdlp_download(
                         eprintln!("[ytdlp_download] WARN recorte sem arquivo capturado");
                     }
                 }
+            }
+
+            // yt-dlp saiu com 0 mas nenhum artefato elegível (nem `Destination:`,
+            // nem varredura): emitir `complete` dava card "concluído" com
+            // tamanho 0 e "abrir arquivo" apontando para caminho antigo.
+            if final_path.is_none() {
+                let msg =
+                    "yt-dlp encerrou sem produzir arquivo identificável em Downloads".to_string();
+                eprintln!("[ytdlp_download] WARN: {msg}");
+                let _ = app.emit(
+                    "yt-dlp-progress",
+                    &serde_json::json!({ "id": download_id, "type": "error", "message": &msg }),
+                );
+                let _ = take_cleanup_intent(&download_id);
+                return Err(msg);
             }
 
             let size = if let Some(ref p) = final_path {
@@ -1005,15 +1102,6 @@ pub async fn ytdlp_download(
                 "subWarning": sub_warning,
             });
             let _ = app.emit("yt-dlp-progress", &complete_event);
-            let _ = app.emit(
-                "binary-download",
-                serde_json::json!({
-                    "stage": "done",
-                    "file": "yt-dlp",
-                    "filePath": final_path,
-                    "size": size,
-                }),
-            );
             // Sucesso: descarta rastreio de parciais.
             let _ = forget_download_paths(&download_id);
             let _ = take_cleanup_intent(&download_id);
@@ -1060,14 +1148,6 @@ pub async fn ytdlp_download(
                 "message": &err_msg,
             });
             let _ = app.emit("yt-dlp-progress", &error_event);
-            let _ = app.emit(
-                "binary-download",
-                serde_json::json!({
-                    "stage": "error",
-                    "file": "yt-dlp",
-                    "message": &err_msg,
-                }),
-            );
 
             Err(err_msg)
         }
@@ -1269,6 +1349,9 @@ pub async fn ytdlp_cancel(
         eprintln!("[ytdlp_cancel] Cancelled download id={}", resolved_id);
         Ok(())
     } else {
+        // Nada registrado: pode ser a janela spawn→registro do download.
+        // Guarda o pedido para ele ser executado assim que o filho nascer.
+        mark_cancel_requested(&resolved_id);
         Err("Nenhum download ativo com esse id".into())
     }
 }
@@ -1774,6 +1857,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn stderr_tail_nao_parte_caractere_multibyte_nao_panic() {
+        // Regressão: o coletor antigo fatiava por byte (`len() - 4000`) e
+        // panicava fora do limite de caractere com acento/CJK — o panic morria
+        // no join e a causa real do erro sumia.
+        let nasty = "ERRO: título acentuado 日本語ファイル名 🎬 ".repeat(400);
+        let bytes = nasty.as_bytes();
+        let tail = stderr_tail(bytes, 4000);
+        assert!(tail.chars().count() <= 4000);
+        assert!(tail.contains("日本語"));
+        // Slice no meio de um char (bytes crus truncados) também não panic.
+        let cut = &bytes[..bytes.len() - 1];
+        let _ = stderr_tail(cut, 10);
+        assert_eq!(stderr_tail("abc".as_bytes(), 2), "bc");
+    }
+
+    #[test]
     fn clean_error_drops_ffmpeg_progress_noise() {
         let stderr = "frame=  100 fps=112 q=-1.0 size= 1000KiB time=00:00:05.00 bitrate=1500kbits/s speed=1.8x\n\
             elapsed=0:00:05.00 frame=100 fps=112 q=-1.0\n\
@@ -1994,7 +2093,7 @@ mod tests {
         let got = fs_elect_finished(dir.join("show.mp4").to_string_lossy().into_owned()).unwrap();
         assert_eq!(got["path"].as_str().unwrap(), dir.join("show.mkv").to_string_lossy().as_ref());
         assert_eq!(got["size"].as_u64().unwrap(), 6);
-        assert_eq!(got["hasPart"].as_bool().unwrap(), false);
+        assert!(!got["hasPart"].as_bool().unwrap());
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -2008,7 +2107,7 @@ mod tests {
         std::fs::write(dir.join("show.mp4-Frag3.part"), b"f").unwrap();
         let got = fs_elect_finished(dir.join("show.webm").to_string_lossy().into_owned()).unwrap();
         assert_eq!(got["path"].as_str().unwrap(), dir.join("show.mp4").to_string_lossy().as_ref());
-        assert_eq!(got["hasPart"].as_bool().unwrap(), true);
+        assert!(got["hasPart"].as_bool().unwrap());
         std::fs::remove_dir_all(&dir).ok();
     }
 
