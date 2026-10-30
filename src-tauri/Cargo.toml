@@ -12,7 +12,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "process", "signal", "fs", "io-util", "io-std", "sync", "time"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-webpki-roots", "stream"] }
-zip = "2"
+zip = { version = "9", default-features = false, features = ["deflate"] }
 tar = "0.4"
 # xz2 (já vinha via zip): decode xz em C + API de stream, que permite
 # extrair direto sem o .tar temporário de ~500 MB.

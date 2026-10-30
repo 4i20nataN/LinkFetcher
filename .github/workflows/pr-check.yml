@@ -61,8 +61,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
+      # generate_context! lê o frontendDist do tauri.conf.json: sem o
+      # ../dist-web (job frontend não compartilha workspace), o proc macro
+      # panica antes do primeiro teste. Um stub basta — Rust não executa a UI.
+      - name: Stub do frontendDist (generate_context)
+        run: mkdir -p dist-web && printf '<!doctype html><html></html>' > dist-web/index.html
+
+      # --locked: a CI não pode re-resolver o Cargo.lock (o que está commitado
+      # é o que auditamos e o que o release empacota).
       - name: Testes unitários Rust
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
 
       - name: Clippy (desktop)
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+        run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings

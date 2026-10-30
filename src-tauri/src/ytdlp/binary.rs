@@ -509,7 +509,8 @@ fn install_ffmpeg(
     let mut got_probe = false;
     for i in 0..zip.len() {
         let mut entry = zip.by_index(i).map_err(|e| e.to_string())?;
-        let name = entry.name().replace('\\', "/");
+        // zip 9: name() virou ZipResult<Cow<str>> (decodificação pode falhar).
+        let name = entry.name().map_err(|e| e.to_string())?.replace('\\', "/");
         let dest = if name.ends_with("bin/ffmpeg.exe") {
             got_ffmpeg = true;
             Some(ffmpeg_dest)
