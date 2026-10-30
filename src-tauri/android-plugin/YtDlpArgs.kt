@@ -28,6 +28,9 @@ class ExecuteArgs {
     var publicSubdir: String? = null
     // Título p/ a notificação nativa de progresso/conclusão.
     var title: String = ""
+    // URL do download (opcional): quando há dump em cache dessa URL exata
+    // (probe recente), `execute` pula a re-extração via --load-info-json.
+    var url: String = ""
 }
 
 @InvokeArg

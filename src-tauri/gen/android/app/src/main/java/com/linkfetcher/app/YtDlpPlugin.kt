@@ -31,10 +31,17 @@ private const val TAG = "YtDlpPlugin"
 @TauriPlugin
 class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
 
-    // Pool limitado (núcleo 2, teto 8, fila ilimitada): picos de probes +
-    // downloads enfileiram em vez de explodir threads; sem Abort (invoke
-    // jamais pode ficar sem resposta por pool cheio).
+    // Comandos curtos (probe, playlist, busca): núcleo 2, teto 8. Download
+    // nunca enfileira aqui — ver `downloadExecutor` abaixo.
     private val executor = java.util.concurrent.ThreadPoolExecutor(
+        2, 8, 60L, java.util.concurrent.TimeUnit.SECONDS,
+        java.util.concurrent.LinkedBlockingQueue()
+    )
+    // Downloads (`execute`) ocupam a thread até o fim do job; no pool
+    // compartilhado uma análise enfileirava atrás de um download e só saía
+    // quando ele terminasse — a lentidão "eterna" ao analisar com a fila
+    // ativa. Pool próprio: concorre até 2, o resto espera em fila própria.
+    private val downloadExecutor = java.util.concurrent.ThreadPoolExecutor(
         2, 8, 60L, java.util.concurrent.TimeUnit.SECONDS,
         java.util.concurrent.LinkedBlockingQueue()
     )
@@ -229,6 +236,8 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                     invoke.reject(YtDlpParsing.cleanError(response.err.ifBlank { response.out }))
                     return@cmd
                 }
+                // Cache do dump cru p/ o download da mesma URL pular a extração.
+                writeInfoCache(args.url, response.out)
                 try {
                     val obj = JSObject(response.out)
                     // Enxuta antes do IPC (ver slimProbe): o dump cheio
@@ -360,6 +369,65 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
+    // ---- cache de dump-json (início de download sem 2ª extração) ----
+    // No mobile a extração roda no Python embarcado (segundos por URL, e o
+    // gargalo nº 1 do "cliquei e demorou a começar"). Cada probe bem-sucedido
+    // persiste o dump CRU (antes do slimProbe — os campos de URL/headers caem
+    // no slim). `execute` troca a URL por `--load-info-json`, e o yt-dlp parte
+    // direto para o download. TTL curto: URLs assinadas do YouTube vencem;
+    // erro na troca re-executa com a URL normal (fallback em `execute`).
+
+    private fun infoCacheDir(): File =
+        File(activity.applicationContext.filesDir, "info-cache").apply { mkdirs() }
+
+    private fun infoCacheKey(url: String): String =
+        java.security.MessageDigest.getInstance("SHA-256").digest(url.toByteArray())
+            .joinToString("") { "%02x".format(it) }.substring(0, 32)
+
+    private fun infoCacheFile(url: String): File =
+        File(infoCacheDir(), infoCacheKey(url) + ".json")
+
+    private fun writeInfoCache(url: String, dump: String) {
+        try {
+            if (dump.isBlank() || dump.length > 8_000_000) return
+            // NDJSON (playlist/mais de um vídeo): só o dump único é reprodutível.
+            if (dump.indexOf('\n') >= 0) return
+            val f = infoCacheFile(url)
+            val tmp = File(f.parentFile, f.name + ".tmp")
+            tmp.writeText(dump)
+            if (f.exists()) f.delete()
+            tmp.renameTo(f)
+            pruneInfoCache()
+        } catch (e: Exception) {
+            Log.d(TAG, "info-cache escreveu falhou (sem efeito): ${e.message}")
+        }
+    }
+
+    private fun pruneInfoCache() {
+        try {
+            val now = System.currentTimeMillis()
+            val files = infoCacheDir().listFiles() ?: return
+            for (f in files) if (now - f.lastModified() > 6 * 3600_000L) f.delete()
+            val alive = files.filter { it.exists() }.sortedByDescending { it.lastModified() }
+            for (f in alive.drop(40)) f.delete()
+        } catch (_: Exception) { /* poda best-effort */ }
+    }
+
+    // Troca o par final `-- <url>` por `--load-info-json <arquivo>` quando há
+    // dump fresco dessa EXATA URL. Sem cache (ou argv inesperado) → null.
+    private fun swapArgvToInfoCache(argv: List<String>, url: String): List<String>? {
+        if (url.isBlank()) return null
+        val n = argv.size
+        if (n < 2 || argv[n - 2] != "--" || argv[n - 1] != url) return null
+        val f = infoCacheFile(url)
+        if (!f.exists()) return null
+        if (System.currentTimeMillis() - f.lastModified() > 20 * 60_000L) return null
+        val out = argv.subList(0, n - 2).toMutableList()
+        out.add("--load-info-json")
+        out.add(f.absolutePath)
+        return out
+    }
+
     // ---- execute: argv canônico do Rust no yt-dlp embarcado ----
 
     @Command
@@ -369,7 +437,7 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
             invoke.reject("argv ou processId inválidos")
             return
         }
-        executor.execute cmd@{
+        downloadExecutor.execute cmd@{
             ensureInitialized()
             ensureNotificationPermission()
             val startMs = System.currentTimeMillis()
@@ -420,16 +488,11 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                     if (text != null) put("text", text.take(140))
                 }
             }
-            try {
-                activeJobs[args.processId] = startMs
-                // Retry reusa o id: limpa desfecho da tentativa anterior para
-                // um `finished` velho nunca reconciliar a nova execução.
-                finishedJobs.remove(args.processId)
-                lastProgress.remove(args.processId)
-                processingJobs.remove(args.processId)
+            // Uma rodada do yt-dlp embarcado com toda a ingestão de progresso.
+            fun runArgv(argv: List<String>): YoutubeDLResponse {
                 val request = YoutubeDLRequest(emptyList<String>())
-                request.addCommands(args.argv)
-                val response = YoutubeDL.getInstance().execute(request, args.processId) { libProgress, _, line ->
+                request.addCommands(argv)
+                return YoutubeDL.getInstance().execute(request, args.processId) { libProgress, _, line ->
                     // A lib calcula % sozinha (fragmentos HLS, total
                     // desconhecido): cobre linhas que o parse não entende.
                     // Fora de 0..100 (NaN cai aqui) = indeterminado, ignora.
@@ -467,9 +530,37 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                         }
                     }
                 }
+            }
+            // Erro já notificado à UI (troca por info-cache vencida): o
+            // desfecho da rodada final não emite o evento duas vezes.
+            var errorEmitted = false
+            try {
+                activeJobs[args.processId] = startMs
+                // Retry reusa o id: limpa desfecho da tentativa anterior para
+                // um `finished` velho nunca reconciliar a nova execução.
+                finishedJobs.remove(args.processId)
+                lastProgress.remove(args.processId)
+                processingJobs.remove(args.processId)
+                // Início acelerado: dump em cache da MESMA URL (probe recente)
+                // troca a extração por `--load-info-json`. Falhou (cache vencido,
+                // URL assinada expirada) → reexecuta com a URL normal.
+                val cachedArgv = swapArgvToInfoCache(args.argv, args.url)
+                var response = if (cachedArgv != null) {
+                    Log.i(TAG, "execute ${args.processId}: usando info-cache (sem re-extração)")
+                    runArgv(cachedArgv)
+                } else runArgv(args.argv)
+                // Só o erro de saída religa a extração pela URL (um fallback por
+                // job): sem retry em "ok sem arquivo", que poderia renomear um
+                // `.part` pela metade como concluído.
+                if (cachedArgv != null && response.exitCode != 0) {
+                    Log.i(TAG, "execute ${args.processId}: info-cache falhou; repetindo com URL")
+                    errorEmitted = true // o erro da troca não vira evento duplicado na UI
+                    activeJobs[args.processId] = System.currentTimeMillis()
+                    response = runArgv(args.argv)
+                }
                 if (response.exitCode != 0) {
                     val msg = YtDlpParsing.cleanError(response.err.ifBlank { response.out })
-                    emitOnUi("yt-dlp-progress") {
+                    if (!errorEmitted) emitOnUi("yt-dlp-progress") {
                         put("id", args.processId)
                         put("type", "error")
                         put("message", msg)
@@ -498,7 +589,7 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                         Log.w(TAG, "execute ${args.processId} err-tail=${response.err.takeLast(600)}")
                     } catch (_: Exception) { /* diagnóstico best-effort */ }
                     val msg = "download concluído sem arquivo final"
-                    emitOnUi("yt-dlp-progress") {
+                    if (!errorEmitted) emitOnUi("yt-dlp-progress") {
                         put("id", args.processId)
                         put("type", "error")
                         put("message", msg)
@@ -535,7 +626,7 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
             } catch (e: Exception) {
                 Log.e(TAG, "execute ${args.processId} falhou", e)
                 val msg = (e.message ?: "Falha no download").take(500)
-                emitOnUi("yt-dlp-progress") {
+                if (!errorEmitted) emitOnUi("yt-dlp-progress") {
                     put("id", args.processId)
                     put("type", "error")
                     put("message", msg)

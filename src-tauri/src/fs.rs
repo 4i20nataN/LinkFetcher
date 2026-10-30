@@ -1163,6 +1163,7 @@ pub async fn ytdlp_download(
         let payload = serde_json::json!({
             "argv": argv,
             "processId": attempt_params.id,
+            "url": attempt_params.url,
             "warnFilters": filters_dropped,
             "title": attempt_params.title.as_deref().unwrap_or(""),
             "publicSubdir": attempt_params.mobile_public_subdir
