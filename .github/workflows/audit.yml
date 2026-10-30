@@ -40,10 +40,12 @@ jobs:
       - name: Instalar Rust
         uses: dtolnay/rust-toolchain@stable
 
-      # O crate vive em src-tauri/ (Cargo.lock lá); rustsec/audit-check não
-      # aceita working-directory e falhava por procurar na raiz do repo.
+      # O crate vive em src-tauri/ (Cargo.lock lá). A action
+      # embarkstudios/cargo-audit-action saiu do GitHub e o job morria em
+      # "Set up job"; cargo-audit direto faz o mesmo check sem action.
+      - name: Instalar cargo-audit
+        run: cargo install cargo-audit --locked
+
       - name: Audit Rust (RustSec)
-        uses: embarkstudios/cargo-audit-action@v0.2.10
-        with:
-          working_directory: src-tauri
-          args: '--deny warnings'
+        working-directory: src-tauri
+        run: cargo audit --deny warnings

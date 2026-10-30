@@ -54,6 +54,13 @@ jobs:
         with:
           components: clippy
 
+      # gtk-sys/gdk-sys (árvore do Tauri) pedem os -dev do WebKitGTK no
+      # runner: sem isso `cargo test` morria no build antes do primeiro teste.
+      - name: Instalar Dependências Linux (WebKitGTK e bibliotecas do sistema)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
       - name: Testes unitários Rust
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
