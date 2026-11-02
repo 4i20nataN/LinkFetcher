@@ -22,6 +22,9 @@ import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
 private const val TAG = "YtDlpPlugin"
+// Reuso do dump persistido pelo probe. Casa com o cache JS (10 min) para
+// não devolver metadados mais velhos do que a própria sessão devolveria.
+private const val PROBE_INFO_CACHE_TTL_MS = 10 * 60_000L
 
 // Fonte canônica: este arquivo + os demais `*.kt` de `src-tauri/android-plugin/`
 // são copiados para `gen/` pelo `scripts/sync-android-plugin.mjs` (o CI
@@ -212,6 +215,23 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
             return
         }
         executor.execute cmd@{
+            // Cache de probe: o dump CRU gravado pelo último probe desta URL
+            // (o mesmo arquivo que o download usa via `--load-info-json`)
+            // ainda está fresco → devolve sem acordar o Python. Torna a 2ª
+            // análise instantânea também depois de reabrir o app: o cache JS
+            // morre com a WebView, este não. Mesmo TTL do cache JS (10 min);
+            // sessão expirada/URL assinada vencida continua indo para a rede.
+            readInfoCache(args.url, PROBE_INFO_CACHE_TTL_MS)?.let { cached ->
+                try {
+                    val obj = JSObject(cached)
+                    YtDlpParsing.slimProbe(obj)
+                    Log.i(TAG, "probe cache hit (${cached.length} bytes) para ${args.url}")
+                    invoke.resolve(obj)
+                    return@cmd
+                } catch (e: Exception) {
+                    Log.d(TAG, "probe cache ilegível, indo para a rede: ${e.message}")
+                }
+            }
             ensureInitialized()
             val t0 = System.currentTimeMillis()
             try {
@@ -422,6 +442,19 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
+    // Dump fresco desta URL, ou null. Só o arquivo que o próprio probe
+    // gravou; `tmp`/arquivo truncado caem no catch de quem lê.
+    private fun readInfoCache(url: String, maxAgeMs: Long): String? {
+        val f = infoCacheFile(url)
+        if (!f.exists()) return null
+        if (System.currentTimeMillis() - f.lastModified() > maxAgeMs) return null
+        return try {
+            f.readText()
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private fun pruneInfoCache() {
         try {
             val now = System.currentTimeMillis()
@@ -470,7 +503,6 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
             ensureInitialized()
             ensureNotificationPermission()
             val startMs = System.currentTimeMillis()
-            var captured: String? = null
             // Todos os destinos vistos (download + pós-processamento): o último
             // pode ser um intermediário já apagado (ex. .webm após extrair o
             // .mp3) — na conclusão procura-se o mais recente EXISTENTE.
@@ -532,7 +564,6 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                             prev?.downloaded ?: 0L, prev?.total ?: 0L))
                     }
                     YtDlpParsing.parseDestination(line)?.let {
-                        captured = it
                         seen.add(it)
                         lastPaths[args.processId] = it
                     }
