@@ -159,6 +159,9 @@ pub fn run() {
           }
         }
       }
+      // No Android o setup não usa `app` (só o bloco desktop acima).
+      #[cfg(not(desktop))]
+      let _ = app;
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
