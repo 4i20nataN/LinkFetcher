@@ -36,8 +36,11 @@ export function LiveDownloadStats({ item, settings }: LiveDownloadStatsProps) {
       }
       const cutRange = (it.downloadSections || '').replace(/^\*/, '');
       const silent = it.status === 'downloading' && !!it.downloadSections && !(it.progress > 0);
+      const isConnecting = it.status === 'downloading' && it.progress === 0 && it.speed === 0 && !it.activity && !silent;
       if (bytesRef.current) {
-        bytesRef.current.textContent = silent
+        bytesRef.current.textContent = isConnecting
+          ? (en ? 'Connecting…' : 'Conectando…')
+          : silent
           ? `${formatBytes(it.sizeDownloaded)} ${en ? 'downloaded' : 'baixados'}`
           : (it.sizeTotal > 0
             ? `${formatBytes(it.sizeDownloaded)} / ${formatBytes(it.sizeTotal)} (${it.progress}%)${it.status === 'downloading' && cutRange ? ` · ${cutRange}` : ''}`
@@ -58,6 +61,7 @@ export function LiveDownloadStats({ item, settings }: LiveDownloadStatsProps) {
   const isCompleted = item.status === 'completed';
   const isFailed = ['failed', 'cancelled'].includes(item.status);
   const isCutSilent = isDownloading && !!item.downloadSections && !(item.progress > 0);
+  const isConnecting = isDownloading && item.progress === 0 && item.speed === 0 && !item.activity && !isCutSilent;
   const cutRange = (item.downloadSections || '').replace(/^\*/, '');
 
   return (
@@ -97,6 +101,8 @@ export function LiveDownloadStats({ item, settings }: LiveDownloadStatsProps) {
         >
           {isCutSilent
             ? `${formatBytes(item.sizeDownloaded)} ${settings.language === 'en' ? 'downloaded' : 'baixados'}`
+            : isConnecting
+            ? (settings.language === 'en' ? 'Connecting…' : 'Conectando…')
             : (item.sizeTotal > 0
               ? `${formatBytes(item.sizeDownloaded)} / ${formatBytes(item.sizeTotal)} (${item.progress}%)${isDownloading && cutRange ? ` · ${cutRange}` : ''}`
               : `${formatBytes(item.sizeDownloaded)} (${item.progress}%)`
