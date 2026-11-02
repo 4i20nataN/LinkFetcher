@@ -11,13 +11,20 @@ pub struct ProbeOptions {
 }
 
 /// Probe no Android via yt-dlp embarcado.
+/// O Python pode travar em rede (DNS/extrator): sem deadline o `await` do
+/// bridge fica pendurado e a UI em "Analisando…" para sempre.
 #[cfg(target_os = "android")]
 #[tauri::command]
 pub async fn ytdlp_probe(
     app: AppHandle,
     options: ProbeOptions,
 ) -> Result<serde_json::Value, String> {
-    crate::mobile_ytdlp::call_mobile(&app, "probe", &options).await
+    tokio::time::timeout(
+        std::time::Duration::from_secs(120),
+        crate::mobile_ytdlp::call_mobile(&app, "probe", &options),
+    )
+    .await
+    .map_err(|_| "probe: tempo esgotado (120s) — verifique a conexão".to_string())?
 }
 
 async fn run_capture(bin: &Path, args: &[String]) -> Result<Vec<u8>, String> {
@@ -108,7 +115,12 @@ pub async fn ytdlp_probe_playlist(
     app: AppHandle,
     options: ProbeOptions,
 ) -> Result<PlaylistResult, String> {
-    crate::mobile_ytdlp::call_mobile(&app, "probePlaylist", &options).await
+    tokio::time::timeout(
+        std::time::Duration::from_secs(120),
+        crate::mobile_ytdlp::call_mobile(&app, "probePlaylist", &options),
+    )
+    .await
+    .map_err(|_| "playlist: tempo esgotado (120s) — verifique a conexão".to_string())?
 }
 
 /// Parse das linhas NDJSON do `--flat-playlist`.

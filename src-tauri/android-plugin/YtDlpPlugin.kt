@@ -96,6 +96,14 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
         executor.execute cmd@{
             val t0 = System.currentTimeMillis()
             ensureInitialized()
+            // `init` só extrai o env Python. O 1º `--dump-json` ainda paga o
+            // zipimport do yt-dlp (~1s em aparelho fraco). Rodar `--version`
+            // aqui aquece o zipapp sem rede, tirando esse custo da 1ª análise.
+            try {
+                val warm = YoutubeDLRequest(emptyList<String>())
+                warm.addOption("--version")
+                YoutubeDL.getInstance().execute(warm, "prewarm-${System.nanoTime()}")
+            } catch (_: Exception) { /* aquecimento best-effort */ }
             Log.i(TAG, "pre-warm yt-dlp em ${System.currentTimeMillis() - t0}ms")
         }
         // Conclusão de download do APK de update → abre o instalador.
@@ -213,10 +221,19 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
                     request.addOption("--no-download")
                     request.addOption("--no-playlist")
                     request.addOption("--no-warnings")
-                    // Fail-fast em rede móvel instável: sem isso o probe usa os
-                    // retries padrão (10 + backoff) e trava a UI por minutos.
-                    request.addOption("--socket-timeout", "15")
-                    request.addOption("--retries", "2")
+                    // NÃO forçar `player_client` aqui. Medido com o yt-dlp
+                    // 2026.08.19 na mesma rede: `player_client=android,web`
+                    // devolve 1 formato em vez de 24 (o client android exige
+                    // PO token e o web não é consultado quando ele responde).
+                    // Com 1 formato os presets 720p/1080p/4K morrem com
+                    // "format not available" e a UI mente sobre as resoluções.
+                    // `skip=translated_subs` só evita buscar traduções de
+                    // legenda: menos trabalho no extrator, zero formatos a menos.
+                    if (args.url.contains("youtube.com") || args.url.contains("youtu.be")) {
+                        request.addOption("--extractor-args", "youtube:skip=translated_subs")
+                    }
+                    request.addOption("--socket-timeout", "10")
+                    request.addOption("--retries", "1")
                     args.proxy?.takeIf { it.isNotBlank() }?.let {
                         request.addOption("--proxy", it)
                     }
@@ -389,14 +406,16 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
 
     private fun writeInfoCache(url: String, dump: String) {
         try {
-            if (dump.isBlank() || dump.length > 8_000_000) return
+            val clean = dump.trim()
+            if (clean.isBlank() || clean.length > 8_000_000) return
             // NDJSON (playlist/mais de um vídeo): só o dump único é reprodutível.
-            if (dump.indexOf('\n') >= 0) return
+            if (clean.indexOf('\n') >= 0) return
             val f = infoCacheFile(url)
             val tmp = File(f.parentFile, f.name + ".tmp")
-            tmp.writeText(dump)
+            tmp.writeText(clean)
             if (f.exists()) f.delete()
             tmp.renameTo(f)
+            Log.i(TAG, "info-cache gravado com sucesso para $url (${clean.length} bytes)")
             pruneInfoCache()
         } catch (e: Exception) {
             Log.d(TAG, "info-cache escreveu falhou (sem efeito): ${e.message}")
@@ -413,19 +432,29 @@ class YtDlpPlugin(private val activity: Activity) : Plugin(activity) {
         } catch (_: Exception) { /* poda best-effort */ }
     }
 
-    // Troca o par final `-- <url>` por `--load-info-json <arquivo>` quando há
+    // Troca o par `-- <url>` por `--load-info-json <arquivo>` quando há
     // dump fresco dessa EXATA URL. Sem cache (ou argv inesperado) → null.
     private fun swapArgvToInfoCache(argv: List<String>, url: String): List<String>? {
-        if (url.isBlank()) return null
-        val n = argv.size
-        if (n < 2 || argv[n - 2] != "--" || argv[n - 1] != url) return null
-        val f = infoCacheFile(url)
+        val targetUrl = url.ifBlank {
+            val dashIdx = argv.lastIndexOf("--")
+            if (dashIdx >= 0 && dashIdx + 1 < argv.size) argv[dashIdx + 1] else ""
+        }
+        if (targetUrl.isBlank()) return null
+        val f = infoCacheFile(targetUrl)
         if (!f.exists()) return null
         if (System.currentTimeMillis() - f.lastModified() > 20 * 60_000L) return null
-        val out = argv.subList(0, n - 2).toMutableList()
-        out.add("--load-info-json")
-        out.add(f.absolutePath)
-        return out
+
+        val dashIdx = argv.lastIndexOf("--")
+        if (dashIdx >= 0 && dashIdx + 1 < argv.size && argv[dashIdx + 1] == targetUrl) {
+            val out = argv.toMutableList()
+            out.removeAt(dashIdx + 1)
+            out.removeAt(dashIdx)
+            out.add("--load-info-json")
+            out.add(f.absolutePath)
+            Log.i(TAG, "swapArgvToInfoCache: usando dump local para $targetUrl")
+            return out
+        }
+        return null
     }
 
     // ---- execute: argv canônico do Rust no yt-dlp embarcado ----
