@@ -130,7 +130,8 @@ export function buildArgsPreview(item: {
 
   if (item.restrictFilenames) args.push('--restrict-filenames');
   if (item.noOverwrites) args.push('--no-overwrites');
-  if (item.keepVideo) args.push('--keep-video');
+  // `--keep-video` sem extração de áudio é no-op no yt-dlp.
+  if (item.keepVideo && item.audioOnly) args.push('--keep-video');
 
   if (item.downloadSections) args.push('--download-sections', item.downloadSections);
   if (item.sponsorblockRemove) args.push('--sponsorblock-remove', item.sponsorblockRemove);

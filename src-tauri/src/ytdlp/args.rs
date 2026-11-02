@@ -1,5 +1,5 @@
 //! Builder canônico de argv do yt-dlp (porte de `YtDlpSpawn.ts`).
-//! `--fps-max` vira `--format-sort fps:N`; nunca passado literal.
+//! `fps_max` vira filtro `[fps<=N]` no seletor; nunca `--format-sort fps:N`.
 
 use std::path::Path;
 
@@ -482,7 +482,9 @@ pub fn build_args(
     if is_true(&params.no_overwrites) {
         args.push("--no-overwrites".to_owned());
     }
-    if is_true(&params.keep_video) {
+    if is_true(&params.keep_video) && is_true(&params.audio_only) {
+        // Sem `--extract-audio` o yt-dlp ignora a flag: só faz sentido no
+        // modo áudio (manter o vídeo de origem após a conversão).
         args.push("--keep-video".to_owned());
     }
 
@@ -722,6 +724,28 @@ mod tests {
         };
         let joined = build_args(&p1, &dir(), None).join(" ");
         assert!(joined.contains("--extractor-args youtube:player_client=android"), "{joined}");
+    }
+
+    #[test]
+    fn keep_video_only_with_audio_extraction() {
+        let p = DownloadParams {
+            url: "https://x/y".into(),
+            audio_only: Some(true),
+            keep_video: Some(true),
+            ..Default::default()
+        };
+        let joined = build_args(&p, &dir(), None).join(" ");
+        assert!(joined.contains("--extract-audio"), "{joined}");
+        assert!(joined.contains("--keep-video"), "{joined}");
+
+        // Sem extração de áudio o yt-dlp ignora a flag: não poluir o argv.
+        let p2 = DownloadParams {
+            url: "https://x/y".into(),
+            keep_video: Some(true),
+            ..Default::default()
+        };
+        let joined2 = build_args(&p2, &dir(), None).join(" ");
+        assert!(!joined2.contains("--keep-video"), "{joined2}");
     }
 
     #[test]
