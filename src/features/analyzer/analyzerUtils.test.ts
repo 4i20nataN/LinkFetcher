@@ -1,7 +1,7 @@
 // Lote de playlist: MediaInfo da entry flat + opções globais.
 import { describe, it, expect } from 'vitest';
 import {
-  fmtDuration, playlistItemToMedia, buildBulkOptions, removePlaylistItem, canBulkPlaylist,
+  fmtDuration, playlistItemToMedia, buildBulkOptions, removePlaylistItem, canBulkPlaylist, normalizeAndValidateUrl,
 } from './analyzerUtils';
 import type { FormatOptions } from '../downloads/FormatOptions';
 import type { PlaylistInfo } from '../../types';
@@ -109,5 +109,40 @@ describe('canBulkPlaylist', () => {
   it('licença expirada: lote bloqueado', () => {
     expect(canBulkPlaylist({ expiresAt: Math.floor(Date.now() / 1000) - 1 })).toBe(false);
     expect(canBulkPlaylist({ expiresAt: 1 })).toBe(false);
+  });
+});
+
+describe('normalizeAndValidateUrl', () => {
+  it('rejeita texto vazio ou espaços', () => {
+    expect(normalizeAndValidateUrl('', 'pt').valid).toBe(false);
+    expect(normalizeAndValidateUrl('   ', 'pt').valid).toBe(false);
+  });
+
+  it('rejeita link truncado sem domínio (regressão do print do usuário: ArNiV6yd7skk?is=...)', () => {
+    const res = normalizeAndValidateUrl('ArNiV6yd7skk?is=RRjQ5RUUP910jbmN', 'pt');
+    expect(res.valid).toBe(false);
+    expect(res.error).toBeDefined();
+
+    const resHttp = normalizeAndValidateUrl('http://ArNiV6yd7skk?is=RRjQ5RUUP910jbmN', 'pt');
+    expect(resHttp.valid).toBe(false);
+    expect(resHttp.error).toContain('Link incompleto ou cortado');
+  });
+
+  it('auto-completa protocolo se colado sem https://', () => {
+    const res = normalizeAndValidateUrl('youtube.com/watch?v=dQw4w9WgXcQ', 'pt');
+    expect(res.valid).toBe(true);
+    expect(res.url).toBe('https://youtube.com/watch?v=dQw4w9WgXcQ');
+  });
+
+  it('extrai link quando compartilhado com texto junto', () => {
+    const res = normalizeAndValidateUrl('Olha esse vídeo legal: https://www.instagram.com/reel/Cx12345678/?igsh=abc', 'pt');
+    expect(res.valid).toBe(true);
+    expect(res.url).toBe('https://www.instagram.com/reel/Cx12345678/?igsh=abc');
+  });
+
+  it('limpa parâmetros de tempo da URL', () => {
+    const res = normalizeAndValidateUrl('https://youtu.be/dQw4w9WgXcQ?t=42&time_continue=10', 'pt');
+    expect(res.valid).toBe(true);
+    expect(res.url).toBe('https://youtu.be/dQw4w9WgXcQ');
   });
 });

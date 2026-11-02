@@ -28,6 +28,66 @@ export const sanitizeUrl = (rawUrl: string): string => {
   }
 };
 
+export interface UrlValidationResult {
+  valid: boolean;
+  url?: string;
+  error?: string;
+}
+
+/** Valida, auto-completa protocolo e extrai URL de textos de compartilhamento.
+ *  Evita timeouts de 30s no backend ao rejeitar antecipadamente hostnames cortados (sem domínio). */
+export function normalizeAndValidateUrl(rawInput: string, language: 'en' | 'pt'): UrlValidationResult {
+  let text = (rawInput || '').trim();
+  if (!text) {
+    return {
+      valid: false,
+      error: language === 'en' ? 'Please enter a link.' : 'Insira um link para analisar.',
+    };
+  }
+
+  // Extrai URL se foi compartilhado texto com link no meio (ex.: "Veja este vídeo https://...")
+  const extractedMatch = text.match(/https?:\/\/[^\s]+/i);
+  if (extractedMatch) {
+    text = extractedMatch[0];
+  } else if (!/^https?:\/\//i.test(text)) {
+    // Se não tiver protocolo, mas tiver padrão de domínio (ex: youtube.com/... ou www.instagram.com/...)
+    if (/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/.*)?$/i.test(text)) {
+      text = `https://${text}`;
+    }
+  }
+
+  if (!/^https?:\/\/.+/i.test(text)) {
+    return {
+      valid: false,
+      error: language === 'en'
+        ? 'Please enter a valid URL starting with http:// or https://'
+        : 'Insira uma URL válida começando com http:// ou https://',
+    };
+  }
+
+  try {
+    const parsed = new URL(text);
+    // Domínio deve existir e conter ponto (evita hostnames locais truncados como 'ArNiV6yd7skk')
+    if (!parsed.hostname || !parsed.hostname.includes('.') || parsed.hostname.endsWith('.')) {
+      return {
+        valid: false,
+        error: language === 'en'
+          ? 'Incomplete link: missing a valid website domain (e.g. youtube.com, instagram.com).'
+          : 'Link incompleto ou cortado: falta o site/domínio (ex: youtube.com, instagram.com).',
+      };
+    }
+    parsed.searchParams.delete('t');
+    parsed.searchParams.delete('time_continue');
+    parsed.searchParams.delete('start');
+    return { valid: true, url: parsed.toString() };
+  } catch {
+    return {
+      valid: false,
+      error: language === 'en' ? 'Invalid URL format.' : 'Formato de URL inválido.',
+    };
+  }
+}
+
 // Referência do gratuito (total inicial do card): áudio = 1ª faixa;
 // vídeo = maior faixa DENTRO do teto do gratuito (≤1080p60). Sem o teto o
 // card mostra a faixa 4K e o tamanho dela, embora o arquivo baixe em 1080p.
@@ -57,7 +117,11 @@ export function buildQuickOptions(base: FormatOptions, kind: 'audio' | 'video'):
     ...base,
     format: kind === 'audio'
       ? 'bestaudio/best'
-      : 'bv*[height<=1080]+ba/b[height<=1080]',
+      // `width<=1080` cobre vertical/Reel (1080x1920 tem height 1920 > teto).
+      // Sem branch final "best": ele ignoraria o teto do gratuito e baixaria 4K
+      // quando nenhum filtro casasse — o backend já tem o retry resiliente como
+      // último recurso (e o usuário é avisado pela degradação explícita).
+      : 'bv*[height<=1080]+ba/b[height<=1080]/bv*[width<=1080]+ba/b[width<=1080]',
     audioOnly: kind === 'audio',
     audioFormat: kind === 'audio' ? 'mp3' : base.audioFormat,
     audioQuality: kind === 'audio' ? '0' : base.audioQuality,

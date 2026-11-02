@@ -3,12 +3,14 @@ import type { TranslationKey } from '../../../core/i18n';
 
 export const VIDEO_PRESETS = [
   { id: 'best', label: '★ Melhor', height: Infinity, format: 'bestvideo+bestaudio/best', starYellow: true },
-  { id: '2160p', label: '4K Ultra', height: 2160, format: 'bv*[height<=2160]+ba/b[height<=2160]' },
-  { id: '1440p', label: '1440 QHD', height: 1440, format: 'bv*[height<=1440]+ba/b[height<=1440]' },
-  { id: '1080p', label: '1080 Full HD', height: 1080, format: 'bv*[height<=1080]+ba/b[height<=1080]' },
-  { id: '720p', label: '720 HD', height: 720, format: 'bv*[height<=720]+ba/b[height<=720]' },
-  { id: '480p', label: '480 SD', height: 480, format: 'bv*[height<=480]+ba/b[height<=480]' },
-  { id: '360p', label: '360 Baixa', height: 360, format: 'bv*[height<=360]+ba/b[height<=360]' },
+  // `width<=` cobre vertical/Reel; sem branch final "best" (ele ignoraria a
+  // resolução escolhida e baixaria 4K em quem pediu 360p).
+  { id: '2160p', label: '4K Ultra', height: 2160, format: 'bv*[height<=2160]+ba/b[height<=2160]/bv*[width<=2160]+ba/b[width<=2160]' },
+  { id: '1440p', label: '1440 QHD', height: 1440, format: 'bv*[height<=1440]+ba/b[height<=1440]/bv*[width<=1440]+ba/b[width<=1440]' },
+  { id: '1080p', label: '1080 Full HD', height: 1080, format: 'bv*[height<=1080]+ba/b[height<=1080]/bv*[width<=1080]+ba/b[width<=1080]' },
+  { id: '720p', label: '720 HD', height: 720, format: 'bv*[height<=720]+ba/b[height<=720]/bv*[width<=720]+ba/b[width<=720]' },
+  { id: '480p', label: '480 SD', height: 480, format: 'bv*[height<=480]+ba/b[height<=480]/bv*[width<=480]+ba/b[width<=480]' },
+  { id: '360p', label: '360 Baixa', height: 360, format: 'bv*[height<=360]+ba/b[height<=360]/bv*[width<=360]+ba/b[width<=360]' },
 ] as const;
 
 export const VIDEO_FORMATS = ['mp4', 'mkv', 'webm', 'flv'] as const;

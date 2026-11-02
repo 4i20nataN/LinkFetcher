@@ -17,7 +17,7 @@ import { isLicenseActive, isLicenseGenuine } from '../../core/license/license';
 import type { FormatOptions } from '../downloads/FormatOptions';
 import { isPlaylistUrl } from '../../core/ytdlp/playlistUtils';
 import { adapterErrorMessage } from '../../core/ytdlp/YtDlpAdapter';
-import { sanitizeUrl, formatUploadDate as fmtDate, pickQuickRefFormat, buildQuickOptions, buildBulkOptions, playlistItemToMedia, removePlaylistItem, canBulkPlaylist } from './analyzerUtils';
+import { sanitizeUrl, normalizeAndValidateUrl, formatUploadDate as fmtDate, pickQuickRefFormat, buildQuickOptions, buildBulkOptions, playlistItemToMedia, removePlaylistItem, canBulkPlaylist } from './analyzerUtils';
 import { LicenseModal } from '../../core/license/LicenseModal';
 import { AnalyzeForm } from './AnalyzeForm';
 import { PlaylistCard } from './PlaylistCard';
@@ -86,15 +86,17 @@ export const LinkAnalyzer: React.FC = () => {
 
   useEffect(() => {
     if (selectedUrl) {
-      setUrl(selectedUrl);
       setSelectedUrl('');
-      const trimmed = selectedUrl.trim();
-      if (trimmed && /^https?:\/\/.+/i.test(trimmed)) {
-        const clean = sanitizeUrl(trimmed);
-        handleAnalyze(clean);
+      const res = normalizeAndValidateUrl(selectedUrl, settings.language);
+      if (res.valid && res.url) {
+        setUrl(res.url);
+        handleAnalyze(res.url);
+      } else {
+        setUrl(selectedUrl);
+        if (res.error) setError(res.error);
       }
     }
-  }, [selectedUrl]);
+  }, [selectedUrl, settings.language]);
 
   useEffect(() => {
     const saved = localStorage.getItem('universal_downloader_analyzer_state');
@@ -222,17 +224,14 @@ export const LinkAnalyzer: React.FC = () => {
   handleAnalyzeRef.current = handleAnalyze;
 
   const handleSubmit = async () => {
-    let trimmed = url.trim();
-    if (!trimmed) return;
-    if (!/^https?:\/\/.+/i.test(trimmed)) {
-      setError(settings.language === 'en' ? 'Please enter a valid URL starting with http:// or https://' : 'Insira uma URL válida começando com http:// ou https://');
+    const res = normalizeAndValidateUrl(url, settings.language);
+    if (!res.valid || !res.url) {
+      setError(res.error || (settings.language === 'en' ? 'Invalid URL' : 'URL inválida'));
       return;
     }
-    
-    trimmed = sanitizeUrl(trimmed);
-    setUrl(trimmed);
 
-    await handleAnalyze(trimmed);
+    setUrl(res.url);
+    await handleAnalyze(res.url);
   };
 
   const handleClearForm = () => {

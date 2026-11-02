@@ -79,7 +79,14 @@ describe('pickQuickRefFormat', () => {
 describe('buildQuickOptions', () => {
   it('vídeo: teto 1080p60 + merge mp4 copy', () => {
     const q = buildQuickOptions(base(), 'video');
-    expect(q.format).toBe('bv*[height<=1080]+ba/b[height<=1080]');
+    const format = q.format ?? '';
+    expect(format).toContain('height<=1080');
+    expect(format).toContain('width<=1080');
+    // Sem "best" sem filtro: um fallback ilimitado furaria o teto do gratuito
+    // (4K) quando nenhum filtro casasse. Toda branch precisa de height/width.
+    for (const branch of format.split('/')) {
+      expect(branch).toMatch(/\[(height|width)<=\d+\]/);
+    }
     expect(q.audioOnly).toBe(false);
     expect(q.fpsMax).toBe(60);
     expect(q.videoFormat).toBe('mp4');
