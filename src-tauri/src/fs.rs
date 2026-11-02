@@ -647,6 +647,21 @@ fn should_retry_with_android_client(
         && (err_lower.contains("403") || err_lower.contains("forbidden"))
 }
 
+/// Retry com formato resiliente se o formato selecionado for incompatível (ex. Reel vertical / Facebook).
+fn should_retry_with_best_format(
+    params: &crate::ytdlp::args::DownloadParams,
+    err_lower: &str,
+    code: Option<i32>,
+) -> bool {
+    let already_tried = params.format.as_deref().is_some_and(|f| {
+        f == "bestvideo+bestaudio/best" || f == "bestaudio/best" || f == "best"
+    });
+    !already_tried
+        && code.is_some()
+        && (err_lower.contains("requested format is not available")
+            || err_lower.contains("format is not available"))
+}
+
 /// Apaga temporários de um base (nunca o final); retorna quantos removeu.
 fn remove_temp_variants(base: &Path) -> u32 {
     let mut removed = 0u32;
@@ -1132,6 +1147,18 @@ pub async fn ytdlp_download(
                 return Box::pin(ytdlp_download(app.clone(), None, Some(retry_params), None)).await;
             }
 
+            // Formato indisponível (vídeo vertical/facebook/filtro estrito): re-executa com formato resiliente.
+            if should_retry_with_best_format(&params, &err_msg.to_lowercase(), status.code()) {
+                eprintln!("[ytdlp_download] formato indisponível; repetindo com formato resiliente");
+                let mut retry_params = params;
+                retry_params.format = Some(if retry_params.audio_only.unwrap_or(false) {
+                    "bestaudio/best".to_owned()
+                } else {
+                    "bestvideo+bestaudio/best".to_owned()
+                });
+                return Box::pin(ytdlp_download(app.clone(), None, Some(retry_params), None)).await;
+            }
+
             // Cancelamento definitivo apaga parciais; pausa/erro mantém p/ resume.
             if take_cleanup_intent(&download_id) {
                 if let Some(remembered) = forget_download_paths(&download_id) {
@@ -1235,7 +1262,7 @@ pub async fn ytdlp_download(
     let filters_dropped = params.normalize_audio.unwrap_or(false)
         || params.video_sharpen.as_deref().is_some_and(|s| !s.is_empty() && s != "none");
     let mut attempt_params = params;
-    for attempt in 0..2 {
+    for attempt in 0..3 {
         let mut argv = crate::ytdlp::args::build_args(&attempt_params, &output_dir, None);
         strip_mobile_unsupported(&mut argv);
         eprintln!("[ytdlp_download:android] argv (tentativa {}): {:?}", attempt + 1, argv);
@@ -1262,19 +1289,33 @@ pub async fn ytdlp_download(
                 return Err("download concluído sem arquivo final".into());
             }
             Err(e) => {
+                let err_lower = e.to_lowercase();
                 let asked = attempt_params.write_subs.unwrap_or(false)
                     || attempt_params.write_auto_subs.unwrap_or(false);
-                if attempt == 0
-                    && attempt_params.subs_fallback.is_none()
-                    && asked
-                    && e.to_lowercase().contains("subtitle")
-                {
-                    eprintln!("[ytdlp_download:android] subs falharam; repetindo sem legendas");
-                    attempt_params.subs_fallback = Some(e);
-                    attempt_params.write_subs = Some(false);
-                    attempt_params.write_auto_subs = Some(false);
-                    attempt_params.embed_subs = Some(false);
-                    continue;
+                if attempt < 2 {
+                    if attempt_params.subs_fallback.is_none()
+                        && asked
+                        && err_lower.contains("subtitle")
+                    {
+                        eprintln!("[ytdlp_download:android] subs falharam; repetindo sem legendas");
+                        attempt_params.subs_fallback = Some(e);
+                        attempt_params.write_subs = Some(false);
+                        attempt_params.write_auto_subs = Some(false);
+                        attempt_params.embed_subs = Some(false);
+                        continue;
+                    }
+                    let is_default_fmt = attempt_params.format.as_deref().is_some_and(|f| {
+                        f == "bestvideo+bestaudio/best" || f == "bestaudio/best" || f == "best"
+                    });
+                    if !is_default_fmt && (err_lower.contains("requested format is not available") || err_lower.contains("format is not available")) {
+                        eprintln!("[ytdlp_download:android] formato indisponível; repetindo com formato resiliente");
+                        attempt_params.format = Some(if attempt_params.audio_only.unwrap_or(false) {
+                            "bestaudio/best".to_string()
+                        } else {
+                            "bestvideo+bestaudio/best".to_string()
+                        });
+                        continue;
+                    }
                 }
                 if take_cleanup_intent(&attempt_params.id) {
                     let _ = forget_download_paths(&attempt_params.id);
@@ -2278,5 +2319,43 @@ mod tests {
             "unable to download video data: http error 403",
             Some(1),
         ));
+    }
+
+    #[test]
+    fn best_format_retry_eligibility() {
+        use crate::ytdlp::args::DownloadParams;
+        let strict = DownloadParams {
+            format: Some("bv*[height<=1080]+ba/b[height<=1080]".into()),
+            ..Default::default()
+        };
+        // Formato pedido indisponível + saída natural → elegível.
+        assert!(should_retry_with_best_format(
+            &strict,
+            "requested format is not available",
+            Some(1),
+        ));
+        // Kill (sem código) → não.
+        assert!(!should_retry_with_best_format(
+            &strict,
+            "requested format is not available",
+            None,
+        ));
+        // Erro alheio a formato (ex. 403) → não.
+        assert!(!should_retry_with_best_format(
+            &strict,
+            "unable to download video data: http error 403",
+            Some(1),
+        ));
+        // Já resiliente (vídeo/áudio/best) → não (evita loop).
+        for fmt in ["bestvideo+bestaudio/best", "bestaudio/best", "best"] {
+            let p = DownloadParams {
+                format: Some(fmt.into()),
+                ..Default::default()
+            };
+            assert!(
+                !should_retry_with_best_format(&p, "format is not available", Some(1)),
+                "{fmt} não deveria repetir"
+            );
+        }
     }
 }
